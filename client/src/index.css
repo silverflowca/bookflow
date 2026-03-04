@@ -1,0 +1,390 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme CSS Variables */
+:root {
+  --color-bg: #faf5ff;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f3e8ff;
+  --color-border: #d8b4fe;
+  --color-border-strong: #a855f7;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-accent: #9333ea;
+  --color-primary-h: 270;
+  --color-primary-s: 76%;
+  --color-primary-l: 55%;
+}
+
+/* Apply theme colors */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Component border styles with stronger distinction */
+.theme-card {
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.theme-card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.theme-header {
+  background-color: var(--color-surface);
+  border-bottom: 2px solid var(--color-border-strong);
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+.theme-section {
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+.theme-section-header {
+  border-bottom: 2px solid var(--color-border);
+  padding: 1rem;
+  font-weight: 600;
+}
+
+.theme-title {
+  color: var(--color-text);
+  border-bottom: 3px solid var(--color-border-strong);
+  padding-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.theme-sidebar {
+  background-color: var(--color-surface);
+  border-right: 2px solid var(--color-border-strong);
+}
+
+.theme-modal {
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border-strong);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.theme-input {
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  color: var(--color-text);
+  transition: border-color 0.2s;
+}
+
+.theme-input:focus {
+  border-color: var(--color-border-strong);
+  outline: none;
+  box-shadow: 0 0 0 3px hsla(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l), 0.2);
+}
+
+.theme-button-primary {
+  background-color: var(--color-accent);
+  color: white;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.theme-button-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.theme-button-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  transition: all 0.2s;
+}
+
+.theme-button-secondary:hover {
+  border-color: var(--color-border-strong);
+  background-color: var(--color-surface-hover);
+}
+
+/* Dark mode adjustments */
+.dark .theme-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+}
+
+.dark .theme-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+}
+
+.dark .theme-header {
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+}
+
+.dark .theme-modal {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  min-height: 300px;
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Inline content markers */
+.inline-question {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-bottom: 2px dashed #3b82f6;
+  cursor: pointer;
+  padding: 1px 2px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.inline-question:hover {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
+.inline-poll {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-bottom: 2px dashed #10b981;
+  cursor: pointer;
+  padding: 1px 2px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.inline-poll:hover {
+  background-color: rgba(16, 185, 129, 0.3);
+}
+
+.inline-highlight {
+  background-color: rgba(251, 191, 36, 0.4);
+  padding: 1px 2px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.inline-highlight:hover {
+  background-color: rgba(251, 191, 36, 0.6);
+}
+
+.inline-note {
+  background-color: rgba(168, 85, 247, 0.15);
+  border-bottom: 2px dotted #a855f7;
+  cursor: pointer;
+  padding: 1px 2px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.inline-note:hover {
+  background-color: rgba(168, 85, 247, 0.3);
+}
+
+.inline-link {
+  background-color: rgba(6, 182, 212, 0.1);
+  color: #0891b2;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  cursor: pointer;
+  padding: 1px 2px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.inline-link:hover {
+  background-color: rgba(6, 182, 212, 0.25);
+}
+
+.inline-media {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-bottom: 2px solid #ef4444;
+  cursor: pointer;
+  padding: 1px 2px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.inline-media:hover {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+.inline-audio {
+  background-color: rgba(249, 115, 22, 0.15);
+  border-bottom-color: #f97316;
+}
+
+.inline-audio:hover {
+  background-color: rgba(249, 115, 22, 0.3);
+}
+
+.inline-video {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-bottom-color: #ef4444;
+}
+
+.inline-video:hover {
+  background-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Interactive form inline styles */
+.inline-form {
+  background-color: rgba(99, 102, 241, 0.15);
+  border-bottom: 2px dashed #6366f1;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.inline-form:hover {
+  background-color: rgba(99, 102, 241, 0.3);
+}
+
+.inline-select {
+  background-color: rgba(99, 102, 241, 0.12);
+  border-bottom-color: #6366f1;
+}
+
+.inline-multiselect {
+  background-color: rgba(139, 92, 246, 0.12);
+  border-bottom-color: #8b5cf6;
+}
+
+.inline-textbox {
+  background-color: rgba(107, 114, 128, 0.12);
+  border-bottom-color: #6b7280;
+}
+
+.inline-textarea {
+  background-color: rgba(107, 114, 128, 0.15);
+  border-bottom-color: #6b7280;
+}
+
+.inline-radio {
+  background-color: rgba(249, 115, 22, 0.12);
+  border-bottom-color: #f97316;
+}
+
+.inline-checkbox {
+  background-color: rgba(20, 184, 166, 0.12);
+  border-bottom-color: #14b8a6;
+}
+
+/* Code block inline style */
+.inline-code {
+  background-color: rgba(51, 65, 85, 0.15);
+  border: 1px solid #475569;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.inline-code:hover {
+  background-color: rgba(51, 65, 85, 0.3);
+}
+
+/* Scripture block inline style */
+.inline-scripture {
+  background-color: rgba(180, 83, 9, 0.12);
+  border-left: 3px solid #b45309;
+  cursor: pointer;
+  padding: 2px 8px;
+  font-style: italic;
+  transition: background-color 0.2s;
+}
+
+.inline-scripture:hover {
+  background-color: rgba(180, 83, 9, 0.25);
+}
+
+/* Reader styles */
+.reader-content {
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.8;
+  color: var(--color-text);
+}
+
+.reader-content h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  border-bottom: 3px solid var(--color-border-strong);
+  padding-bottom: 0.5rem;
+}
+
+.reader-content h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 0.25rem;
+}
+
+.reader-content p {
+  margin-bottom: 1rem;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Theme color swatch for picker */
+.color-swatch {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  border: 3px solid var(--color-border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+  border-color: var(--color-border-strong);
+}
+
+.color-swatch.active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px hsla(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l), 0.3);
+}
+
+/* Override Tailwind colors with theme variables */
+.bg-theme { background-color: var(--color-bg); }
+.bg-surface { background-color: var(--color-surface); }
+.bg-surface-hover { background-color: var(--color-surface-hover); }
+.border-theme { border-color: var(--color-border); }
+.border-strong { border-color: var(--color-border-strong); }
+.text-theme { color: var(--color-text); }
+.text-muted { color: var(--color-text-muted); }
+.text-accent { color: var(--color-accent); }
