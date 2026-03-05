@@ -441,6 +441,9 @@ export default function BookReader() {
           <article className="max-w-3xl mx-auto px-4 py-8">
             <h1 className="text-3xl font-bold mb-6">{chapter.title}</h1>
 
+            {/* Start of Chapter Content */}
+            <StartOfChapterContent items={inlineContent} />
+
             <div className="reader-content text-lg text-gray-800 leading-relaxed">
               <ChapterContent
                 content={chapter.content}
@@ -451,9 +454,7 @@ export default function BookReader() {
             </div>
 
             {/* End of Chapter Questions */}
-            <EndOfChapterContent
-              items={inlineContent.filter(i => i.position_in_chapter === 'end_of_chapter')}
-            />
+            <EndOfChapterContent items={inlineContent} />
 
             {/* Navigation */}
             <nav className="flex justify-between items-center mt-12 pt-8 border-t">
@@ -969,30 +970,59 @@ function TipTapNode({
             );
           }
 
-          // Add the highlighted match
-          const markerClass = getInlineContentClass(match.content.content_type);
-          const icon = getInlineContentIcon(match.content.content_type);
-          const isAuthorContent = match.content.is_author_content;
+          // Check if this is an interactive form type
+          const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block'];
+          const isFormType = formTypes.includes(match.content.content_type);
+          const displayMode = match.content.display_mode || 'inline';
 
-          segments.push(
-            <span
-              key={`match-${match.content.id}`}
-              className={`${markerClass} relative group`}
-              onClick={() => onContentClick(match.content)}
-              title={`Click to view ${match.content.content_type} (${isAuthorContent ? 'Author' : 'Reader'})`}
-            >
-              <TextWithMarks text={nodeText.slice(start, end)} marks={node.marks} />
-              <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
-                {icon}
-                {/* Author/Reader indicator */}
-                {isAuthorContent ? (
-                  <Crown className="h-2.5 w-2.5 text-amber-500" />
-                ) : (
-                  <User className="h-2.5 w-2.5 text-blue-500" />
-                )}
+          // If display mode is inline and it's a form type, render the form element directly
+          if (isFormType && displayMode === 'inline') {
+            // Render the interactive form element inline
+            segments.push(
+              <InlineFormElement key={`form-${match.content.id}`} content={match.content} />
+            );
+          } else if (isFormType && (displayMode === 'start_of_chapter' || displayMode === 'end_of_chapter')) {
+            // For start/end of chapter display, just show highlighted text with indicator
+            const markerClass = getInlineContentClass(match.content.content_type);
+            const icon = getInlineContentIcon(match.content.content_type);
+            segments.push(
+              <span
+                key={`match-${match.content.id}`}
+                className={`${markerClass} relative group cursor-default`}
+                title={`Form displayed at ${displayMode === 'start_of_chapter' ? 'start' : 'end'} of chapter`}
+              >
+                <TextWithMarks text={nodeText.slice(start, end)} marks={node.marks} />
+                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
+                  {icon}
+                </span>
               </span>
-            </span>
-          );
+            );
+          } else {
+            // Sidebar mode or non-form types: show highlighted text that opens panel on click
+            const markerClass = getInlineContentClass(match.content.content_type);
+            const icon = getInlineContentIcon(match.content.content_type);
+            const isAuthorContent = match.content.is_author_content;
+
+            segments.push(
+              <span
+                key={`match-${match.content.id}`}
+                className={`${markerClass} relative group`}
+                onClick={() => onContentClick(match.content)}
+                title={`Click to view ${match.content.content_type} (${isAuthorContent ? 'Author' : 'Reader'})`}
+              >
+                <TextWithMarks text={nodeText.slice(start, end)} marks={node.marks} />
+                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
+                  {icon}
+                  {/* Author/Reader indicator */}
+                  {isAuthorContent ? (
+                    <Crown className="h-2.5 w-2.5 text-amber-500" />
+                  ) : (
+                    <User className="h-2.5 w-2.5 text-blue-500" />
+                  )}
+                </span>
+              </span>
+            );
+          }
 
           lastIndex = end;
         });
@@ -1033,13 +1063,32 @@ function TipTapNode({
   }
 }
 
+function StartOfChapterContent({ items }: { items: InlineContent[] }) {
+  // Filter items with display_mode 'start_of_chapter'
+  const startItems = items.filter(item => item.display_mode === 'start_of_chapter');
+  if (startItems.length === 0) return null;
+
+  return (
+    <div className="mb-8 pb-6 border-b space-y-4">
+      <h3 className="text-lg font-semibold text-gray-700">Before You Begin</h3>
+      {startItems.map((item) => (
+        <InlineContentBlock key={item.id} content={item} />
+      ))}
+    </div>
+  );
+}
+
 function EndOfChapterContent({ items }: { items: InlineContent[] }) {
-  if (items.length === 0) return null;
+  // Filter items with position_in_chapter 'end_of_chapter' OR display_mode 'end_of_chapter'
+  const endItems = items.filter(item =>
+    item.position_in_chapter === 'end_of_chapter' || item.display_mode === 'end_of_chapter'
+  );
+  if (endItems.length === 0) return null;
 
   return (
     <div className="mt-12 pt-8 border-t space-y-6">
-      <h2 className="text-xl font-bold">Chapter Questions</h2>
-      {items.map((item) => (
+      <h2 className="text-xl font-bold">Chapter Review</h2>
+      {endItems.map((item) => (
         <InlineContentBlock key={item.id} content={item} />
       ))}
     </div>
@@ -1657,6 +1706,242 @@ function ScriptureBlockDisplay({ content }: { content: InlineContent }) {
         </p>
       )}
     </div>
+  );
+}
+
+// Inline form element - renders interactive forms directly in the text
+function InlineFormElement({ content }: { content: InlineContent }) {
+  const type = content.content_type;
+
+  switch (type) {
+    case 'select':
+      return <InlineSelect content={content} />;
+    case 'multiselect':
+      return <InlineMultiselect content={content} />;
+    case 'textbox':
+      return <InlineTextbox content={content} />;
+    case 'textarea':
+      return <InlineTextarea content={content} />;
+    case 'radio':
+      return <InlineRadio content={content} />;
+    case 'checkbox':
+      return <InlineCheckbox content={content} />;
+    case 'code_block':
+      return <InlineCodeBlock content={content} />;
+    case 'scripture_block':
+      return <InlineScripture content={content} />;
+    default:
+      return null;
+  }
+}
+
+// Inline Select dropdown
+function InlineSelect({ content }: { content: InlineContent }) {
+  const data = content.content_data as SelectData;
+  const [value, setValue] = useState(data.default_value || '');
+
+  return (
+    <span className="inline-flex items-center gap-1 mx-1">
+      <select
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="inline-block px-2 py-0.5 text-sm border border-indigo-300 rounded bg-indigo-50 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+        style={{ minWidth: '120px' }}
+      >
+        <option value="">{data.placeholder || 'Select...'}</option>
+        {data.options?.map((opt) => (
+          <option key={opt.id} value={opt.id}>{opt.text}</option>
+        ))}
+      </select>
+      {data.required && <span className="text-red-500 text-xs">*</span>}
+    </span>
+  );
+}
+
+// Inline Multiselect (shown as compact checkboxes)
+function InlineMultiselect({ content }: { content: InlineContent }) {
+  const data = content.content_data as MultiselectData;
+  const [selected, setSelected] = useState<string[]>(data.default_values || []);
+
+  const toggleOption = (id: string) => {
+    setSelected(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2 mx-1 py-1 px-2 bg-violet-50 border border-violet-200 rounded">
+      {data.options?.map((opt) => (
+        <label key={opt.id} className="inline-flex items-center gap-1 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={selected.includes(opt.id)}
+            onChange={() => toggleOption(opt.id)}
+            className="w-3.5 h-3.5 rounded border-violet-400 text-violet-600 focus:ring-violet-500"
+          />
+          <span className="text-gray-700">{opt.text}</span>
+        </label>
+      ))}
+    </span>
+  );
+}
+
+// Inline Textbox (single line)
+function InlineTextbox({ content }: { content: InlineContent }) {
+  const data = content.content_data as TextboxData;
+  const [value, setValue] = useState(data.default_value || '');
+
+  return (
+    <span className="inline-flex items-center gap-1 mx-1">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={data.placeholder || 'Type here...'}
+        maxLength={data.max_length}
+        className="inline-block px-2 py-0.5 text-sm border border-gray-300 rounded bg-gray-50 focus:ring-1 focus:ring-gray-500 focus:outline-none"
+        style={{ minWidth: '150px', maxWidth: '250px' }}
+      />
+      {data.required && <span className="text-red-500 text-xs">*</span>}
+    </span>
+  );
+}
+
+// Inline Textarea (multi-line, but compact)
+function InlineTextarea({ content }: { content: InlineContent }) {
+  const data = content.content_data as TextareaData;
+  const [value, setValue] = useState(data.default_value || '');
+
+  return (
+    <span className="inline-block mx-1 align-middle">
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={data.placeholder || 'Enter your response...'}
+        rows={data.rows || 2}
+        maxLength={data.max_length}
+        className="block w-64 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+      />
+      {data.max_length && (
+        <span className="text-xs text-gray-400">{value.length}/{data.max_length}</span>
+      )}
+    </span>
+  );
+}
+
+// Inline Radio buttons
+function InlineRadio({ content }: { content: InlineContent }) {
+  const data = content.content_data as RadioData;
+  const [selected, setSelected] = useState(data.default_value || '');
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-3 mx-1 py-1 px-2 bg-orange-50 border border-orange-200 rounded">
+      {data.options?.map((opt) => (
+        <label key={opt.id} className="inline-flex items-center gap-1 cursor-pointer text-sm">
+          <input
+            type="radio"
+            name={`inline-radio-${content.id}`}
+            checked={selected === opt.id}
+            onChange={() => setSelected(opt.id)}
+            className="w-3.5 h-3.5 border-orange-400 text-orange-600 focus:ring-orange-500"
+          />
+          <span className="text-gray-700">{opt.text}</span>
+        </label>
+      ))}
+    </span>
+  );
+}
+
+// Inline Checkbox options
+function InlineCheckbox({ content }: { content: InlineContent }) {
+  const data = content.content_data as CheckboxData;
+  const [selected, setSelected] = useState<string[]>(data.default_values || []);
+
+  const toggleOption = (id: string) => {
+    setSelected(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2 mx-1 py-1 px-2 bg-teal-50 border border-teal-200 rounded">
+      {data.options?.map((opt) => (
+        <label key={opt.id} className="inline-flex items-center gap-1 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={selected.includes(opt.id)}
+            onChange={() => toggleOption(opt.id)}
+            className="w-3.5 h-3.5 rounded border-teal-400 text-teal-600 focus:ring-teal-500"
+          />
+          <span className="text-gray-700">{opt.text}</span>
+        </label>
+      ))}
+    </span>
+  );
+}
+
+// Inline Code Block
+function InlineCodeBlock({ content }: { content: InlineContent }) {
+  const data = content.content_data as CodeBlockData;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(data.code || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <span className="inline-block mx-1 align-top my-2">
+      <span className="block bg-slate-900 rounded-lg overflow-hidden border border-slate-700" style={{ maxWidth: '500px' }}>
+        <span className="flex items-center justify-between px-3 py-1 bg-slate-800 border-b border-slate-700">
+          <span className="flex items-center gap-2">
+            <Code className="h-3.5 w-3.5 text-slate-400" />
+            {data.language && (
+              <span className="text-xs text-slate-400 font-mono">{data.language}</span>
+            )}
+          </span>
+          <button
+            onClick={handleCopy}
+            className="text-xs px-2 py-0.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </span>
+        <pre className="p-3 overflow-x-auto text-slate-100">
+          <code className="text-xs font-mono whitespace-pre">{data.code}</code>
+        </pre>
+      </span>
+    </span>
+  );
+}
+
+// Inline Scripture Block
+function InlineScripture({ content }: { content: InlineContent }) {
+  const data = content.content_data as ScriptureBlockData;
+
+  return (
+    <span className="inline-block mx-1 my-2 align-top">
+      <span className="block bg-amber-50 border-l-3 border-amber-500 rounded-r px-3 py-2" style={{ maxWidth: '450px', borderLeftWidth: '3px' }}>
+        <span className="flex items-center gap-2 mb-1">
+          <BookOpen className="h-3.5 w-3.5 text-amber-700" />
+          <span className="text-sm font-semibold text-amber-800">{data.reference}</span>
+          {data.version && (
+            <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+              {data.version}
+            </span>
+          )}
+        </span>
+        <span className="block text-gray-700 italic text-sm leading-relaxed">
+          "{data.text}"
+        </span>
+        {data.notes && (
+          <span className="block mt-2 text-xs text-gray-500 border-t border-amber-200 pt-2">
+            {data.notes}
+          </span>
+        )}
+      </span>
+    </span>
   );
 }
 

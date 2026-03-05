@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type {
-  InlineContent, SelectData, MultiselectData, TextboxData, TextareaData,
+  InlineContent, InlineDisplayMode, SelectData, MultiselectData, TextboxData, TextareaData,
   RadioData, CheckboxData, CodeBlockData, ScriptureBlockData
 } from '../../types';
 
@@ -9,6 +9,37 @@ interface FormProps {
   onSubmit: (data: Partial<InlineContent>) => void;
   onClose: () => void;
   isEditing?: boolean;
+}
+
+// Display mode selector component
+function DisplayModeSelector({
+  value,
+  onChange
+}: {
+  value: InlineDisplayMode;
+  onChange: (mode: InlineDisplayMode) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1">Display Mode</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as InlineDisplayMode)}
+        className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+      >
+        <option value="inline">Inline (directly in text)</option>
+        <option value="sidebar">Sidebar (click to view)</option>
+        <option value="start_of_chapter">Start of Chapter</option>
+        <option value="end_of_chapter">End of Chapter</option>
+      </select>
+      <p className="text-xs text-gray-500 mt-1">
+        {value === 'inline' && 'Form appears directly within the text where readers can interact with it.'}
+        {value === 'sidebar' && 'Text is highlighted and readers click to view the form in a side panel.'}
+        {value === 'start_of_chapter' && 'Form appears at the beginning of the chapter.'}
+        {value === 'end_of_chapter' && 'Form appears at the end of the chapter.'}
+      </p>
+    </div>
+  );
 }
 
 function FormButtons({
@@ -52,13 +83,14 @@ function FormButtons({
   );
 }
 
-export function SelectForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: SelectData }) {
+export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: SelectData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [options, setOptions] = useState<{ id: string; text: string }[]>(
     initialData?.options || [{ id: 'opt_1', text: '' }]
   );
   const [required, setRequired] = useState(initialData?.required || false);
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
     setOptions([...options, { id: `opt_${Date.now()}`, text: '' }]);
@@ -72,7 +104,7 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing }: FormPr
       options: options.filter(o => o.text.trim()),
       required,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -146,12 +178,14 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing }: FormPr
         <span className="text-sm">Required</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function MultiselectForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: MultiselectData }) {
+export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: MultiselectData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [options, setOptions] = useState<{ id: string; text: string }[]>(
@@ -160,6 +194,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing }: F
   const [required, setRequired] = useState(initialData?.required || false);
   const [minSelections, setMinSelections] = useState(initialData?.min_selections?.toString() || '');
   const [maxSelections, setMaxSelections] = useState(initialData?.max_selections?.toString() || '');
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
     setOptions([...options, { id: `opt_${Date.now()}`, text: '' }]);
@@ -175,7 +210,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing }: F
       min_selections: minSelections ? parseInt(minSelections) : undefined,
       max_selections: maxSelections ? parseInt(maxSelections) : undefined,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -274,17 +309,20 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing }: F
         <span className="text-sm">Required</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function TextboxForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: TextboxData }) {
+export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: TextboxData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,7 +333,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing }: FormP
       max_length: maxLength ? parseInt(maxLength) : undefined,
       default_value: defaultValue || undefined,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -355,18 +393,21 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing }: FormP
         <span className="text-sm">Required</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function TextareaForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: TextareaData }) {
+export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: TextareaData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [rows, setRows] = useState(initialData?.rows?.toString() || '4');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -378,7 +419,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing }: Form
       rows: rows ? parseInt(rows) : 4,
       default_value: defaultValue || undefined,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -452,18 +493,21 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing }: Form
         <span className="text-sm">Required</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function RadioForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: RadioData }) {
+export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: RadioData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [options, setOptions] = useState<{ id: string; text: string; description?: string }[]>(
     initialData?.options || [{ id: 'opt_1', text: '' }]
   );
   const [required, setRequired] = useState(initialData?.required || false);
   const [layout, setLayout] = useState<'vertical' | 'horizontal'>(initialData?.layout || 'vertical');
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
     setOptions([...options, { id: `opt_${Date.now()}`, text: '' }]);
@@ -477,7 +521,7 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing }: FormPro
       required,
       layout,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -565,12 +609,14 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing }: FormPro
         <span className="text-sm">Required</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function CheckboxForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: CheckboxData }) {
+export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: CheckboxData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [options, setOptions] = useState<{ id: string; text: string; description?: string }[]>(
     initialData?.options || [{ id: 'opt_1', text: '' }]
@@ -579,6 +625,7 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing }: Form
   const [minSelections, setMinSelections] = useState(initialData?.min_selections?.toString() || '');
   const [maxSelections, setMaxSelections] = useState(initialData?.max_selections?.toString() || '');
   const [layout, setLayout] = useState<'vertical' | 'horizontal'>(initialData?.layout || 'vertical');
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
     setOptions([...options, { id: `opt_${Date.now()}`, text: '' }]);
@@ -594,7 +641,7 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing }: Form
       max_selections: maxSelections ? parseInt(maxSelections) : undefined,
       layout,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -707,17 +754,20 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing }: Form
         <span className="text-sm">Required</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: CodeBlockData }) {
+export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: CodeBlockData; initialDisplayMode?: InlineDisplayMode }) {
   const [title, setTitle] = useState(initialData?.title || '');
   const [language, setLanguage] = useState(initialData?.language || 'javascript');
   const [code, setCode] = useState(initialData?.code || '');
   const [lineNumbers, setLineNumbers] = useState(initialData?.line_numbers !== false);
   const [caption, setCaption] = useState(initialData?.caption || '');
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const languages = [
     { value: 'javascript', label: 'JavaScript' },
@@ -751,7 +801,7 @@ export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing }: For
       line_numbers: lineNumbers,
       caption: caption || undefined,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -812,18 +862,21 @@ export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing }: For
         <span className="text-sm">Show line numbers</span>
       </label>
 
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>
   );
 }
 
-export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing }: FormProps & { initialData?: ScriptureBlockData }) {
+export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: ScriptureBlockData; initialDisplayMode?: InlineDisplayMode }) {
   const [reference, setReference] = useState(initialData?.reference || '');
   const [version, setVersion] = useState(initialData?.version || 'KJV');
   const [text, setText] = useState(initialData?.text || '');
   const [title, setTitle] = useState(initialData?.title || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [showReference, setShowReference] = useState(initialData?.show_reference !== false);
+  const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const versions = [
     { value: 'KJV', label: 'King James Version (KJV)' },
@@ -848,7 +901,7 @@ export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing }
       notes: notes || undefined,
       show_reference: showReference,
     };
-    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
 
   return (
@@ -921,6 +974,8 @@ export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing }
         />
         <span className="text-sm">Show reference below text</span>
       </label>
+
+      <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
     </form>

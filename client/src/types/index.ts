@@ -75,6 +75,9 @@ export type InlineContentType =
   | 'select' | 'multiselect' | 'textbox' | 'textarea' | 'radio' | 'checkbox'
   | 'code_block' | 'scripture_block';
 
+// Display mode for interactive content
+export type InlineDisplayMode = 'inline' | 'sidebar' | 'start_of_chapter' | 'end_of_chapter';
+
 export interface InlineContent {
   id: string;
   book_id: string;
@@ -90,6 +93,7 @@ export interface InlineContent {
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
   position_in_chapter: 'inline' | 'end_of_chapter' | 'start_of_chapter';
+  display_mode?: InlineDisplayMode; // How the content is displayed to readers
   created_at: string;
   updated_at: string;
   creator?: Profile;
