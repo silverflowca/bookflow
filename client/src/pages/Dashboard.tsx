@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Image, Loader2 } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 

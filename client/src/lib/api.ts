@@ -44,10 +44,18 @@ class ApiClient {
       headers,
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: any = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Server returned invalid response (${response.status}): ${text.slice(0, 100)}`);
+      }
+    }
 
     if (!response.ok) {
-      throw new Error(data.error || 'Request failed');
+      throw new Error(data.error || `Request failed (${response.status})`);
     }
 
     return data;

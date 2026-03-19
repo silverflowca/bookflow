@@ -93,7 +93,7 @@ function QuestionForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit:
   const [question, setQuestion] = useState(initialData?.question || '');
   const [questionType, setQuestionType] = useState<'open' | 'multiple_choice' | 'quiz'>(initialData?.type || 'open');
   const [options, setOptions] = useState<{ id: string; text: string }[]>(initialData?.options || []);
-  const [correctAnswer, setCorrectAnswer] = useState<string[]>(initialData?.correct_answer || []);
+  const [correctAnswer, setCorrectAnswer] = useState<string[]>(Array.isArray(initialData?.correct_answer) ? initialData.correct_answer : initialData?.correct_answer ? [initialData.correct_answer] : []);
   const [explanation, setExplanation] = useState(initialData?.explanation || '');
   const [visibility, setVisibility] = useState<'all_readers' | 'author_only'>('all_readers');
 
@@ -582,49 +582,6 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
     setRecordingTime(0);
   };
 
-  const uploadRecording = async () => {
-    if (!recordedBlob) return;
-
-    setUploading(true);
-    setUploadProgress(0);
-
-    try {
-      const fileName = `recording_${Date.now()}.${type === 'audio' ? 'webm' : 'webm'}`;
-      const file = new File([recordedBlob], fileName, { type: recordedBlob.type });
-
-      // Get upload URL
-      const { upload_url, storage_path } = await api.getUploadUrl(fileName, file.type);
-
-      // Upload
-      const uploadResponse = await fetch(upload_url, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      });
-
-      if (!uploadResponse.ok) throw new Error('Upload failed');
-
-      // Register
-      const registered = await api.registerFile({
-        file_name: fileName,
-        file_type: file.type,
-        file_size: file.size,
-        storage_path,
-        display_name: title || `Recording ${new Date().toLocaleDateString()}`,
-      });
-
-      setUploadedFile({
-        url: registered.file_url || storage_path,
-        name: fileName,
-      });
-      setUploadProgress(100);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      alert('Failed to upload recording.');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

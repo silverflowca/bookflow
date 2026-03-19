@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, Square, Loader2,
-  Plus, User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code
+  User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import type {
-  Book, Chapter, InlineContent, InlineContentType, QuestionData, PollData, MediaData, LinkData, NoteData, HighlightData, BookSettings,
+  Book, Chapter, InlineContent, InlineContentType, QuestionData, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData
 } from '../types';
 

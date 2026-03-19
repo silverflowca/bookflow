@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
-  Video, GripVertical, EyeOff, Trash2, X, ChevronDown, ChevronUp, ExternalLink, Pencil,
+  Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -269,7 +269,7 @@ export default function ChapterEditor() {
     try {
       await api.updateInlineContent(id, { content_data: data.content_data });
       setInlineContents(inlineContents.map(item =>
-        item.id === id ? { ...item, content_data: data.content_data } : item
+        item.id === id ? { ...item, content_data: data.content_data! } : item
       ));
       setShowInlineModal(null);
     } catch (err) {
@@ -670,8 +670,8 @@ function InlineContentItem({
   onDelete,
   onMovePosition,
   onEdit,
-  index,
-  totalItems
+  index: _index,
+  totalItems: _totalItems
 }: {
   item: InlineContent;
   onToggleVisibility: (id: string, visibility: InlineContent['visibility']) => void;
