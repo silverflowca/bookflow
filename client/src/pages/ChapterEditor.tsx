@@ -336,13 +336,13 @@ export default function ChapterEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-hover">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="bg-surface border-b border-theme sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link to={`/edit/book/${bookId}`} className="text-gray-500 hover:text-gray-700">
+              <Link to={`/edit/book/${bookId}`} className="text-muted hover:text-theme">
                 <ChevronLeft className="h-6 w-6" />
               </Link>
               <input
@@ -356,21 +356,21 @@ export default function ChapterEditor() {
             </div>
             <div className="flex items-center gap-3">
               {lastSaved && (
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted">
                   Saved {lastSaved.toLocaleTimeString()}
                 </span>
               )}
               <button
                 onClick={() => handleSave()}
                 disabled={saving}
-                className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+                className="flex items-center gap-1 px-3 py-1.5 theme-button-primary rounded disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Saving...' : 'Save'}
               </button>
               <Link
                 to={`/book/${bookId}/chapter/${chapterId}`}
-                className="flex items-center gap-1 px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded"
+                className="flex items-center gap-1 px-3 py-1.5 text-muted hover:bg-surface-hover rounded"
               >
                 <Eye className="h-4 w-4" />
                 Preview
@@ -381,7 +381,7 @@ export default function ChapterEditor() {
                 className={`flex items-center gap-1 px-3 py-1.5 rounded ${
                   ttsPlaying
                     ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    : 'text-muted hover:bg-surface-hover'
                 }`}
                 title={ttsPlaying ? 'Stop audio' : 'Listen to chapter'}
               >
@@ -403,7 +403,7 @@ export default function ChapterEditor() {
         {/* Editor */}
         <div className="flex-1">
           {/* Toolbar */}
-          <div className="bg-white rounded-t-lg border border-b-0 p-2 flex gap-1 flex-wrap">
+          <div className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap">
             <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBold().run()}
               active={editor?.isActive('bold')}
@@ -425,7 +425,7 @@ export default function ChapterEditor() {
             >
               <u>U</u>
             </ToolbarButton>
-            <div className="w-px bg-gray-200 mx-1" />
+            <div className="w-px bg-surface-hover mx-1" />
             <ToolbarButton
               onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
               active={editor?.isActive('heading', { level: 2 })}
@@ -454,7 +454,7 @@ export default function ChapterEditor() {
             >
               "
             </ToolbarButton>
-            <div className="w-px bg-gray-200 mx-1" />
+            <div className="w-px bg-surface-hover mx-1" />
             <ToolbarButton
               onClick={() => handleAddInlineContent('question')}
               title="Add Question"
@@ -504,32 +504,32 @@ export default function ChapterEditor() {
             >
               <Video className="h-4 w-4" />
             </ToolbarButton>
-            <div className="w-px bg-gray-200 mx-1" />
+            <div className="w-px bg-surface-hover mx-1" />
             <ToolbarButton
               onClick={() => handleAddInlineContent('select')}
               title="Add Select Dropdown"
-              className="text-indigo-600"
+              className="text-accent"
             >
               <ChevronRight className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => handleAddInlineContent('multiselect')}
               title="Add Multi-Select"
-              className="text-indigo-600"
+              className="text-accent"
             >
               <List className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => handleAddInlineContent('textbox')}
               title="Add Text Input"
-              className="text-gray-600"
+              className="text-muted"
             >
               <Type className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => handleAddInlineContent('textarea')}
               title="Add Text Area"
-              className="text-gray-600"
+              className="text-muted"
             >
               <AlignLeft className="h-4 w-4" />
             </ToolbarButton>
@@ -564,7 +564,7 @@ export default function ChapterEditor() {
           </div>
 
           {/* Editor Content */}
-          <div className="bg-white border rounded-b-lg">
+          <div className="bg-surface border border-theme rounded-b-lg">
             <EditorContent
               editor={editor}
               className="prose max-w-none p-6 min-h-[500px] focus:outline-none"
@@ -574,11 +574,11 @@ export default function ChapterEditor() {
 
         {/* Sidebar - Inline Content List */}
         <div className="w-80 flex-shrink-0">
-          <div className="bg-white rounded-lg border sticky top-20">
+          <div className="theme-card sticky top-20">
             <div className="p-3 border-b flex items-center justify-between">
               <div>
                 <h3 className="font-medium">Inline Content</h3>
-                <p className="text-xs text-gray-500">{inlineContents.length} items</p>
+                <p className="text-xs text-muted">{inlineContents.length} items</p>
               </div>
               <div className="flex gap-1">
                 <button
@@ -599,7 +599,7 @@ export default function ChapterEditor() {
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
               {inlineContents.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500 text-center">
+                <div className="p-4 text-sm text-muted text-center">
                   No inline content yet. Select text and add questions, polls, or notes.
                 </div>
               ) : (
@@ -656,7 +656,7 @@ function ToolbarButton({
       onClick={onClick}
       title={title}
       className={`px-2 py-1 rounded text-sm font-medium ${
-        active ? 'bg-gray-200 text-gray-900' : 'text-gray-600 hover:bg-gray-100'
+        active ? 'bg-surface-hover text-theme' : 'text-muted hover:bg-surface-hover'
       } ${className}`}
     >
       {children}
@@ -710,26 +710,26 @@ function InlineContentItem({
     <div className={`border-b last:border-b-0 ${isHidden ? 'opacity-60' : ''}`}>
       {/* Header Row */}
       <div
-        className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50 ${bgColors[item.content_type]}`}
+        className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-surface-hover ${bgColors[item.content_type]}`}
         onClick={() => setExpanded(!expanded)}
       >
-        <GripVertical className="h-4 w-4 text-gray-400 cursor-grab" />
+        <GripVertical className="h-4 w-4 text-muted cursor-grab" />
         {icons[item.content_type]}
         <span className="text-sm font-medium capitalize flex-1">{item.content_type}</span>
-        {isHidden && <EyeOff className="h-3 w-3 text-gray-400" />}
+        {isHidden && <EyeOff className="h-3 w-3 text-muted" />}
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-gray-400" />
+          <ChevronUp className="h-4 w-4 text-muted" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <ChevronDown className="h-4 w-4 text-muted" />
         )}
       </div>
 
       {/* Expanded Content */}
       {expanded && (
-        <div className="p-3 bg-white border-t">
+        <div className="p-3 bg-surface border-t border-theme">
           {/* Anchor Text */}
           {item.anchor_text && (
-            <p className="text-xs text-gray-500 mb-2 italic">"{item.anchor_text}"</p>
+            <p className="text-xs text-muted mb-2 italic">"{item.anchor_text}"</p>
           )}
 
           {/* Content Preview */}
@@ -747,7 +747,7 @@ function InlineContentItem({
               }}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
                 isHidden
-                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-surface-hover text-muted hover:bg-surface-hover'
                   : 'bg-green-100 text-green-700 hover:bg-green-200'
               }`}
               title={isHidden ? 'Hidden from readers' : 'Visible to readers'}
@@ -763,14 +763,14 @@ function InlineContentItem({
                   e.stopPropagation();
                   setShowPositionMenu(!showPositionMenu);
                 }}
-                className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 rounded"
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-hover text-muted hover:bg-surface-hover rounded"
               >
                 {item.position_in_chapter === 'inline' ? 'Inline' :
                  item.position_in_chapter === 'end_of_chapter' ? 'End' : 'Start'}
                 <ChevronDown className="h-3 w-3" />
               </button>
               {showPositionMenu && (
-                <div className="absolute left-0 top-full mt-1 bg-white border rounded shadow-lg z-10 w-32">
+                <div className="absolute left-0 top-full mt-1 bg-surface border-theme border rounded shadow-lg z-10 w-32">
                   {(['inline', 'start_of_chapter', 'end_of_chapter'] as const).map((pos) => (
                     <button
                       key={pos}
@@ -779,8 +779,8 @@ function InlineContentItem({
                         onMovePosition(item.id, pos);
                         setShowPositionMenu(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 ${
-                        item.position_in_chapter === pos ? 'bg-primary-50 text-primary-600' : ''
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-hover ${
+                        item.position_in_chapter === pos ? 'bg-primary-50 text-accent' : ''
                       }`}
                     >
                       {pos === 'inline' ? 'Inline' :
@@ -832,14 +832,14 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const q = data as QuestionData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{q.question}</p>
-          <p className="text-xs text-gray-500 mt-1">Type: {q.type}</p>
+          <p className="font-medium text-theme">{q.question}</p>
+          <p className="text-xs text-muted mt-1">Type: {q.type}</p>
           {q.options && (
-            <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
+            <ul className="mt-1 text-xs text-muted list-disc list-inside">
               {q.options.slice(0, 3).map((opt, i) => (
                 <li key={i}>{opt.text}</li>
               ))}
-              {q.options.length > 3 && <li className="text-gray-400">+{q.options.length - 3} more</li>}
+              {q.options.length > 3 && <li className="text-muted">+{q.options.length - 3} more</li>}
             </ul>
           )}
         </div>
@@ -850,12 +850,12 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const p = data as PollData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{p.question}</p>
-          <ul className="mt-1 text-xs text-gray-600 list-disc list-inside">
+          <p className="font-medium text-theme">{p.question}</p>
+          <ul className="mt-1 text-xs text-muted list-disc list-inside">
             {p.options.slice(0, 3).map((opt, i) => (
               <li key={i}>{opt.text}</li>
             ))}
-            {p.options.length > 3 && <li className="text-gray-400">+{p.options.length - 3} more</li>}
+            {p.options.length > 3 && <li className="text-muted">+{p.options.length - 3} more</li>}
           </ul>
         </div>
       );
@@ -866,14 +866,14 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const m = data as MediaData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800 mb-2">{m.title || `${item.content_type} clip`}</p>
+          <p className="font-medium text-theme mb-2">{m.title || `${item.content_type} clip`}</p>
           {item.content_type === 'audio' ? (
             <audio src={m.url} controls className="w-full h-8" preload="metadata" />
           ) : (
             <video src={m.url} controls className="w-full rounded" preload="metadata" style={{ maxHeight: '150px' }} />
           )}
           {m.duration && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Duration: {Math.floor(m.duration / 60)}:{(m.duration % 60).toString().padStart(2, '0')}
             </p>
           )}
@@ -896,7 +896,7 @@ function ContentPreview({ item }: { item: InlineContent }) {
             <ExternalLink className="h-3 w-3" />
           </a>
           {l.description && (
-            <p className="text-xs text-gray-500 mt-1">{l.description}</p>
+            <p className="text-xs text-muted mt-1">{l.description}</p>
           )}
         </div>
       );
@@ -907,7 +907,7 @@ function ContentPreview({ item }: { item: InlineContent }) {
       return (
         <div className="text-sm">
           <span className="text-xs text-purple-600 font-medium uppercase">{n.type}</span>
-          <p className="text-gray-800 mt-1">{n.text}</p>
+          <p className="text-theme mt-1">{n.text}</p>
         </div>
       );
     }
@@ -925,7 +925,7 @@ function ContentPreview({ item }: { item: InlineContent }) {
           <span className={`px-2 py-0.5 rounded ${colorClass}`}>
             {item.anchor_text || 'Highlighted text'}
           </span>
-          {h.note && <p className="text-gray-600 mt-1 text-xs">{h.note}</p>}
+          {h.note && <p className="text-muted mt-1 text-xs">{h.note}</p>}
         </div>
       );
     }
@@ -934,8 +934,8 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const s = data as SelectData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{s.label}</p>
-          <p className="text-xs text-gray-500 mt-1">Dropdown with {s.options?.length || 0} options</p>
+          <p className="font-medium text-theme">{s.label}</p>
+          <p className="text-xs text-muted mt-1">Dropdown with {s.options?.length || 0} options</p>
         </div>
       );
     }
@@ -944,8 +944,8 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const ms = data as MultiselectData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{ms.label}</p>
-          <p className="text-xs text-gray-500 mt-1">Multi-select with {ms.options?.length || 0} options</p>
+          <p className="font-medium text-theme">{ms.label}</p>
+          <p className="text-xs text-muted mt-1">Multi-select with {ms.options?.length || 0} options</p>
         </div>
       );
     }
@@ -954,8 +954,8 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const tb = data as TextboxData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{tb.label}</p>
-          <p className="text-xs text-gray-500 mt-1">Text input{tb.required ? ' (required)' : ''}</p>
+          <p className="font-medium text-theme">{tb.label}</p>
+          <p className="text-xs text-muted mt-1">Text input{tb.required ? ' (required)' : ''}</p>
         </div>
       );
     }
@@ -964,8 +964,8 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const ta = data as TextareaData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{ta.label}</p>
-          <p className="text-xs text-gray-500 mt-1">Multi-line text ({ta.rows || 4} rows){ta.required ? ' - required' : ''}</p>
+          <p className="font-medium text-theme">{ta.label}</p>
+          <p className="text-xs text-muted mt-1">Multi-line text ({ta.rows || 4} rows){ta.required ? ' - required' : ''}</p>
         </div>
       );
     }
@@ -974,15 +974,15 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const r = data as RadioData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{r.label}</p>
-          <ul className="mt-1 text-xs text-gray-600">
+          <p className="font-medium text-theme">{r.label}</p>
+          <ul className="mt-1 text-xs text-muted">
             {r.options?.slice(0, 3).map((opt, i) => (
               <li key={i} className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full border border-gray-400"></span>
+                <span className="w-2 h-2 rounded-full border border-strong"></span>
                 {opt.text}
               </li>
             ))}
-            {(r.options?.length || 0) > 3 && <li className="text-gray-400">+{(r.options?.length || 0) - 3} more</li>}
+            {(r.options?.length || 0) > 3 && <li className="text-muted">+{(r.options?.length || 0) - 3} more</li>}
           </ul>
         </div>
       );
@@ -992,15 +992,15 @@ function ContentPreview({ item }: { item: InlineContent }) {
       const c = data as CheckboxData;
       return (
         <div className="text-sm">
-          <p className="font-medium text-gray-800">{c.label}</p>
-          <ul className="mt-1 text-xs text-gray-600">
+          <p className="font-medium text-theme">{c.label}</p>
+          <ul className="mt-1 text-xs text-muted">
             {c.options?.slice(0, 3).map((opt, i) => (
               <li key={i} className="flex items-center gap-1">
-                <span className="w-2 h-2 border border-gray-400"></span>
+                <span className="w-2 h-2 border border-strong"></span>
                 {opt.text}
               </li>
             ))}
-            {(c.options?.length || 0) > 3 && <li className="text-gray-400">+{(c.options?.length || 0) - 3} more</li>}
+            {(c.options?.length || 0) > 3 && <li className="text-muted">+{(c.options?.length || 0) - 3} more</li>}
           </ul>
         </div>
       );
@@ -1011,10 +1011,10 @@ function ContentPreview({ item }: { item: InlineContent }) {
       return (
         <div className="text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono bg-gray-100 px-1 rounded">{cb.language}</span>
-            {cb.title && <span className="text-gray-800 font-medium">{cb.title}</span>}
+            <span className="text-xs font-mono bg-surface-hover px-1 rounded">{cb.language}</span>
+            {cb.title && <span className="text-theme font-medium">{cb.title}</span>}
           </div>
-          <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-hidden text-ellipsis whitespace-nowrap">
+          <pre className="mt-1 text-xs bg-surface-hover p-2 rounded overflow-hidden text-ellipsis whitespace-nowrap">
             {cb.code?.substring(0, 100)}{(cb.code?.length || 0) > 100 ? '...' : ''}
           </pre>
         </div>
@@ -1027,14 +1027,14 @@ function ContentPreview({ item }: { item: InlineContent }) {
         <div className="text-sm">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-amber-700">{sb.reference}</span>
-            {sb.version && <span className="text-xs text-gray-500">({sb.version})</span>}
+            {sb.version && <span className="text-xs text-muted">({sb.version})</span>}
           </div>
-          <p className="mt-1 text-gray-800 italic text-xs line-clamp-2">"{sb.text}"</p>
+          <p className="mt-1 text-theme italic text-xs line-clamp-2">"{sb.text}"</p>
         </div>
       );
     }
 
     default:
-      return <p className="text-sm text-gray-500">Preview not available</p>;
+      return <p className="text-sm text-muted">Preview not available</p>;
   }
 }

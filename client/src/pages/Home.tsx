@@ -39,7 +39,7 @@ export default function Home() {
             <div className="flex gap-4 justify-center">
               <Link
                 to="/register"
-                className="bg-white text-primary-600 hover:bg-primary-50 px-6 py-3 rounded-lg font-semibold"
+                className="bg-white text-accent hover:bg-primary-50 px-6 py-3 rounded-lg font-semibold"
               >
                 Start Writing
               </Link>
@@ -55,7 +55,7 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-12">
             Everything You Need to Create Interactive Books
@@ -86,7 +86,7 @@ export default function Home() {
       </section>
 
       {/* Published Books Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-surface-hover">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-12">
             Explore Published Books
@@ -97,7 +97,7 @@ export default function Home() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
           ) : books.length === 0 ? (
-            <div className="text-center text-gray-500">
+            <div className="text-center text-muted">
               <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No published books yet. Be the first to create one!</p>
             </div>
@@ -117,18 +117,18 @@ export default function Home() {
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
     <div className="text-center p-6">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 text-primary-600 mb-4">
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 text-accent mb-4">
         {icon}
       </div>
       <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-gray-600">{description}</p>
+      <p className="text-muted">{description}</p>
     </div>
   );
 }
 
 function BookCard({ book }: { book: Book }) {
   return (
-    <Link to={`/book/${book.id}`} className="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+    <Link to={`/book/${book.id}`} className="block bg-surface rounded-lg shadow-sm hover:shadow-md transition-shadow">
       <div className="aspect-[3/4] bg-gradient-to-br from-primary-100 to-primary-200 rounded-t-lg flex items-center justify-center">
         {book.cover_image_url ? (
           <img
@@ -143,13 +143,13 @@ function BookCard({ book }: { book: Book }) {
       <div className="p-4">
         <h3 className="font-semibold text-lg mb-1 line-clamp-2">{book.title}</h3>
         {book.subtitle && (
-          <p className="text-sm text-gray-500 mb-2 line-clamp-1">{book.subtitle}</p>
+          <p className="text-sm text-muted mb-2 line-clamp-1">{book.subtitle}</p>
         )}
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted">
           by {book.author?.display_name || 'Unknown Author'}
         </p>
         {book.chapters && (
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs text-muted mt-2">
             {book.chapters.length} chapters
           </p>
         )}

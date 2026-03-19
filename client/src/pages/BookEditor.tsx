@@ -85,8 +85,8 @@ export default function BookEditor() {
   if (!book) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-        <p className="text-gray-500">Book not found</p>
-        <Link to="/dashboard" className="text-primary-600 hover:underline">
+        <p className="text-muted">Book not found</p>
+        <Link to="/dashboard" className="text-accent hover:underline">
           Return to Dashboard
         </Link>
       </div>
@@ -97,7 +97,7 @@ export default function BookEditor() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Link to="/dashboard" className="text-gray-500 hover:text-gray-700">
+        <Link to="/dashboard" className="text-muted hover:text-theme">
           <ChevronLeft className="h-6 w-6" />
         </Link>
         <div className="flex-1">
@@ -112,24 +112,24 @@ export default function BookEditor() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold">{book.title}</h1>
-                {book.subtitle && <p className="text-gray-500">{book.subtitle}</p>}
+                {book.subtitle && <p className="text-muted">{book.subtitle}</p>}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setEditingBook(true)}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
                 >
                   <Edit className="h-5 w-5" />
                 </button>
                 <Link
                   to={`/edit/book/${bookId}/settings`}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
                 >
                   <Settings className="h-5 w-5" />
                 </Link>
                 <Link
                   to={`/book/${bookId}`}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
                 >
                   <Eye className="h-5 w-5" />
                 </Link>
@@ -140,14 +140,14 @@ export default function BookEditor() {
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between bg-white rounded-lg border p-4 mb-6">
+      <div className="flex items-center justify-between bg-surface rounded-lg border-theme border p-4 mb-6">
         <div className="flex items-center gap-4">
           <span className={`px-2 py-1 text-sm font-medium rounded ${
             book.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
           }`}>
             {book.status}
           </span>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted">
             {chapters.length} chapters
           </span>
         </div>
@@ -165,12 +165,12 @@ export default function BookEditor() {
       </div>
 
       {/* Chapters */}
-      <div className="bg-white rounded-lg border">
-        <div className="flex items-center justify-between p-4 border-b">
+      <div className="theme-section">
+        <div className="flex items-center justify-between p-4 border-b border-theme">
           <h2 className="font-semibold">Chapters</h2>
           <button
             onClick={() => setShowNewChapter(true)}
-            className="flex items-center gap-1 text-primary-600 hover:text-primary-700 text-sm font-medium"
+            className="flex items-center gap-1 text-accent hover:text-accent text-sm font-medium"
           >
             <Plus className="h-4 w-4" />
             Add Chapter
@@ -178,11 +178,11 @@ export default function BookEditor() {
         </div>
 
         {chapters.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
+          <div className="p-8 text-center text-muted">
             <p className="mb-4">No chapters yet</p>
             <button
               onClick={() => setShowNewChapter(true)}
-              className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700"
+              className="inline-flex items-center gap-2 theme-button-primary px-4 py-2 rounded"
             >
               <Plus className="h-4 w-4" />
               Create First Chapter
@@ -191,16 +191,16 @@ export default function BookEditor() {
         ) : (
           <div className="divide-y">
             {chapters.map((chapter, index) => (
-              <div key={chapter.id} className="flex items-center gap-4 p-4 hover:bg-gray-50">
-                <GripVertical className="h-5 w-5 text-gray-400 cursor-move" />
+              <div key={chapter.id} className="flex items-center gap-4 p-4 hover:bg-surface-hover">
+                <GripVertical className="h-5 w-5 text-muted cursor-move" />
                 <div className="flex-1">
                   <Link
                     to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                    className="font-medium hover:text-primary-600"
+                    className="font-medium hover:text-accent"
                   >
                     Chapter {index + 1}: {chapter.title}
                   </Link>
-                  <div className="flex gap-3 text-sm text-gray-500">
+                  <div className="flex gap-3 text-sm text-muted">
                     <span>{chapter.word_count || 0} words</span>
                     <span>{chapter.estimated_read_time_minutes || 1} min read</span>
                     <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
@@ -211,13 +211,13 @@ export default function BookEditor() {
                 <div className="flex gap-2">
                   <Link
                     to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
                   >
                     <Edit className="h-4 w-4" />
                   </Link>
                   <button
                     onClick={() => handleDeleteChapter(chapter.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                    className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -260,20 +260,20 @@ function EditBookForm({
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="w-full text-2xl font-bold border-b border-gray-300 focus:border-primary-500 focus:outline-none py-1"
+        className="w-full text-2xl font-bold border-b border-theme focus:border-primary-500 focus:outline-none py-1"
         placeholder="Book Title"
       />
       <input
         type="text"
         value={subtitle}
         onChange={(e) => setSubtitle(e.target.value)}
-        className="w-full text-gray-500 border-b border-gray-200 focus:border-primary-500 focus:outline-none py-1"
+        className="w-full text-muted border-b border-theme focus:border-primary-500 focus:outline-none py-1"
         placeholder="Subtitle (optional)"
       />
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="w-full text-sm border rounded p-2 focus:border-primary-500 focus:outline-none"
+        className="w-full text-sm theme-input p-2 focus:border-primary-500 focus:outline-none"
         rows={2}
         placeholder="Description"
       />
@@ -281,14 +281,14 @@ function EditBookForm({
         <button
           onClick={() => onSave({ title, subtitle, description })}
           disabled={saving}
-          className="flex items-center gap-1 bg-primary-600 text-white px-3 py-1 rounded text-sm hover:bg-primary-700 disabled:opacity-50"
+          className="flex items-center gap-1 theme-button-primary px-3 py-1 rounded text-sm disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
           {saving ? 'Saving...' : 'Save'}
         </button>
         <button
           onClick={onCancel}
-          className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded text-sm"
+          className="px-3 py-1 text-muted hover:bg-surface-hover rounded text-sm"
         >
           Cancel
         </button>
@@ -308,14 +308,14 @@ function NewChapterModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+      <div className="bg-surface rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h2 className="text-lg font-bold mb-4">New Chapter</h2>
         <form onSubmit={(e) => { e.preventDefault(); onCreate(title); }}>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2 theme-input focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Chapter Title"
             autoFocus
             required
@@ -324,13 +324,13 @@ function NewChapterModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
+              className="flex-1 px-4 py-2 theme-button-secondary rounded"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+              className="flex-1 px-4 py-2 theme-button-primary rounded"
             >
               Create
             </button>

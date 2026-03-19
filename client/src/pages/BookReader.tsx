@@ -317,9 +317,9 @@ export default function BookReader() {
   if (!book) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-        <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">Book not found</p>
-        <Link to="/" className="text-primary-600 hover:underline">
+        <BookOpen className="h-12 w-12 text-muted mx-auto mb-4" />
+        <p className="text-muted">Book not found</p>
+        <Link to="/" className="text-accent hover:underline">
           Return Home
         </Link>
       </div>
@@ -327,20 +327,20 @@ export default function BookReader() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-surface-hover flex">
       {/* Table of Contents Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 w-72 bg-white border-r transform transition-transform z-20 ${
+      <aside className={`fixed inset-y-0 left-0 w-72 bg-surface border-r border-theme transform transition-transform z-20 ${
         showToc ? 'translate-x-0' : '-translate-x-full'
       } lg:relative lg:translate-x-0`}>
         <div className="h-full flex flex-col">
-          <div className="p-4 border-b flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 text-primary-600">
+          <div className="p-4 border-b border-theme flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2 text-accent">
               <BookOpen className="h-6 w-6" />
               <span className="font-semibold">BookFlow</span>
             </Link>
             <button
               onClick={() => setShowToc(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="lg:hidden text-muted hover:text-theme"
             >
               <X className="h-5 w-5" />
             </button>
@@ -348,8 +348,8 @@ export default function BookReader() {
 
           <div className="p-4">
             <h2 className="font-bold text-lg">{book.title}</h2>
-            {book.subtitle && <p className="text-sm text-gray-500">{book.subtitle}</p>}
-            <p className="text-sm text-gray-600 mt-1">by {book.author?.display_name}</p>
+            {book.subtitle && <p className="text-sm text-muted">{book.subtitle}</p>}
+            <p className="text-sm text-muted mt-1">by {book.author?.display_name}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -362,7 +362,7 @@ export default function BookReader() {
                   className={`block px-3 py-2 rounded text-sm ${
                     ch.id === chapterId
                       ? 'bg-primary-100 text-primary-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      : 'text-theme hover:bg-surface-hover'
                   }`}
                 >
                   {index + 1}. {ch.title}
@@ -384,16 +384,16 @@ export default function BookReader() {
       {/* Main Content */}
       <main className="flex-1 min-w-0 relative">
         {/* Header */}
-        <header className="sticky top-0 bg-white border-b z-10">
+        <header className="sticky top-0 bg-surface border-b border-theme z-10">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <button
               onClick={() => setShowToc(true)}
-              className="lg:hidden text-gray-600 hover:text-gray-900"
+              className="lg:hidden text-muted hover:text-theme"
             >
               <Menu className="h-6 w-6" />
             </button>
             <div className="flex-1 text-center">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted">
                 Chapter {currentChapterIndex + 1} of {book.chapters?.length}
               </p>
             </div>
@@ -444,7 +444,7 @@ export default function BookReader() {
             {/* Start of Chapter Content */}
             <StartOfChapterContent items={inlineContent} />
 
-            <div className="reader-content text-lg text-gray-800 leading-relaxed">
+            <div className="reader-content text-lg text-theme leading-relaxed">
               <ChapterContent
                 content={chapter.content}
                 contentText={chapter.content_text}
@@ -461,11 +461,11 @@ export default function BookReader() {
               {prevChapter ? (
                 <Link
                   to={`/book/${bookId}/chapter/${prevChapter.id}`}
-                  className="flex items-center gap-2 text-primary-600 hover:text-primary-700"
+                  className="flex items-center gap-2 text-accent hover:text-accent"
                 >
                   <ChevronLeft className="h-5 w-5" />
                   <div>
-                    <p className="text-xs text-gray-500">Previous</p>
+                    <p className="text-xs text-muted">Previous</p>
                     <p className="font-medium">{prevChapter.title}</p>
                   </div>
                 </Link>
@@ -476,10 +476,10 @@ export default function BookReader() {
               {nextChapter ? (
                 <Link
                   to={`/book/${bookId}/chapter/${nextChapter.id}`}
-                  className="flex items-center gap-2 text-primary-600 hover:text-primary-700 text-right"
+                  className="flex items-center gap-2 text-accent hover:text-accent text-right"
                 >
                   <div>
-                    <p className="text-xs text-gray-500">Next</p>
+                    <p className="text-xs text-muted">Next</p>
                     <p className="font-medium">{nextChapter.title}</p>
                   </div>
                   <ChevronRight className="h-5 w-5" />
@@ -490,7 +490,7 @@ export default function BookReader() {
             </nav>
           </article>
         ) : (
-          <div className="max-w-3xl mx-auto px-4 py-8 text-center text-gray-500">
+          <div className="max-w-3xl mx-auto px-4 py-8 text-center text-muted">
             Select a chapter to start reading
           </div>
         )}
@@ -612,7 +612,7 @@ function ChapterContent({
   }, [content]);
 
   if (!parsedContent && !contentText) {
-    return <p className="text-gray-500 italic">No content yet</p>;
+    return <p className="text-muted italic">No content yet</p>;
   }
 
   // If we have TipTap JSON, render it properly
@@ -738,13 +738,13 @@ function getInlineContentIcon(type: string): React.ReactNode {
     case 'video':
       return <Video className={`${iconClass} text-red-600`} />;
     case 'select':
-      return <ChevronRight className={`${iconClass} text-indigo-600`} />;
+      return <ChevronRight className={`${iconClass} text-accent`} />;
     case 'multiselect':
       return <List className={`${iconClass} text-violet-600`} />;
     case 'textbox':
-      return <Type className={`${iconClass} text-gray-600`} />;
+      return <Type className={`${iconClass} text-muted`} />;
     case 'textarea':
-      return <AlignLeft className={`${iconClass} text-gray-600`} />;
+      return <AlignLeft className={`${iconClass} text-muted`} />;
     case 'radio':
       return <Circle className={`${iconClass} text-orange-600`} />;
     case 'checkbox':
@@ -778,7 +778,7 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
           content = <s>{content}</s>;
           break;
         case 'code':
-          content = <code className="bg-gray-100 px-1 rounded text-sm font-mono">{content}</code>;
+          content = <code className="bg-surface-hover px-1 rounded text-sm font-mono">{content}</code>;
           break;
         case 'link':
           content = (
@@ -786,7 +786,7 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
               href={mark.attrs?.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary-600 hover:underline"
+              className="text-accent hover:underline"
             >
               {content}
             </a>
@@ -897,7 +897,7 @@ function TipTapNode({
 
     case 'blockquote':
       return (
-        <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-700 mb-4">
+        <blockquote className="border-l-4 border-strong pl-4 italic text-muted mb-4">
           {node.content?.map((child: any, index: number) => (
             <TipTapNode
               key={index}
@@ -911,7 +911,7 @@ function TipTapNode({
 
     case 'codeBlock':
       return (
-        <pre className="bg-gray-100 rounded-lg p-4 mb-4 overflow-x-auto">
+        <pre className="bg-surface-hover rounded-lg p-4 mb-4 overflow-x-auto">
           <code className="text-sm font-mono">
             {node.content?.map((child: any, index: number) => (
               <TipTapNode
@@ -926,7 +926,7 @@ function TipTapNode({
       );
 
     case 'horizontalRule':
-      return <hr className="my-6 border-gray-300" />;
+      return <hr className="my-6 border-theme" />;
 
     case 'text':
       const nodeText = node.text || '';
@@ -1070,7 +1070,7 @@ function StartOfChapterContent({ items }: { items: InlineContent[] }) {
 
   return (
     <div className="mb-8 pb-6 border-b space-y-4">
-      <h3 className="text-lg font-semibold text-gray-700">Before You Begin</h3>
+      <h3 className="text-lg font-semibold text-theme">Before You Begin</h3>
       {startItems.map((item) => (
         <InlineContentBlock key={item.id} content={item} />
       ))}
@@ -1161,14 +1161,14 @@ function QuestionBlock({ content }: { content: InlineContent }) {
         <MessageSquare className="h-5 w-5 text-blue-600" />
         <span className="font-medium text-blue-800">Question</span>
       </div>
-      <p className="text-gray-800 mb-4">{data.question}</p>
+      <p className="text-theme mb-4">{data.question}</p>
 
       {data.type === 'open' && !submitted && (
         <>
           <textarea
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
-            className="w-full p-3 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-3 theme-input rounded-lg resize-none focus:ring-2 focus:ring-blue-500"
             rows={3}
             placeholder="Type your answer..."
           />
@@ -1221,7 +1221,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
           {data.title || (isAudio ? 'Audio Clip' : 'Video Clip')}
         </span>
         {data.duration && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted">
             ({Math.floor(data.duration / 60)}:{(data.duration % 60).toString().padStart(2, '0')})
           </span>
         )}
@@ -1280,7 +1280,7 @@ function LinkBlock({ content }: { content: InlineContent }) {
         {data.title || data.url}
       </a>
       {data.description && (
-        <p className="text-sm text-gray-600 mt-2">{data.description}</p>
+        <p className="text-sm text-muted mt-2">{data.description}</p>
       )}
     </div>
   );
@@ -1302,7 +1302,7 @@ function NoteBlock({ content }: { content: InlineContent }) {
         <StickyNote className={`h-5 w-5 ${style.text}`} />
         <span className={`font-medium ${style.text} capitalize`}>{data.type}</span>
       </div>
-      <p className="text-gray-800 whitespace-pre-wrap">{data.text}</p>
+      <p className="text-theme whitespace-pre-wrap">{data.text}</p>
     </div>
   );
 }
@@ -1321,14 +1321,14 @@ function HighlightBlock({ content }: { content: InlineContent }) {
   return (
     <div className={`${style} border rounded-lg p-4`}>
       <div className="flex items-center gap-2 mb-2">
-        <Highlighter className="h-5 w-5 text-gray-600" />
-        <span className="font-medium text-gray-800">Highlight</span>
+        <Highlighter className="h-5 w-5 text-muted" />
+        <span className="font-medium text-theme">Highlight</span>
       </div>
       {content.anchor_text && (
-        <p className="italic text-gray-700 mb-2">"{content.anchor_text}"</p>
+        <p className="italic text-muted mb-2">"{content.anchor_text}"</p>
       )}
       {data.note && (
-        <p className="text-gray-800 text-sm">{data.note}</p>
+        <p className="text-theme text-sm">{data.note}</p>
       )}
     </div>
   );
@@ -1377,7 +1377,7 @@ function PollBlock({ content }: { content: InlineContent }) {
         <BarChart2 className="h-5 w-5 text-green-600" />
         <span className="font-medium text-green-800">Poll</span>
       </div>
-      <p className="text-gray-800 mb-4">{data.question}</p>
+      <p className="text-theme mb-4">{data.question}</p>
 
       <div className="space-y-2">
         {data.options.map((opt) => {
@@ -1391,7 +1391,7 @@ function PollBlock({ content }: { content: InlineContent }) {
               className={`relative p-3 border rounded-lg cursor-pointer transition-colors ${
                 selected === opt.id
                   ? 'border-green-500 bg-green-100'
-                  : 'border-gray-200 hover:border-green-300'
+                  : 'border-theme hover:border-green-300'
               } ${voted ? 'cursor-default' : ''}`}
             >
               {voted && (
@@ -1403,7 +1403,7 @@ function PollBlock({ content }: { content: InlineContent }) {
               <div className="relative flex justify-between items-center">
                 <span>{opt.text}</span>
                 {voted && (
-                  <span className="text-sm text-gray-600">{percent}%</span>
+                  <span className="text-sm text-muted">{percent}%</span>
                 )}
               </div>
             </div>
@@ -1422,7 +1422,7 @@ function PollBlock({ content }: { content: InlineContent }) {
       )}
 
       {voted && (
-        <p className="mt-2 text-sm text-gray-600">{totalVotes} votes</p>
+        <p className="mt-2 text-sm text-muted">{totalVotes} votes</p>
       )}
     </div>
   );
@@ -1436,15 +1436,15 @@ function SelectBlock({ content }: { content: InlineContent }) {
   return (
     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
       <div className="flex items-center gap-2 mb-3">
-        <ChevronRight className="h-5 w-5 text-indigo-600" />
+        <ChevronRight className="h-5 w-5 text-accent" />
         <span className="font-medium text-indigo-800">Select</span>
         {data.required && <span className="text-red-500 text-sm">*</span>}
       </div>
-      <label className="block text-gray-700 mb-2">{data.label}</label>
+      <label className="block text-theme mb-2">{data.label}</label>
       <select
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="w-full p-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+        className="w-full p-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-surface"
       >
         <option value="">{data.placeholder || 'Select an option...'}</option>
         {data.options?.map((opt) => (
@@ -1473,7 +1473,7 @@ function MultiselectBlock({ content }: { content: InlineContent }) {
         <span className="font-medium text-violet-800">Multi-Select</span>
         {data.required && <span className="text-red-500 text-sm">*</span>}
       </div>
-      <label className="block text-gray-700 mb-2">{data.label}</label>
+      <label className="block text-theme mb-2">{data.label}</label>
       <div className="space-y-2">
         {data.options?.map((opt) => (
           <label
@@ -1481,7 +1481,7 @@ function MultiselectBlock({ content }: { content: InlineContent }) {
             className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
               selected.includes(opt.id)
                 ? 'bg-violet-100 border-violet-400'
-                : 'bg-white border-gray-200 hover:border-violet-300'
+                : 'bg-surface border-theme hover:border-violet-300'
             }`}
           >
             <input
@@ -1504,23 +1504,23 @@ function TextboxBlock({ content }: { content: InlineContent }) {
   const [value, setValue] = useState(data.default_value || '');
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+    <div className="bg-surface-hover border border-theme rounded-lg p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Type className="h-5 w-5 text-gray-600" />
-        <span className="font-medium text-gray-800">Text Input</span>
+        <Type className="h-5 w-5 text-muted" />
+        <span className="font-medium text-theme">Text Input</span>
         {data.required && <span className="text-red-500 text-sm">*</span>}
       </div>
-      <label className="block text-gray-700 mb-2">{data.label}</label>
+      <label className="block text-theme mb-2">{data.label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={data.placeholder || ''}
         maxLength={data.max_length}
-        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500"
+        className="w-full p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500"
       />
       {data.max_length && (
-        <p className="text-xs text-gray-500 mt-1">{value.length}/{data.max_length} characters</p>
+        <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
       )}
     </div>
   );
@@ -1532,23 +1532,23 @@ function TextareaBlock({ content }: { content: InlineContent }) {
   const [value, setValue] = useState(data.default_value || '');
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+    <div className="bg-surface-hover border border-theme rounded-lg p-4">
       <div className="flex items-center gap-2 mb-3">
-        <AlignLeft className="h-5 w-5 text-gray-600" />
-        <span className="font-medium text-gray-800">Text Area</span>
+        <AlignLeft className="h-5 w-5 text-muted" />
+        <span className="font-medium text-theme">Text Area</span>
         {data.required && <span className="text-red-500 text-sm">*</span>}
       </div>
-      <label className="block text-gray-700 mb-2">{data.label}</label>
+      <label className="block text-theme mb-2">{data.label}</label>
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={data.placeholder || ''}
         rows={data.rows || 4}
         maxLength={data.max_length}
-        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 resize-none"
+        className="w-full p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500 resize-none"
       />
       {data.max_length && (
-        <p className="text-xs text-gray-500 mt-1">{value.length}/{data.max_length} characters</p>
+        <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
       )}
     </div>
   );
@@ -1566,7 +1566,7 @@ function RadioBlock({ content }: { content: InlineContent }) {
         <span className="font-medium text-orange-800">Choose One</span>
         {data.required && <span className="text-red-500 text-sm">*</span>}
       </div>
-      <label className="block text-gray-700 mb-2">{data.label}</label>
+      <label className="block text-theme mb-2">{data.label}</label>
       <div className="space-y-2">
         {data.options?.map((opt) => (
           <label
@@ -1574,7 +1574,7 @@ function RadioBlock({ content }: { content: InlineContent }) {
             className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
               selected === opt.id
                 ? 'bg-orange-100 border-orange-400'
-                : 'bg-white border-gray-200 hover:border-orange-300'
+                : 'bg-surface border-theme hover:border-orange-300'
             }`}
           >
             <input
@@ -1610,7 +1610,7 @@ function CheckboxBlock({ content }: { content: InlineContent }) {
         <span className="font-medium text-teal-800">Select All That Apply</span>
         {data.required && <span className="text-red-500 text-sm">*</span>}
       </div>
-      <label className="block text-gray-700 mb-2">{data.label}</label>
+      <label className="block text-theme mb-2">{data.label}</label>
       <div className="space-y-2">
         {data.options?.map((opt) => (
           <label
@@ -1618,7 +1618,7 @@ function CheckboxBlock({ content }: { content: InlineContent }) {
             className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
               selected.includes(opt.id)
                 ? 'bg-teal-100 border-teal-400'
-                : 'bg-white border-gray-200 hover:border-teal-300'
+                : 'bg-surface border-theme hover:border-teal-300'
             }`}
           >
             <input
@@ -1632,7 +1632,7 @@ function CheckboxBlock({ content }: { content: InlineContent }) {
         ))}
       </div>
       {data.min_selections && (
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-muted mt-2">
           Select at least {data.min_selections} option{data.min_selections > 1 ? 's' : ''}
         </p>
       )}
@@ -1697,11 +1697,11 @@ function ScriptureBlockDisplay({ content }: { content: InlineContent }) {
           </span>
         )}
       </div>
-      <blockquote className="text-gray-800 italic text-lg leading-relaxed">
+      <blockquote className="text-theme italic text-lg leading-relaxed">
         "{data.text}"
       </blockquote>
       {data.notes && (
-        <p className="mt-3 text-sm text-gray-600 border-t border-amber-200 pt-3">
+        <p className="mt-3 text-sm text-muted border-t border-amber-200 pt-3">
           {data.notes}
         </p>
       )}
@@ -1779,7 +1779,7 @@ function InlineMultiselect({ content }: { content: InlineContent }) {
             onChange={() => toggleOption(opt.id)}
             className="w-3.5 h-3.5 rounded border-violet-400 text-violet-600 focus:ring-violet-500"
           />
-          <span className="text-gray-700">{opt.text}</span>
+          <span className="text-theme">{opt.text}</span>
         </label>
       ))}
     </span>
@@ -1799,7 +1799,7 @@ function InlineTextbox({ content }: { content: InlineContent }) {
         onChange={(e) => setValue(e.target.value)}
         placeholder={data.placeholder || 'Type here...'}
         maxLength={data.max_length}
-        className="inline-block px-2 py-0.5 text-sm border border-gray-300 rounded bg-gray-50 focus:ring-1 focus:ring-gray-500 focus:outline-none"
+        className="inline-block px-2 py-0.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
         style={{ minWidth: '150px', maxWidth: '250px' }}
       />
       {data.required && <span className="text-red-500 text-xs">*</span>}
@@ -1820,10 +1820,10 @@ function InlineTextarea({ content }: { content: InlineContent }) {
         placeholder={data.placeholder || 'Enter your response...'}
         rows={data.rows || 2}
         maxLength={data.max_length}
-        className="block w-64 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50 focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+        className="block w-64 px-2 py-1 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
       />
       {data.max_length && (
-        <span className="text-xs text-gray-400">{value.length}/{data.max_length}</span>
+        <span className="text-xs text-muted">{value.length}/{data.max_length}</span>
       )}
     </span>
   );
@@ -1845,7 +1845,7 @@ function InlineRadio({ content }: { content: InlineContent }) {
             onChange={() => setSelected(opt.id)}
             className="w-3.5 h-3.5 border-orange-400 text-orange-600 focus:ring-orange-500"
           />
-          <span className="text-gray-700">{opt.text}</span>
+          <span className="text-theme">{opt.text}</span>
         </label>
       ))}
     </span>
@@ -1873,7 +1873,7 @@ function InlineCheckbox({ content }: { content: InlineContent }) {
             onChange={() => toggleOption(opt.id)}
             className="w-3.5 h-3.5 rounded border-teal-400 text-teal-600 focus:ring-teal-500"
           />
-          <span className="text-gray-700">{opt.text}</span>
+          <span className="text-theme">{opt.text}</span>
         </label>
       ))}
     </span>
@@ -1932,11 +1932,11 @@ function InlineScripture({ content }: { content: InlineContent }) {
             </span>
           )}
         </span>
-        <span className="block text-gray-700 italic text-sm leading-relaxed">
+        <span className="block text-theme italic text-sm leading-relaxed">
           "{data.text}"
         </span>
         {data.notes && (
-          <span className="block mt-2 text-xs text-gray-500 border-t border-amber-200 pt-2">
+          <span className="block mt-2 text-xs text-muted border-t border-amber-200 pt-2">
             {data.notes}
           </span>
         )}
@@ -1953,8 +1953,8 @@ function InlineContentPanel({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-y-0 right-0 w-80 bg-white border-l shadow-lg z-30 flex flex-col">
-      <div className="flex items-center justify-between p-4 border-b">
+    <div className="fixed inset-y-0 right-0 w-80 bg-surface border-l border-theme shadow-lg z-30 flex flex-col">
+      <div className="flex items-center justify-between p-4 border-b border-theme">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold capitalize">{content.content_type}</h3>
           {/* Author/Reader Badge */}
@@ -1970,7 +1970,7 @@ function InlineContentPanel({
             </span>
           )}
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+        <button onClick={onClose} className="text-muted hover:text-theme">
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -2025,10 +2025,10 @@ function RightSideToolbar({
     { type: 'link', icon: Link2, label: 'Links', color: 'text-cyan-600', bgColor: 'bg-cyan-100', hoverBg: 'hover:bg-cyan-50' },
     { type: 'audio', icon: Play, label: 'Audio', color: 'text-orange-600', bgColor: 'bg-orange-100', hoverBg: 'hover:bg-orange-50' },
     { type: 'video', icon: Video, label: 'Video', color: 'text-red-600', bgColor: 'bg-red-100', hoverBg: 'hover:bg-red-50' },
-    { type: 'select', icon: ChevronRight, label: 'Dropdowns', color: 'text-indigo-600', bgColor: 'bg-indigo-100', hoverBg: 'hover:bg-indigo-50' },
+    { type: 'select', icon: ChevronRight, label: 'Dropdowns', color: 'text-accent', bgColor: 'bg-indigo-100', hoverBg: 'hover:bg-indigo-50' },
     { type: 'multiselect', icon: List, label: 'Multi-Selects', color: 'text-violet-600', bgColor: 'bg-violet-100', hoverBg: 'hover:bg-violet-50' },
-    { type: 'textbox', icon: Type, label: 'Text Inputs', color: 'text-gray-600', bgColor: 'bg-gray-100', hoverBg: 'hover:bg-gray-50' },
-    { type: 'textarea', icon: AlignLeft, label: 'Text Areas', color: 'text-gray-600', bgColor: 'bg-gray-100', hoverBg: 'hover:bg-gray-50' },
+    { type: 'textbox', icon: Type, label: 'Text Inputs', color: 'text-muted', bgColor: 'bg-surface-hover', hoverBg: 'hover:bg-surface-hover' },
+    { type: 'textarea', icon: AlignLeft, label: 'Text Areas', color: 'text-muted', bgColor: 'bg-surface-hover', hoverBg: 'hover:bg-surface-hover' },
     { type: 'radio', icon: Circle, label: 'Radio Options', color: 'text-orange-600', bgColor: 'bg-orange-100', hoverBg: 'hover:bg-orange-50' },
     { type: 'checkbox', icon: CheckSquare, label: 'Checkboxes', color: 'text-teal-600', bgColor: 'bg-teal-100', hoverBg: 'hover:bg-teal-50' },
     { type: 'code_block', icon: Code, label: 'Code Blocks', color: 'text-slate-600', bgColor: 'bg-slate-100', hoverBg: 'hover:bg-slate-50' },
@@ -2038,7 +2038,7 @@ function RightSideToolbar({
   return (
     <>
       {/* Icon Toolbar - Fixed to right */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-white rounded-lg shadow-lg p-2 border">
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-surface rounded-lg shadow-lg p-2 border-theme border">
         {toolbarItems.map(({ type, icon: Icon, label, color, bgColor, hoverBg }) => {
           const count = counts[type];
           const isActive = filterType === type;
@@ -2053,7 +2053,7 @@ function RightSideToolbar({
               disabled={count === 0}
               title={`${label} (${count})`}
             >
-              <Icon className={`h-5 w-5 ${isActive ? color : 'text-gray-500 group-hover:' + color}`} />
+              <Icon className={`h-5 w-5 ${isActive ? color : 'text-muted group-hover:' + color}`} />
 
               {/* Count badge */}
               {count > 0 && (
@@ -2073,12 +2073,12 @@ function RightSideToolbar({
 
       {/* Expanded List Panel */}
       {filterType && filteredItems.length > 0 && (
-        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-20 w-72 max-h-[60vh] bg-white rounded-lg shadow-xl border overflow-hidden">
-          <div className="flex items-center justify-between p-3 border-b bg-gray-50">
+        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-20 w-72 max-h-[60vh] bg-surface rounded-lg shadow-xl border-theme border overflow-hidden">
+          <div className="flex items-center justify-between p-3 border-b border-theme bg-surface-hover">
             <h4 className="font-semibold capitalize text-sm">{filterType}s ({filteredItems.length})</h4>
             <button
               onClick={() => onFilterChange(null)}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-muted hover:text-theme"
             >
               <X className="h-4 w-4" />
             </button>
@@ -2088,10 +2088,10 @@ function RightSideToolbar({
               <button
                 key={item.id}
                 onClick={() => onContentSelect(item)}
-                className="w-full text-left p-3 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                className="w-full text-left p-3 hover:bg-surface-hover border-b border-theme last:border-b-0 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-gray-800 line-clamp-2 flex-1">
+                  <p className="text-sm text-theme line-clamp-2 flex-1">
                     {item.anchor_text || `${filterType} ${index + 1}`}
                   </p>
                   {/* Author/Reader Badge */}
@@ -2106,7 +2106,7 @@ function RightSideToolbar({
                   )}
                 </div>
                 {item.content_data && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                  <p className="text-xs text-muted mt-1 line-clamp-1">
                     {(item.content_data as any).question || (item.content_data as any).note || (item.content_data as any).url || ''}
                   </p>
                 )}
@@ -2192,10 +2192,10 @@ function ReaderSelectionToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="fixed z-50 flex items-center gap-1 bg-white rounded-lg shadow-xl border px-2 py-1.5"
+      className="fixed z-50 flex items-center gap-1 bg-surface rounded-lg shadow-xl border-theme border px-2 py-1.5"
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
-      <span className="text-xs text-gray-500 mr-1">Add:</span>
+      <span className="text-xs text-muted mr-1">Add:</span>
       {buttons.map(({ type, icon: Icon, label, color }) => (
         <button
           key={type}
@@ -2208,7 +2208,7 @@ function ReaderSelectionToolbar({
       ))}
       <button
         onClick={onClose}
-        className="p-1 ml-1 text-gray-400 hover:text-gray-600"
+        className="p-1 ml-1 text-muted hover:text-theme"
         title="Cancel"
       >
         <X className="h-3.5 w-3.5" />
@@ -2228,14 +2228,14 @@ function ContentFilterBar({
   isAuthor: boolean;
 }) {
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-white rounded-full shadow-lg border px-3 py-2">
-      <span className="text-xs text-gray-500">Show:</span>
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-surface rounded-full shadow-lg border-theme border px-3 py-2">
+      <span className="text-xs text-muted">Show:</span>
       <button
         onClick={() => onFilterChange('all')}
         className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
           filter === 'all'
             ? 'bg-primary-600 text-white'
-            : 'text-gray-600 hover:bg-gray-100'
+            : 'text-muted hover:bg-surface-hover'
         }`}
       >
         All
@@ -2245,7 +2245,7 @@ function ContentFilterBar({
         className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full transition-colors ${
           filter === 'author'
             ? 'bg-amber-500 text-white'
-            : 'text-gray-600 hover:bg-gray-100'
+            : 'text-muted hover:bg-surface-hover'
         }`}
       >
         <Crown className="h-3 w-3" />
@@ -2256,7 +2256,7 @@ function ContentFilterBar({
         className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full transition-colors ${
           filter === 'mine'
             ? 'bg-blue-500 text-white'
-            : 'text-gray-600 hover:bg-gray-100'
+            : 'text-muted hover:bg-surface-hover'
         }`}
       >
         <User className="h-3 w-3" />
