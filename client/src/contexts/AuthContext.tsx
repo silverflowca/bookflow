@@ -49,38 +49,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await api.getMe();
       setUser(data.user);
       setProfile(data.profile);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Auth check failed:', err);
-      api.setToken(null);
+      // Don't clear the token on profile load failure — user is still logged in
     } finally {
       setLoading(false);
     }
   }
 
   async function login(email: string, password: string) {
-    const data = await api.login(email, password);
-    // api.login() calls api.setToken() internally; also sign in to Supabase
-    // so onAuthStateChange fires and keeps the client session in sync
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // onAuthStateChange will fire and set the token automatically
+    // Load profile from backend using the fresh token
     if (data.session?.access_token) {
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
+      api.setToken(data.session.access_token);
+      await loadProfile();
     }
-    setUser(data.user);
-    setProfile(data.profile || null);
   }
 
   async function register(email: string, password: string, displayName: string) {
-    const data = await api.register(email, password, displayName);
-    if (data.session?.access_token) {
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: displayName } },
+    });
+    if (error) throw error;
+    if (!data.session) {
+      throw new Error('Registration successful — please check your email to confirm your account.');
     }
-    setUser(data.user);
-    setProfile(data.profile || null);
+    if (data.session?.access_token) {
+      api.setToken(data.session.access_token);
+      await loadProfile();
+    }
   }
 
   async function logout() {
