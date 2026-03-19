@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, Image, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
 
@@ -12,6 +12,8 @@ export default function BookSettings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [togglingVisibility, setTogglingVisibility] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,6 +98,27 @@ export default function BookSettings() {
     }
   }
 
+  async function handleToggleVisibility() {
+    if (!bookId || !book) return;
+    setTogglingVisibility(true);
+    try {
+      const newVisibility = book.visibility === 'public' ? 'private' : 'public';
+      const newStatus = newVisibility === 'public' && book.status === 'draft' ? 'published' : book.status;
+      const updated = await api.updateBook(bookId, { visibility: newVisibility, status: newStatus });
+      setBook(updated);
+    } catch (err) {
+      console.error('Failed to update visibility:', err);
+    } finally {
+      setTogglingVisibility(false);
+    }
+  }
+
+  function handleCopyUrl() {
+    navigator.clipboard.writeText(`${window.location.origin}/book/${bookId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   function updateSetting(key: keyof BookSettingsType, value: boolean | number) {
     if (!settings) return;
     setSettings({ ...settings, [key]: value });
@@ -143,6 +166,55 @@ export default function BookSettings() {
 
       {/* Settings Form */}
       <div className="bg-white rounded-lg border divide-y">
+        {/* Publishing */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-1">Publishing</h2>
+          <p className="text-sm text-gray-500 mb-4">Control who can access this book</p>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleToggleVisibility}
+                disabled={togglingVisibility}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  book.visibility === 'public'
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {togglingVisibility ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : book.visibility === 'public' ? (
+                  <Globe className="h-4 w-4" />
+                ) : (
+                  <Lock className="h-4 w-4" />
+                )}
+                {book.visibility === 'public' ? 'Public' : 'Private'}
+              </button>
+              <span className="text-sm text-gray-500">
+                {book.visibility === 'public'
+                  ? 'Anyone with the link can read this book'
+                  : 'Only you can see this book'}
+              </span>
+            </div>
+          </div>
+
+          {book.visibility === 'public' && (
+            <div className="mt-4 flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm text-gray-600 flex-1 truncate">
+                {window.location.origin}/book/{bookId}
+              </span>
+              <button
+                onClick={handleCopyUrl}
+                className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 bg-white border rounded-md transition-colors"
+              >
+                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Book Cover */}
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-4">Book Cover</h2>

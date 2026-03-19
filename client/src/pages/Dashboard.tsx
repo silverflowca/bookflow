@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Loader2 } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 
@@ -42,6 +42,10 @@ export default function Dashboard() {
     setBooks(books.map(b =>
       b.id === bookId ? { ...b, cover_image_url: coverUrl } : b
     ));
+  }
+
+  function handleBookUpdate(updated: Book) {
+    setBooks(books.map(b => b.id === updated.id ? updated : b));
   }
 
   return (
@@ -87,6 +91,7 @@ export default function Dashboard() {
               book={book}
               onDelete={() => handleDeleteBook(book.id)}
               onCoverUpdate={handleCoverUpdate}
+              onUpdate={handleBookUpdate}
             />
           ))}
         </div>
@@ -106,11 +111,35 @@ export default function Dashboard() {
   );
 }
 
-function BookCard({ book, onDelete, onCoverUpdate }: { book: Book; onDelete: () => void; onCoverUpdate: (bookId: string, coverUrl: string) => void }) {
+function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onDelete: () => void; onCoverUpdate: (bookId: string, coverUrl: string) => void; onUpdate: (book: Book) => void }) {
   const [showMenu, setShowMenu] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showCoverUpload, setShowCoverUpload] = useState(false);
+  const [togglingVisibility, setTogglingVisibility] = useState(false);
+  const [copied, setCopied] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const bookUrl = `${window.location.origin}/book/${book.id}`;
+
+  async function handleToggleVisibility() {
+    setTogglingVisibility(true);
+    try {
+      const newVisibility = book.visibility === 'public' ? 'private' : 'public';
+      const newStatus = newVisibility === 'public' && book.status === 'draft' ? 'published' : book.status;
+      const updated = await api.updateBook(book.id, { visibility: newVisibility, status: newStatus });
+      onUpdate(updated);
+    } catch (err) {
+      console.error('Failed to update visibility:', err);
+    } finally {
+      setTogglingVisibility(false);
+    }
+  }
+
+  function handleCopyUrl() {
+    navigator.clipboard.writeText(bookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const statusColors = {
     draft: 'bg-yellow-100 text-yellow-800 border border-yellow-300',
@@ -252,6 +281,39 @@ function BookCard({ book, onDelete, onCoverUpdate }: { book: Book; onDelete: () 
           <span className="text-xs text-muted">
             {book.chapters?.length || 0} chapters
           </span>
+        </div>
+
+        {/* Visibility Toggle */}
+        <div className="mt-3 flex items-center justify-between">
+          <button
+            onClick={handleToggleVisibility}
+            disabled={togglingVisibility}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              book.visibility === 'public'
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                : 'bg-surface-hover text-muted hover:bg-surface'
+            }`}
+          >
+            {togglingVisibility ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : book.visibility === 'public' ? (
+              <Globe className="h-3 w-3" />
+            ) : (
+              <Lock className="h-3 w-3" />
+            )}
+            {book.visibility === 'public' ? 'Public' : 'Private'}
+          </button>
+
+          {book.visibility === 'public' && (
+            <button
+              onClick={handleCopyUrl}
+              className="flex items-center gap-1 text-xs text-muted hover:text-theme transition-colors"
+              title={bookUrl}
+            >
+              {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+              {copied ? 'Copied!' : 'Copy URL'}
+            </button>
+          )}
         </div>
 
         <div className="flex gap-2 mt-4">
