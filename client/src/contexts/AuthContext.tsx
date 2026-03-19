@@ -51,37 +51,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(data.profile);
     } catch (err: any) {
       console.error('Auth check failed:', err);
-      // Don't clear the token on profile load failure — user is still logged in
     } finally {
       setLoading(false);
     }
   }
 
   async function login(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    // onAuthStateChange will fire and set the token automatically
-    // Load profile from backend using the fresh token
-    if (data.session?.access_token) {
-      api.setToken(data.session.access_token);
-      await loadProfile();
+    // Call backend — uses anon key, returns real session + profile
+    const data = await api.login(email, password);
+    if (!data.session?.access_token) {
+      throw new Error('Login failed — no session returned');
     }
+    // Set token and sync Supabase client session for auto-refresh
+    api.setToken(data.session.access_token);
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    setUser(data.user);
+    setProfile(data.profile || null);
   }
 
   async function register(email: string, password: string, displayName: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName } },
+    // Call backend — uses anon key, returns session (null if email confirm required)
+    const data = await api.register(email, password, displayName);
+    if (!data.session?.access_token) {
+      // Email confirmation required
+      throw new Error('Account created! Please check your email to confirm before logging in.');
+    }
+    api.setToken(data.session.access_token);
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
     });
-    if (error) throw error;
-    if (!data.session) {
-      throw new Error('Registration successful — please check your email to confirm your account.');
-    }
-    if (data.session?.access_token) {
-      api.setToken(data.session.access_token);
-      await loadProfile();
-    }
+    setUser(data.user);
+    setProfile(data.profile || null);
   }
 
   async function logout() {
