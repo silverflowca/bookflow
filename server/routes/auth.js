@@ -1,15 +1,15 @@
 import express from 'express';
-import supabase from '../config/supabase.js';
+import { supabase, supabasePublic } from '../config/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Register new user
+// Register new user — uses anon key so Supabase issues a real session
 router.post('/register', async (req, res) => {
   const { email, password, displayName } = req.body;
 
   try {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabasePublic.auth.signUp({
       email,
       password,
       options: {
@@ -29,19 +29,19 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+// Login — uses anon key so Supabase issues a real session with access_token
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabasePublic.auth.signInWithPassword({
       email,
       password
     });
 
     if (error) throw error;
 
-    // Get or create profile
+    // Get or create profile using service role (bypasses RLS)
     let { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -117,10 +117,9 @@ router.put('/profile', authenticate, async (req, res) => {
   }
 });
 
-// Logout (client-side primarily, but can invalidate session)
+// Logout
 router.post('/logout', authenticate, async (req, res) => {
   try {
-    await supabase.auth.signOut();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
