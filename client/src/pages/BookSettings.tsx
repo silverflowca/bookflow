@@ -155,58 +155,56 @@ export default function BookSettings() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
-        <Link to={`/edit/book/${bookId}`} className="text-gray-500 hover:text-gray-700">
+        <Link to={`/edit/book/${bookId}`} className="text-muted hover:text-theme">
           <ChevronLeft className="h-6 w-6" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Book Settings</h1>
-          <p className="text-gray-500">{book.title}</p>
+          <h1 className="text-2xl font-bold text-theme">Book Settings</h1>
+          <p className="text-muted">{book.title}</p>
         </div>
       </div>
 
       {/* Settings Form */}
-      <div className="bg-white rounded-lg border divide-y">
+      <div className="theme-section divide-y divide-[var(--color-border)]">
         {/* Publishing */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-1">Publishing</h2>
-          <p className="text-sm text-gray-500 mb-4">Control who can access this book</p>
+          <h2 className="text-lg font-semibold mb-1 text-theme">Publishing</h2>
+          <p className="text-sm text-muted mb-4">Control who can access this book</p>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleToggleVisibility}
-                disabled={togglingVisibility}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                  book.visibility === 'public'
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {togglingVisibility ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : book.visibility === 'public' ? (
-                  <Globe className="h-4 w-4" />
-                ) : (
-                  <Lock className="h-4 w-4" />
-                )}
-                {book.visibility === 'public' ? 'Public' : 'Private'}
-              </button>
-              <span className="text-sm text-gray-500">
-                {book.visibility === 'public'
-                  ? 'Anyone with the link can read this book'
-                  : 'Only you can see this book'}
-              </span>
-            </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleToggleVisibility}
+              disabled={togglingVisibility}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                book.visibility === 'public'
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-surface-hover text-muted hover:border-strong border-2 border-theme'
+              }`}
+            >
+              {togglingVisibility ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : book.visibility === 'public' ? (
+                <Globe className="h-4 w-4" />
+              ) : (
+                <Lock className="h-4 w-4" />
+              )}
+              {book.visibility === 'public' ? 'Public' : 'Private'}
+            </button>
+            <span className="text-sm text-muted">
+              {book.visibility === 'public'
+                ? 'Anyone with the link can read this book'
+                : 'Only you can see this book'}
+            </span>
           </div>
 
           {book.visibility === 'public' && (
-            <div className="mt-4 flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-600 flex-1 truncate">
+            <div className="mt-4 flex items-center gap-2 p-3 bg-surface-hover border-2 border-theme rounded-lg">
+              <span className="text-sm text-muted flex-1 truncate">
                 {window.location.origin}/book/{bookId}
               </span>
               <button
                 onClick={handleCopyUrl}
-                className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 bg-white border rounded-md transition-colors"
+                className="flex items-center gap-1 px-3 py-1 text-sm theme-button-secondary rounded-md"
               >
                 {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Copied!' : 'Copy'}
@@ -217,14 +215,14 @@ export default function BookSettings() {
 
         {/* Book Cover */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Book Cover</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Book Cover</h2>
+          <p className="text-sm text-muted mb-4">
             Upload a cover image for your book (recommended: 600x900px)
           </p>
 
           <div className="flex items-start gap-6">
             {/* Cover Preview */}
-            <div className="w-32 h-48 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
+            <div className="w-32 h-48 rounded-lg border-2 border-dashed border-theme flex items-center justify-center overflow-hidden bg-surface-hover flex-shrink-0">
               {coverUrl ? (
                 <img
                   src={coverUrl}
@@ -232,7 +230,7 @@ export default function BookSettings() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <Image className="h-12 w-12 text-gray-400" />
+                <Image className="h-12 w-12 text-muted" />
               )}
             </div>
 
@@ -249,7 +247,7 @@ export default function BookSettings() {
               <button
                 onClick={() => coverInputRef.current?.click()}
                 disabled={uploadingCover}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 theme-button-primary rounded-lg disabled:opacity-50"
               >
                 {uploadingCover ? (
                   <>
@@ -267,7 +265,7 @@ export default function BookSettings() {
               {coverUrl && (
                 <button
                   onClick={handleRemoveCover}
-                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg border-2 border-transparent hover:border-red-200"
                 >
                   <X className="h-4 w-4" />
                   Remove Cover
@@ -275,7 +273,7 @@ export default function BookSettings() {
               )}
 
               <p className="text-xs text-gray-500">
-                Supported formats: JPG, PNG, WebP. Max size: 5MB.
+                <span className="text-muted">Supported formats: JPG, PNG, WebP. Max size: 5MB.</span>
               </p>
             </div>
           </div>
@@ -283,8 +281,8 @@ export default function BookSettings() {
 
         {/* Reader Permissions */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Reader Permissions</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Reader Permissions</h2>
+          <p className="text-sm text-muted mb-4">
             Control what readers can add to your book
           </p>
 
@@ -321,8 +319,8 @@ export default function BookSettings() {
 
         {/* Reader Media & Links */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Reader Media & Links</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Reader Media & Links</h2>
+          <p className="text-sm text-muted mb-4">
             Control what media readers can add
           </p>
 
@@ -352,8 +350,8 @@ export default function BookSettings() {
 
         {/* Author Content Options */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Author Content Options</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Author Content Options</h2>
+          <p className="text-sm text-muted mb-4">
             Control your own content abilities
           </p>
 
@@ -383,13 +381,13 @@ export default function BookSettings() {
 
         {/* Media Duration Settings */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Media Duration Limit</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Media Duration Limit</h2>
+          <p className="text-sm text-muted mb-4">
             Maximum recording duration for audio and video clips
           </p>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-theme">
               Max duration (seconds)
             </label>
             <div className="flex items-center gap-4">
@@ -400,13 +398,13 @@ export default function BookSettings() {
                 step="30"
                 value={settings.max_media_duration ?? 60}
                 onChange={(e) => updateSetting('max_media_duration', parseInt(e.target.value) as any)}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                className="flex-1 h-2 bg-surface-hover rounded-lg appearance-none cursor-pointer accent-[var(--color-accent)]"
               />
-              <span className="w-20 text-center font-mono bg-gray-100 px-3 py-1 rounded">
+              <span className="w-20 text-center font-mono bg-surface-hover border border-theme px-3 py-1 rounded text-theme">
                 {formatDuration(settings.max_media_duration ?? 60)}
               </span>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted">
               Choose between 30 seconds and 5 minutes
             </p>
           </div>
@@ -414,8 +412,8 @@ export default function BookSettings() {
 
         {/* Author Content Visibility */}
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Author Content Visibility</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Author Content Visibility</h2>
+          <p className="text-sm text-muted mb-4">
             Control visibility of your annotations
           </p>
 
@@ -447,7 +445,7 @@ export default function BookSettings() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 theme-button-primary rounded-lg disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
           {saving ? 'Saving...' : 'Save Settings'}
@@ -475,12 +473,12 @@ function ToggleSetting({
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          className="w-5 h-5 rounded border-theme accent-[var(--color-accent)]"
         />
       </div>
       <div>
-        <p className="font-medium text-gray-900">{label}</p>
-        <p className="text-sm text-gray-500">{description}</p>
+        <p className="font-medium text-theme">{label}</p>
+        <p className="text-sm text-muted">{description}</p>
       </div>
     </label>
   );
