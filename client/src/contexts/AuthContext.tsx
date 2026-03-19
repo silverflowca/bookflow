@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../lib/api';
+import supabase from '../lib/supabase';
 import type { User, Profile } from '../types';
 
 interface AuthContextType {
@@ -20,16 +21,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    // Get initial session — Supabase auto-refreshes the token
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        api.setToken(session.access_token);
+        loadProfile();
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Keep token in sync on refresh, login, logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token) {
+        api.setToken(session.access_token);
+      } else {
+        api.setToken(null);
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  async function checkAuth() {
-    const token = api.getToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
+  async function loadProfile() {
     try {
       const data = await api.getMe();
       setUser(data.user);
@@ -56,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await api.logout();
+    await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
   }
