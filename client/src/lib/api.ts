@@ -8,7 +8,7 @@ import type {
   ApiResponse
 } from '../types';
 
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 class ApiClient {
   private token: string | null = null;
