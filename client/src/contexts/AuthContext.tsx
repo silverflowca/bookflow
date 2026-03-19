@@ -21,24 +21,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session — Supabase auto-refreshes the token
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.access_token) {
-        api.setToken(session.access_token);
-        loadProfile();
-      } else {
-        setLoading(false);
-      }
-    });
+    let initialized = false;
 
-    // Keep token in sync on refresh, login, logout
+    // onAuthStateChange fires immediately with the current session,
+    // then again on any token refresh, login, or logout.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.access_token) {
         api.setToken(session.access_token);
+        if (!initialized) {
+          initialized = true;
+          loadProfile();
+        }
       } else {
+        initialized = true;
         api.setToken(null);
         setUser(null);
         setProfile(null);
+        setLoading(false);
       }
     });
 
@@ -60,12 +59,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     const data = await api.login(email, password);
+    // api.login() calls api.setToken() internally; also sign in to Supabase
+    // so onAuthStateChange fires and keeps the client session in sync
+    if (data.session?.access_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
     setUser(data.user);
     setProfile(data.profile || null);
   }
 
   async function register(email: string, password: string, displayName: string) {
     const data = await api.register(email, password, displayName);
+    if (data.session?.access_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
     setUser(data.user);
     setProfile(data.profile || null);
   }
