@@ -4,19 +4,34 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const FILEFLOW_URL = process.env.FILEFLOW_URL || 'http://localhost:8680';
+const DEFAULT_FILEFLOW_URL = process.env.FILEFLOW_URL || 'http://localhost:8680';
+
+async function getUserFileflowSettings(userId) {
+  const { data } = await supabase
+    .from('app_settings')
+    .select('fileflow_url, fileflow_access_key')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return {
+    url: data?.fileflow_url || DEFAULT_FILEFLOW_URL,
+    accessKey: data?.fileflow_access_key || null,
+  };
+}
 
 // Proxy file upload to FileFlow
 router.post('/upload', authenticate, async (req, res) => {
   const { file_name, file_type, file_size, book_id, chapter_id, inline_content_id, display_name } = req.body;
 
   try {
+    const { url: fileflowUrl, accessKey } = await getUserFileflowSettings(req.user.id);
+
     // Get upload URL from FileFlow
-    const response = await fetch(`${FILEFLOW_URL}/api/files/upload-url`, {
+    const authHeader = accessKey ? `Bearer ${accessKey}` : `Bearer ${req.token}`;
+    const response = await fetch(`${fileflowUrl}/api/files/upload-url`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${req.token}`
+        'Authorization': authHeader
       },
       body: JSON.stringify({
         fileName: file_name,
@@ -105,9 +120,11 @@ router.get('/:fileId/url', authenticate, async (req, res) => {
     }
 
     // Otherwise get from FileFlow
-    const response = await fetch(`${FILEFLOW_URL}/api/storage/download/${fileRef.fileflow_file_id}`, {
+    const { url: fileflowUrl, accessKey } = await getUserFileflowSettings(req.user.id);
+    const authHeader = accessKey ? `Bearer ${accessKey}` : `Bearer ${req.token}`;
+    const response = await fetch(`${fileflowUrl}/api/storage/download/${fileRef.fileflow_file_id}`, {
       headers: {
-        'Authorization': `Bearer ${req.token}`
+        'Authorization': authHeader
       }
     });
 
