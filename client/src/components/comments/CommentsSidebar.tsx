@@ -35,6 +35,7 @@ export default function CommentsSidebar({
   const [newBody, setNewBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     loadComments();
@@ -62,6 +63,7 @@ export default function CommentsSidebar({
   async function handleSubmit() {
     if (!newBody.trim()) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const opts: { selection_start?: number; selection_end?: number; anchor_text?: string } = {};
       if (pendingSelection) {
@@ -75,8 +77,9 @@ export default function CommentsSidebar({
       setNewBody('');
       setShowNewForm(false);
       onSelectionUsed?.();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create comment:', err);
+      setSubmitError(err.message || 'Failed to post comment');
     } finally {
       setSubmitting(false);
     }
@@ -152,17 +155,20 @@ export default function CommentsSidebar({
             rows={3}
             autoFocus
           />
+          {submitError && (
+            <p className="text-xs text-red-600">{submitError}</p>
+          )}
           <div className="flex gap-2">
             <button
               onClick={handleSubmit}
               disabled={submitting || !newBody.trim()}
-              className="flex items-center gap-1.5 theme-button-primary px-3 py-1.5 rounded-lg text-sm font-medium"
+              className="flex items-center gap-1.5 theme-button-primary px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
               Post
             </button>
             <button
-              onClick={() => { setShowNewForm(false); setNewBody(''); onSelectionUsed?.(); }}
+              onClick={() => { setShowNewForm(false); setNewBody(''); setSubmitError(null); onSelectionUsed?.(); }}
               className="text-sm text-muted hover:text-theme transition-colors"
             >
               Cancel

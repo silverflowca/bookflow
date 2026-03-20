@@ -44,14 +44,9 @@ router.get('/', authenticate, async (req, res) => {
 
     const { data, error } = await supabase
       .from('book_comments')
-      .select(`
-        id, body, selection_start, selection_end, anchor_text, status,
-        resolved_at, created_at, updated_at, parent_id,
-        author:profiles!book_comments_author_id_fkey(id, display_name, avatar_url),
-        resolver:profiles!book_comments_resolved_by_fkey(id, display_name)
-      `)
+      .select('id, body, selection_start, selection_end, anchor_text, status, resolved_at, created_at, updated_at, parent_id, author_id, resolved_by')
       .eq('chapter_id', req.params.chapterId)
-      .is('parent_id', null)  // top-level only; replies fetched separately or nested
+      .is('parent_id', null)
       .order('created_at');
 
     if (error) throw error;
@@ -62,18 +57,34 @@ router.get('/', authenticate, async (req, res) => {
     if (commentIds.length > 0) {
       const { data: replyData } = await supabase
         .from('book_comments')
-        .select(`
-          id, body, parent_id, created_at, updated_at,
-          author:profiles!book_comments_author_id_fkey(id, display_name, avatar_url)
-        `)
+        .select('id, body, parent_id, created_at, updated_at, author_id')
         .in('parent_id', commentIds)
         .order('created_at');
       replies = replyData || [];
     }
 
+    // Fetch profiles for all author_id / resolved_by values
+    const allUserIds = [...new Set([
+      ...data.map(c => c.author_id),
+      ...data.map(c => c.resolved_by).filter(Boolean),
+      ...replies.map(r => r.author_id),
+    ])];
+    const profileMap = {};
+    if (allUserIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', allUserIds);
+      (profiles || []).forEach(p => { profileMap[p.id] = p; });
+    }
+
     const withReplies = data.map(c => ({
       ...c,
-      replies: replies.filter(r => r.parent_id === c.id),
+      author: profileMap[c.author_id] || { id: c.author_id, display_name: null, avatar_url: null },
+      resolver: c.resolved_by ? (profileMap[c.resolved_by] || { id: c.resolved_by, display_name: null }) : null,
+      replies: replies
+        .filter(r => r.parent_id === c.id)
+        .map(r => ({ ...r, author: profileMap[r.author_id] || { id: r.author_id, display_name: null, avatar_url: null } })),
     }));
 
     res.json(withReplies);
@@ -107,13 +118,18 @@ router.post('/', authenticate, async (req, res) => {
         selection_end: selection_end ?? null,
         anchor_text: anchor_text || null,
       })
-      .select(`
-        id, body, selection_start, selection_end, anchor_text, status, created_at, parent_id,
-        author:profiles!book_comments_author_id_fkey(id, display_name, avatar_url)
-      `)
+      .select('id, body, selection_start, selection_end, anchor_text, status, created_at, parent_id, author_id')
       .single();
 
     if (error) throw error;
+
+    // Fetch author profile separately (author_id FK points to auth.users, not profiles)
+    const { data: authorProfile } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .eq('id', req.user.id)
+      .single();
+    const responseData = { ...data, author: authorProfile || { id: req.user.id, display_name: null, avatar_url: null }, replies: [] };
 
     // Notify book owner of new comment (if not self)
     const { data: book } = await supabase
@@ -134,7 +150,7 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
-    res.status(201).json(data);
+    res.status(201).json(responseData);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
