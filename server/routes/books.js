@@ -63,6 +63,34 @@ router.get('/my', authenticate, async (req, res) => {
   }
 });
 
+// Get books where user is a collaborator (not owner)
+router.get('/collaborating', authenticate, async (req, res) => {
+  try {
+    const { data: collabs, error } = await supabase
+      .from('book_collaborators')
+      .select(`
+        role, invite_accepted_at,
+        book:books(
+          id, title, subtitle, cover_image_url, status, visibility,
+          review_status, updated_at, author_id,
+          author:profiles!books_author_id_fkey(id, display_name, avatar_url)
+        )
+      `)
+      .eq('user_id', req.user.id)
+      .not('invite_accepted_at', 'is', null);
+
+    if (error) throw error;
+
+    const books = (collabs || [])
+      .filter(c => c.book)
+      .map(c => ({ ...c.book, userRole: c.role }));
+
+    res.json(books);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get single book
 router.get('/:id', optionalAuth, async (req, res) => {
   try {

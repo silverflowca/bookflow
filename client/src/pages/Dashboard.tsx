@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 
 export default function Dashboard() {
   const [books, setBooks] = useState<Book[]>([]);
+  const [collaboratingBooks, setCollaboratingBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewBookModal, setShowNewBookModal] = useState(false);
   const navigate = useNavigate();
@@ -16,8 +17,12 @@ export default function Dashboard() {
 
   async function loadBooks() {
     try {
-      const data = await api.getMyBooks();
-      setBooks(data);
+      const [ownBooks, collabBooks] = await Promise.all([
+        api.getMyBooks(),
+        api.getCollaboratingBooks().catch(() => []),
+      ]);
+      setBooks(ownBooks);
+      setCollaboratingBooks(collabBooks);
     } catch (err) {
       console.error('Failed to load books:', err);
     } finally {
@@ -94,6 +99,47 @@ export default function Dashboard() {
               onUpdate={handleBookUpdate}
             />
           ))}
+        </div>
+      )}
+
+      {/* Collaborating Books */}
+      {collaboratingBooks.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold text-theme">Collaborating On</h2>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {collaboratingBooks.map((book) => (
+              <div key={book.id} className="theme-section rounded-xl p-4 flex gap-4">
+                {book.cover_image_url ? (
+                  <img src={book.cover_image_url} alt={book.title} className="w-16 h-20 object-cover rounded-lg flex-shrink-0" />
+                ) : (
+                  <div className="w-16 h-20 bg-surface-hover rounded-lg flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="h-6 w-6 text-muted" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-theme truncate">{book.title}</p>
+                  {book.author && (
+                    <p className="text-xs text-muted mt-0.5">by {book.author.display_name}</p>
+                  )}
+                  {(book as Book & { userRole?: string }).userRole && (
+                    <span className="inline-block mt-1.5 text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full font-medium capitalize">
+                      {(book as Book & { userRole?: string }).userRole}
+                    </span>
+                  )}
+                  <Link
+                    to={`/edit/book/${book.id}`}
+                    className="flex items-center gap-1 mt-2 text-xs text-accent hover:underline"
+                  >
+                    <Edit className="h-3 w-3" />
+                    Open
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

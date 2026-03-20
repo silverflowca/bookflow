@@ -16,6 +16,13 @@ import filesRoutes from './routes/files.js';
 import changesRoutes from './routes/changes.js';
 import settingsRoutes from './routes/settings.js';
 import ttsRoutes from './routes/tts.js';
+import collaboratorsRoutes, { acceptInvite } from './routes/collaborators.js';
+import versionsRoutes from './routes/versions.js';
+import commentsRouter from './routes/comments.js';
+import reviewsRoutes from './routes/reviews.js';
+import notificationsRoutes from './routes/notifications.js';
+import publishRoutes from './routes/publish.js';
+import { optionalAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +63,18 @@ app.use('/api/files', filesRoutes);
 app.use('/api/changes', changesRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/tts', ttsRoutes);
+
+// Collaboration routes
+app.use('/api/books/:bookId/collaborators', collaboratorsRoutes);
+app.use('/api/books/:bookId/versions', versionsRoutes);
+app.use('/api/chapters/:chapterId/comments', commentsRouter);
+app.use('/api/books/:bookId/reviews', reviewsRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/books/:bookId', publishRoutes);
+app.use('/api/public', publishRoutes);
+
+// Invite acceptance
+app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

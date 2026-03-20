@@ -5,7 +5,13 @@ import type {
   Profile,
   AuthResponse,
   ReadingProgress,
-  ApiResponse
+  ApiResponse,
+  BookCollaborator,
+  BookVersion,
+  BookComment,
+  ReviewRequest,
+  UserNotification,
+  CollaboratorRole,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -300,6 +306,149 @@ class ApiClient {
 
   async getTTSVoices(): Promise<{ id: string; name: string; language: string; gender: string }[]> {
     return this.request('/tts/voices');
+  }
+
+  // Collaborators
+  async getCollaborators(bookId: string): Promise<BookCollaborator[]> {
+    return this.request(`/books/${bookId}/collaborators`);
+  }
+
+  async inviteCollaborator(bookId: string, data: { email?: string; userId?: string; role: Exclude<CollaboratorRole, 'owner'> }): Promise<BookCollaborator & { invite_token?: string }> {
+    return this.request(`/books/${bookId}/collaborators`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCollaboratorRole(bookId: string, collabId: string, role: Exclude<CollaboratorRole, 'owner'>): Promise<BookCollaborator> {
+    return this.request(`/books/${bookId}/collaborators/${collabId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async removeCollaborator(bookId: string, collabId: string): Promise<void> {
+    return this.request(`/books/${bookId}/collaborators/${collabId}`, { method: 'DELETE' });
+  }
+
+  async acceptInvite(token: string): Promise<{ success?: boolean; requiresAuth?: boolean; book?: Pick<Book, 'id' | 'title'>; role?: string }> {
+    return this.request(`/invites/accept/${token}`, { method: 'POST' });
+  }
+
+  // Versions
+  async getVersions(bookId: string): Promise<BookVersion[]> {
+    return this.request(`/books/${bookId}/versions`);
+  }
+
+  async createVersion(bookId: string, label?: string): Promise<BookVersion> {
+    return this.request(`/books/${bookId}/versions`, {
+      method: 'POST',
+      body: JSON.stringify({ label }),
+    });
+  }
+
+  async getVersion(bookId: string, versionId: string): Promise<BookVersion> {
+    return this.request(`/books/${bookId}/versions/${versionId}`);
+  }
+
+  async restoreVersion(bookId: string, versionId: string): Promise<{ success: boolean; restoredChapters: number }> {
+    return this.request(`/books/${bookId}/versions/${versionId}/restore`, { method: 'POST' });
+  }
+
+  // Comments
+  async getChapterComments(chapterId: string): Promise<BookComment[]> {
+    return this.request(`/chapters/${chapterId}/comments`);
+  }
+
+  async createComment(chapterId: string, body: string, opts?: { selection_start?: number; selection_end?: number; anchor_text?: string; parent_id?: string }): Promise<BookComment> {
+    return this.request(`/chapters/${chapterId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body, ...opts }),
+    });
+  }
+
+  async editComment(commentId: string, body: string): Promise<BookComment> {
+    return this.request(`/comments/${commentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ body }),
+    });
+  }
+
+  async deleteComment(commentId: string): Promise<void> {
+    return this.request(`/comments/${commentId}`, { method: 'DELETE' });
+  }
+
+  async resolveComment(commentId: string, status: 'resolved' | 'rejected' = 'resolved'): Promise<BookComment> {
+    return this.request(`/comments/${commentId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async replyToComment(chapterId: string, parentId: string, body: string): Promise<BookComment> {
+    return this.createComment(chapterId, body, { parent_id: parentId });
+  }
+
+  // Reviews
+  async getReviews(bookId: string): Promise<ReviewRequest[]> {
+    return this.request(`/books/${bookId}/reviews`);
+  }
+
+  async submitForReview(bookId: string, message?: string): Promise<ReviewRequest> {
+    return this.request(`/books/${bookId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
+
+  async reviewDecision(bookId: string, reviewId: string, decision: { status: 'approved' | 'rejected'; reviewer_note?: string }): Promise<ReviewRequest> {
+    return this.request(`/books/${bookId}/reviews/${reviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(decision),
+    });
+  }
+
+  async cancelReview(bookId: string, reviewId: string): Promise<void> {
+    return this.request(`/books/${bookId}/reviews/${reviewId}`, { method: 'DELETE' });
+  }
+
+  // Notifications
+  async getNotifications(limit?: number): Promise<UserNotification[]> {
+    return this.request(`/notifications${limit ? `?limit=${limit}` : ''}`);
+  }
+
+  async getUnreadCount(): Promise<{ count: number }> {
+    return this.request('/notifications/unread-count');
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    return this.request(`/notifications/${id}/read`, { method: 'PUT' });
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    return this.request('/notifications/read-all', { method: 'PUT' });
+  }
+
+  // Publishing
+  async publishBook(bookId: string): Promise<Pick<Book, 'id' | 'title' | 'slug' | 'share_token' | 'status' | 'visibility' | 'published_at'>> {
+    return this.request(`/books/${bookId}/publish`, { method: 'POST' });
+  }
+
+  async unpublishBook(bookId: string): Promise<Pick<Book, 'id' | 'status' | 'visibility'>> {
+    return this.request(`/books/${bookId}/unpublish`, { method: 'POST' });
+  }
+
+  async getPublicBook(slug: string): Promise<Book & { chapters: Chapter[] }> {
+    return this.request(`/public/books/${slug}`);
+  }
+
+  async getSharedBook(token: string): Promise<Book & { chapters: Chapter[] }> {
+    return this.request(`/public/books/share/${token}`);
+  }
+
+  // Collaborator books (books user is a collaborator on)
+  async getCollaboratingBooks(): Promise<Book[]> {
+    return this.request('/books/collaborating');
   }
 
   // Book Cover Upload

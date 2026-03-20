@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History } from 'lucide-react';
 import api from '../lib/api';
-import type { Book, Chapter } from '../types';
+import type { Book, Chapter, BookCollaborator } from '../types';
+import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
 
 export default function BookEditor() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [collaborators, setCollaborators] = useState<BookCollaborator[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingBook, setEditingBook] = useState(false);
@@ -25,6 +27,8 @@ export default function BookEditor() {
       const bookData = await api.getBook(bookId!);
       setBook(bookData);
       setChapters(bookData.chapters || []);
+      // Load collaborators (owner only — silently fail for non-owners)
+      api.getCollaborators(bookId!).then(setCollaborators).catch(() => {});
     } catch (err) {
       console.error('Failed to load book:', err);
     } finally {
@@ -114,7 +118,24 @@ export default function BookEditor() {
                 <h1 className="text-2xl font-bold">{book.title}</h1>
                 {book.subtitle && <p className="text-muted">{book.subtitle}</p>}
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                {collaborators.length > 0 && (
+                  <CollaboratorBadges collaborators={collaborators} bookId={bookId!} />
+                )}
+                <Link
+                  to={`/edit/book/${bookId}/collaborators`}
+                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                  title="Collaborators"
+                >
+                  <Users className="h-5 w-5" />
+                </Link>
+                <Link
+                  to={`/edit/book/${bookId}/versions`}
+                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                  title="Version history"
+                >
+                  <History className="h-5 w-5" />
+                </Link>
                 <button
                   onClick={() => setEditingBook(true)}
                   className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"

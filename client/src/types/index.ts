@@ -29,11 +29,15 @@ export interface Book {
   status: 'draft' | 'published' | 'archived';
   visibility: 'private' | 'public';
   published_at?: string;
+  slug?: string;
+  share_token?: string;
+  review_status?: 'none' | 'pending' | 'approved' | 'rejected';
   created_at: string;
   updated_at: string;
   author?: Profile;
   chapters?: Chapter[];
   settings?: BookSettings;
+  collaborators?: BookCollaborator[];
 }
 
 export interface BookSettings {
@@ -65,8 +69,94 @@ export interface Chapter {
   status: 'draft' | 'published';
   word_count: number;
   estimated_read_time_minutes: number;
+  last_edited_by?: string;
   created_at: string;
   updated_at: string;
+}
+
+// Collaboration types
+export type CollaboratorRole = 'owner' | 'author' | 'editor' | 'reviewer';
+
+export interface BookCollaborator {
+  id: string;
+  book_id: string;
+  user_id: string | null;
+  role: Exclude<CollaboratorRole, 'owner'>;
+  invited_email?: string;
+  invite_accepted_at: string | null;
+  invite_token?: string;
+  created_at: string;
+  user?: Pick<Profile, 'id' | 'display_name' | 'email' | 'avatar_url'>;
+  invited_by_user?: Pick<Profile, 'id' | 'display_name'>;
+}
+
+export interface BookVersion {
+  id: string;
+  book_id: string;
+  version_number: number;
+  label?: string;
+  snapshot?: { chapters: Chapter[]; snapped_at: string };
+  created_by: string;
+  trigger: 'manual' | 'submit_review' | 'publish' | 'auto';
+  created_at: string;
+  created_by_user?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'>;
+}
+
+export interface BookComment {
+  id: string;
+  book_id: string;
+  chapter_id?: string;
+  parent_id?: string;
+  author_id: string;
+  body: string;
+  selection_start?: number;
+  selection_end?: number;
+  anchor_text?: string;
+  status: 'open' | 'resolved' | 'rejected';
+  resolved_by?: string;
+  resolved_at?: string;
+  created_at: string;
+  updated_at: string;
+  author?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'>;
+  resolver?: Pick<Profile, 'id' | 'display_name'>;
+  replies?: BookComment[];
+}
+
+export interface ReviewRequest {
+  id: string;
+  book_id: string;
+  version_id?: string;
+  submitted_by: string;
+  submitted_at: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  reviewer_note?: string;
+  message?: string;
+  submitter?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'>;
+  reviewer?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'>;
+  version?: Pick<BookVersion, 'id' | 'version_number' | 'label'>;
+}
+
+export type NotificationType =
+  | 'invite' | 'comment' | 'comment_reply'
+  | 'review_submitted' | 'review_approved' | 'review_rejected' | 'mention';
+
+export interface UserNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  book_id?: string;
+  chapter_id?: string;
+  comment_id?: string;
+  review_request_id?: string;
+  invite_token?: string;
+  read_at?: string;
+  created_at: string;
+  book?: Pick<Book, 'id' | 'title'>;
+  chapter?: Pick<Chapter, 'id' | 'title'>;
 }
 
 // Inline content types

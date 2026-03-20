@@ -19,9 +19,12 @@ import type {
   CodeBlockData, ScriptureBlockData
 } from '../types';
 import InlineContentModal from '../components/editor/InlineContentModal';
+import CommentsSidebar from '../components/comments/CommentsSidebar';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ChapterEditor() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
+  const { user } = useAuth();
   const [, setChapter] = useState<Chapter | null>(null);
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(true);
@@ -33,6 +36,8 @@ export default function ChapterEditor() {
     selection?: { from: number; to: number; text: string };
     editingItem?: InlineContent;
   } | null>(null);
+  const [showComments, setShowComments] = useState(false);
+  const [commentSelection, setCommentSelection] = useState<{ from: number; to: number; text: string } | null>(null);
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -368,6 +373,16 @@ export default function ChapterEditor() {
                 <Save className="h-4 w-4" />
                 {saving ? 'Saving...' : 'Save'}
               </button>
+              <button
+                onClick={() => setShowComments(!showComments)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded transition-colors ${
+                  showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:bg-surface-hover'
+                }`}
+                title="Comments"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Comments
+              </button>
               <Link
                 to={`/book/${bookId}/chapter/${chapterId}`}
                 className="flex items-center gap-1 px-3 py-1.5 text-muted hover:bg-surface-hover rounded"
@@ -399,7 +414,8 @@ export default function ChapterEditor() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6 flex gap-6">
+      <div className="flex">
+      <div className="flex-1 max-w-5xl mx-auto px-4 py-6 flex gap-6 min-w-0">
         {/* Editor */}
         <div className="flex-1">
           {/* Toolbar */}
@@ -621,6 +637,20 @@ export default function ChapterEditor() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Comments Sidebar */}
+      {showComments && chapterId && bookId && (
+        <CommentsSidebar
+          chapterId={chapterId}
+          bookId={bookId}
+          canResolve={true}
+          currentUserId={user?.id}
+          onClose={() => { setShowComments(false); setCommentSelection(null); }}
+          pendingSelection={commentSelection}
+          onSelectionUsed={() => setCommentSelection(null)}
+        />
+      )}
       </div>
 
       {/* Inline Content Modal */}

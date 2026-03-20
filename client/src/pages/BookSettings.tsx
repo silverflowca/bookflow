@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check } from 'lucide-react';
+import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2 } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
 
@@ -154,14 +154,43 @@ export default function BookSettings() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-center gap-4 mb-6">
         <Link to={`/edit/book/${bookId}`} className="text-muted hover:text-theme">
           <ChevronLeft className="h-6 w-6" />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-theme">Book Settings</h1>
           <p className="text-muted">{book.title}</p>
         </div>
+      </div>
+
+      {/* Quick links */}
+      <div className="flex gap-3 mb-8">
+        <Link
+          to={`/edit/book/${bookId}/collaborators`}
+          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
+        >
+          <Users className="h-4 w-4" />
+          Collaborators
+        </Link>
+        <Link
+          to={`/edit/book/${bookId}/versions`}
+          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
+        >
+          <History className="h-4 w-4" />
+          Versions
+        </Link>
+        {book.slug && (
+          <a
+            href={`/read/${book.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
+          >
+            <Share2 className="h-4 w-4" />
+            Public URL
+          </a>
+        )}
       </div>
 
       {/* Settings Form */}
@@ -209,6 +238,26 @@ export default function BookSettings() {
                 {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Copied!' : 'Copy'}
               </button>
+            </div>
+          )}
+
+          {/* Public slug + share token (set by publish flow) */}
+          {book.slug && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <Globe className="h-4 w-4 text-green-600 flex-shrink-0" />
+                <span className="text-sm text-green-800 flex-1 truncate">
+                  {window.location.origin}/read/{book.slug}
+                </span>
+              </div>
+              {book.share_token && (
+                <div className="flex items-center gap-2 p-3 bg-surface-hover border-2 border-theme rounded-lg">
+                  <Lock className="h-4 w-4 text-muted flex-shrink-0" />
+                  <span className="text-xs text-muted flex-1 truncate">
+                    Private link: {window.location.origin}/read/share/{book.share_token}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

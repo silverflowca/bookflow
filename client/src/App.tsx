@@ -11,6 +11,11 @@ import ChapterEditor from './pages/ChapterEditor';
 import BookReader from './pages/BookReader';
 import BookSettings from './pages/BookSettings';
 import Settings from './pages/Settings';
+import InboxPage from './pages/InboxPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
+import BookCollaboratorsPage from './pages/BookCollaboratorsPage';
+import BookVersionsPage from './pages/BookVersionsPage';
+import PublicBookPage from './pages/PublicBookPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -44,9 +49,18 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        {/* Reading */}
         <Route path="book/:bookId" element={<BookReader />} />
         <Route path="book/:bookId/chapter/:chapterId" element={<BookReader />} />
 
+        {/* Public reader — no auth required */}
+        <Route path="read/:slug" element={<PublicBookPage />} />
+        <Route path="read/share/:token" element={<PublicBookPage />} />
+
+        {/* Invite acceptance — works with or without auth */}
+        <Route path="invite/:token" element={<AcceptInvitePage />} />
+
+        {/* Protected editing routes */}
         <Route path="edit/book/:bookId" element={
           <ProtectedRoute>
             <BookEditor />
@@ -62,6 +76,24 @@ function AppRoutes() {
         <Route path="edit/book/:bookId/settings" element={
           <ProtectedRoute>
             <BookSettings />
+          </ProtectedRoute>
+        } />
+
+        <Route path="edit/book/:bookId/collaborators" element={
+          <ProtectedRoute>
+            <BookCollaboratorsPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="edit/book/:bookId/versions" element={
+          <ProtectedRoute>
+            <BookVersionsPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="inbox" element={
+          <ProtectedRoute>
+            <InboxPage />
           </ProtectedRoute>
         } />
 

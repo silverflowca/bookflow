@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
 import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette } from 'lucide-react';
+import NotificationBell from '../notifications/NotificationBell';
 
 export default function Layout() {
   const { user, profile, logout } = useAuth();
@@ -61,6 +62,7 @@ export default function Layout() {
                     New Book
                   </Link>
                   <div className="flex items-center gap-3 ml-4 pl-4 border-l-2 border-strong">
+                    <NotificationBell />
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme">
                         <User className="h-4 w-4 text-accent" />

@@ -85,4 +85,67 @@ export async function requireAuthor(req, res, next) {
   }
 }
 
-export default { authenticate, optionalAuth, requireAuthor };
+/**
+ * Role-based middleware factory — requires user to be book owner OR a collaborator
+ * with one of the specified roles.
+ *
+ * Usage:  requireRole(['owner', 'author', 'editor'])
+ *
+ * Sets req.book and req.userRole on success.
+ */
+export function requireRole(allowedRoles) {
+  return async (req, res, next) => {
+    const bookId = req.params.bookId || req.params.id || req.body.book_id;
+
+    if (!bookId) {
+      return res.status(400).json({ error: 'Book ID required' });
+    }
+
+    try {
+      const { data: book, error } = await supabase
+        .from('books')
+        .select('id, author_id, status, visibility, slug, share_token, review_status')
+        .eq('id', bookId)
+        .single();
+
+      if (error || !book) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+
+      // Book owner always maps to 'owner' role
+      if (book.author_id === req.user.id) {
+        if (!allowedRoles.includes('owner')) {
+          return res.status(403).json({ error: 'Not authorized for this action' });
+        }
+        req.book = book;
+        req.userRole = 'owner';
+        return next();
+      }
+
+      // Check collaborator role
+      const { data: collab } = await supabase
+        .from('book_collaborators')
+        .select('role, invite_accepted_at')
+        .eq('book_id', bookId)
+        .eq('user_id', req.user.id)
+        .single();
+
+      if (!collab || !collab.invite_accepted_at) {
+        return res.status(403).json({ error: 'Not a collaborator on this book' });
+      }
+
+      if (!allowedRoles.includes(collab.role)) {
+        return res.status(403).json({ error: `Requires one of: ${allowedRoles.join(', ')}` });
+      }
+
+      req.book = book;
+      req.userRole = collab.role;
+      next();
+    } catch (err) {
+      console.error('Role check error:', err);
+      return res.status(500).json({ error: 'Authorization check failed' });
+    }
+  };
+}
+
+export default { authenticate, optionalAuth, requireAuthor, requireRole };
