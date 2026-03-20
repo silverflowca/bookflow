@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History } from 'lucide-react';
 import api from '../lib/api';
-import type { Book, Chapter, BookCollaborator } from '../types';
+import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
+import ReviewBanner from '../components/review/ReviewBanner';
+
+const ROLE_BADGE: Record<CollaboratorRole, { label: string; className: string }> = {
+  owner:    { label: 'Owner',    className: 'bg-purple-100 text-purple-800' },
+  author:   { label: 'Author',   className: 'bg-blue-100 text-blue-800' },
+  editor:   { label: 'Editor',   className: 'bg-green-100 text-green-800' },
+  reviewer: { label: 'Reviewer', className: 'bg-yellow-100 text-yellow-800' },
+};
 
 export default function BookEditor() {
   const { bookId } = useParams<{ bookId: string }>();
@@ -11,6 +19,8 @@ export default function BookEditor() {
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [collaborators, setCollaborators] = useState<BookCollaborator[]>([]);
+  const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
+  const [latestReview, setLatestReview] = useState<ReviewRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingBook, setEditingBook] = useState(false);
@@ -27,8 +37,14 @@ export default function BookEditor() {
       const bookData = await api.getBook(bookId!);
       setBook(bookData);
       setChapters(bookData.chapters || []);
-      // Load collaborators (owner only — silently fail for non-owners)
+      // Load current user's role (works for all collaborators)
+      api.getMyRole(bookId!).then(r => setUserRole(r.role)).catch(() => {});
+      // Load collaborators list (owner only — silently fail for non-owners)
       api.getCollaborators(bookId!).then(setCollaborators).catch(() => {});
+      // Load latest review request
+      api.getReviews(bookId!).then(reviews => {
+        if (reviews.length > 0) setLatestReview(reviews[0]);
+      }).catch(() => {});
     } catch (err) {
       console.error('Failed to load book:', err);
     } finally {
@@ -119,16 +135,22 @@ export default function BookEditor() {
                 {book.subtitle && <p className="text-muted">{book.subtitle}</p>}
               </div>
               <div className="flex items-center gap-2">
+                {/* My role badge */}
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[userRole].className}`}>
+                  {ROLE_BADGE[userRole].label}
+                </span>
                 {collaborators.length > 0 && (
                   <CollaboratorBadges collaborators={collaborators} bookId={bookId!} />
                 )}
-                <Link
-                  to={`/edit/book/${bookId}/collaborators`}
-                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                  title="Collaborators"
-                >
-                  <Users className="h-5 w-5" />
-                </Link>
+                {userRole === 'owner' && (
+                  <Link
+                    to={`/edit/book/${bookId}/collaborators`}
+                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                    title="Collaborators"
+                  >
+                    <Users className="h-5 w-5" />
+                  </Link>
+                )}
                 <Link
                   to={`/edit/book/${bookId}/versions`}
                   className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
@@ -136,18 +158,22 @@ export default function BookEditor() {
                 >
                   <History className="h-5 w-5" />
                 </Link>
-                <button
-                  onClick={() => setEditingBook(true)}
-                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                >
-                  <Edit className="h-5 w-5" />
-                </button>
-                <Link
-                  to={`/edit/book/${bookId}/settings`}
-                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                >
-                  <Settings className="h-5 w-5" />
-                </Link>
+                {userRole === 'owner' && (
+                  <button
+                    onClick={() => setEditingBook(true)}
+                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                  >
+                    <Edit className="h-5 w-5" />
+                  </button>
+                )}
+                {userRole === 'owner' && (
+                  <Link
+                    to={`/edit/book/${bookId}/settings`}
+                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Link>
+                )}
                 <Link
                   to={`/book/${bookId}`}
                   className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
@@ -172,30 +198,50 @@ export default function BookEditor() {
             {chapters.length} chapters
           </span>
         </div>
-        <button
-          onClick={handlePublish}
-          disabled={saving}
-          className={`px-4 py-2 rounded font-medium ${
-            book.status === 'published'
-              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
-        >
-          {book.status === 'published' ? 'Unpublish' : 'Publish'}
-        </button>
+        {userRole === 'owner' && (
+          <button
+            onClick={handlePublish}
+            disabled={saving}
+            className={`px-4 py-2 rounded font-medium ${
+              book.status === 'published'
+                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
+          >
+            {book.status === 'published' ? 'Unpublish' : 'Publish'}
+          </button>
+        )}
       </div>
+
+      {/* Review Banner — visible to all collaborators */}
+      {['owner', 'author', 'reviewer'].includes(userRole) && (
+        <ReviewBanner
+          bookId={bookId!}
+          reviewStatus={book.review_status || 'none'}
+          userRole={userRole}
+          latestReview={latestReview}
+          onStatusChange={(status) => {
+            setBook({ ...book!, review_status: status as Book['review_status'] });
+            api.getReviews(bookId!).then(reviews => {
+              if (reviews.length > 0) setLatestReview(reviews[0]);
+            }).catch(() => {});
+          }}
+        />
+      )}
 
       {/* Chapters */}
       <div className="theme-section">
         <div className="flex items-center justify-between p-4 border-b border-theme">
           <h2 className="font-semibold">Chapters</h2>
-          <button
-            onClick={() => setShowNewChapter(true)}
-            className="flex items-center gap-1 text-accent hover:text-accent text-sm font-medium"
-          >
-            <Plus className="h-4 w-4" />
-            Add Chapter
-          </button>
+          {['owner', 'author', 'editor'].includes(userRole) && (
+            <button
+              onClick={() => setShowNewChapter(true)}
+              className="flex items-center gap-1 text-accent hover:text-accent text-sm font-medium"
+            >
+              <Plus className="h-4 w-4" />
+              Add Chapter
+            </button>
+          )}
         </div>
 
         {chapters.length === 0 ? (
@@ -230,18 +276,22 @@ export default function BookEditor() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Link
-                    to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Link>
-                  <button
-                    onClick={() => handleDeleteChapter(chapter.id)}
-                    className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {['owner', 'author', 'editor'].includes(userRole) && (
+                    <Link
+                      to={`/edit/book/${bookId}/chapter/${chapter.id}`}
+                      className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Link>
+                  )}
+                  {userRole === 'owner' && (
+                    <button
+                      onClick={() => handleDeleteChapter(chapter.id)}
+                      className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

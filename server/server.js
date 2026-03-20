@@ -16,13 +16,13 @@ import filesRoutes from './routes/files.js';
 import changesRoutes from './routes/changes.js';
 import settingsRoutes from './routes/settings.js';
 import ttsRoutes from './routes/tts.js';
-import collaboratorsRoutes, { acceptInvite } from './routes/collaborators.js';
+import collaboratorsRoutes, { acceptInvite, getMyRole } from './routes/collaborators.js';
 import versionsRoutes from './routes/versions.js';
 import commentsRouter from './routes/comments.js';
 import reviewsRoutes from './routes/reviews.js';
 import notificationsRoutes from './routes/notifications.js';
 import publishRoutes from './routes/publish.js';
-import { optionalAuth } from './middleware/auth.js';
+import { authenticate, optionalAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +75,9 @@ app.use('/api/public', publishRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);
+
+// My role on a book
+app.get('/api/books/:bookId/my-role', authenticate, getMyRole);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

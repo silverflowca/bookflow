@@ -309,6 +309,10 @@ class ApiClient {
   }
 
   // Collaborators
+  async getMyRole(bookId: string): Promise<{ role: CollaboratorRole }> {
+    return this.request(`/books/${bookId}/my-role`);
+  }
+
   async getCollaborators(bookId: string): Promise<BookCollaborator[]> {
     return this.request(`/books/${bookId}/collaborators`);
   }

@@ -16,7 +16,7 @@ import api from '../lib/api';
 import type {
   Chapter, InlineContent, MediaData, QuestionData, PollData, NoteData, LinkData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData
+  CodeBlockData, ScriptureBlockData, CollaboratorRole
 } from '../types';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import CommentsSidebar from '../components/comments/CommentsSidebar';
@@ -38,6 +38,7 @@ export default function ChapterEditor() {
   } | null>(null);
   const [showComments, setShowComments] = useState(false);
   const [commentSelection, setCommentSelection] = useState<{ from: number; to: number; text: string } | null>(null);
+  const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -72,10 +73,13 @@ export default function ChapterEditor() {
       loadChapter();
       loadInlineContent();
     }
+    if (bookId) {
+      api.getMyRole(bookId).then(r => setUserRole(r.role)).catch(() => {});
+    }
     return () => {
       if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
     };
-  }, [chapterId]);
+  }, [chapterId, bookId]);
 
   async function loadChapter() {
     try {
@@ -644,7 +648,7 @@ export default function ChapterEditor() {
         <CommentsSidebar
           chapterId={chapterId}
           bookId={bookId}
-          canResolve={true}
+          canResolve={['owner', 'author', 'editor'].includes(userRole)}
           currentUserId={user?.id}
           onClose={() => { setShowComments(false); setCommentSelection(null); }}
           pendingSelection={commentSelection}

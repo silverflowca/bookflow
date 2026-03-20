@@ -153,6 +153,44 @@ router.delete('/:id', authenticate, requireRole(['owner']), async (req, res) => 
   }
 });
 
+// GET /api/books/:bookId/my-role — mounted at app level
+export async function getMyRole(req, res) {
+  try {
+    const bookId = req.params.bookId;
+    const userId = req.user.id;
+
+    const { data: book, error: bookError } = await supabase
+      .from('books')
+      .select('author_id')
+      .eq('id', bookId)
+      .single();
+
+    if (bookError || !book) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+
+    if (book.author_id === userId) {
+      return res.json({ role: 'owner' });
+    }
+
+    const { data: collab } = await supabase
+      .from('book_collaborators')
+      .select('role')
+      .eq('book_id', bookId)
+      .eq('user_id', userId)
+      .not('invite_accepted_at', 'is', null)
+      .maybeSingle();
+
+    if (!collab) {
+      return res.status(403).json({ error: 'Not a collaborator on this book' });
+    }
+
+    res.json({ role: collab.role });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // POST /api/invites/accept/:token — accept an email invite
 // This is mounted at the app level, not under /books/:bookId
 export async function acceptInvite(req, res) {
