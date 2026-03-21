@@ -56,14 +56,14 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-theme theme-title">My Books</h1>
-          <p className="text-muted mt-2">Create and manage your interactive books</p>
+          <p className="text-muted mt-1">Create and manage your interactive books</p>
         </div>
         <button
           onClick={() => setShowNewBookModal(true)}
-          className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium"
+          className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium self-start sm:self-auto"
         >
           <Plus className="h-5 w-5" />
           New Book

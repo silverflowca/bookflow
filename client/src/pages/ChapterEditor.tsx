@@ -360,10 +360,10 @@ export default function ChapterEditor() {
     <div className="min-h-screen bg-surface-hover">
       {/* Header */}
       <header className="bg-surface border-b border-theme sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to={`/edit/book/${bookId}`} className="text-muted hover:text-theme">
+        <div className="max-w-5xl mx-auto px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Link to={`/edit/book/${bookId}`} className="text-muted hover:text-theme flex-shrink-0">
                 <ChevronLeft className="h-6 w-6" />
               </Link>
               <input
@@ -371,55 +371,55 @@ export default function ChapterEditor() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={() => handleSave()}
-                className="text-xl font-semibold border-0 focus:outline-none focus:ring-0 bg-transparent"
+                className="text-base sm:text-xl font-semibold border-0 focus:outline-none focus:ring-0 bg-transparent min-w-0 truncate"
                 placeholder="Chapter Title"
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {lastSaved && (
-                <span className="text-sm text-muted">
+                <span className="text-xs text-muted hidden sm:inline">
                   Saved {lastSaved.toLocaleTimeString()}
                 </span>
               )}
               <button
                 onClick={() => handleSave()}
                 disabled={saving}
-                className="flex items-center gap-1 px-3 py-1.5 theme-button-primary rounded disabled:opacity-50"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1.5 theme-button-primary rounded disabled:opacity-50 text-sm"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save'}
+                <span className="hidden sm:inline">{saving ? 'Saving...' : 'Save'}</span>
               </button>
               {commentSelection && (
                 <button
                   onClick={() => setShowComments(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors text-sm font-medium"
+                  className="flex items-center gap-1 px-2 py-1.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors text-sm font-medium"
                   title="Comment on selected text"
                 >
                   <MessageSquare className="h-4 w-4" />
-                  Comment on selection
+                  <span className="hidden sm:inline">Comment</span>
                 </button>
               )}
               <button
                 onClick={() => setShowComments(!showComments)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded transition-colors ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded transition-colors text-sm ${
                   showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:bg-surface-hover'
                 }`}
                 title="Comments"
               >
                 <MessageSquare className="h-4 w-4" />
-                Comments
+                <span className="hidden sm:inline">Comments</span>
               </button>
               <Link
                 to={`/book/${bookId}/chapter/${chapterId}`}
-                className="flex items-center gap-1 px-3 py-1.5 text-muted hover:bg-surface-hover rounded"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1.5 text-muted hover:bg-surface-hover rounded text-sm"
               >
                 <Eye className="h-4 w-4" />
-                Preview
+                <span className="hidden sm:inline">Preview</span>
               </Link>
               <button
                 onClick={handlePlayTTS}
                 disabled={ttsLoading}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded ${
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded text-sm ${
                   ttsPlaying
                     ? 'bg-red-100 text-red-600 hover:bg-red-200'
                     : 'text-muted hover:bg-surface-hover'
@@ -433,17 +433,19 @@ export default function ChapterEditor() {
                 ) : (
                   <Volume2 className="h-4 w-4" />
                 )}
-                {ttsLoading ? 'Loading...' : ttsPlaying ? 'Stop' : 'Listen'}
+                <span className="hidden sm:inline">
+                  {ttsLoading ? 'Loading...' : ttsPlaying ? 'Stop' : 'Listen'}
+                </span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="flex">
-      <div className="flex-1 max-w-5xl mx-auto px-4 py-6 flex gap-6 min-w-0">
+      <div className="flex min-h-0">
+      <div className={`flex-1 ${showComments ? 'max-w-4xl' : 'max-w-5xl'} mx-auto px-4 py-6 flex gap-6 min-w-0 transition-all`}>
         {/* Editor */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {/* Toolbar */}
           <div className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap">
             <ToolbarButton
@@ -615,7 +617,7 @@ export default function ChapterEditor() {
         </div>
 
         {/* Sidebar - Inline Content List */}
-        <div className="w-80 flex-shrink-0">
+        <div className="w-72 flex-shrink-0 hidden lg:block">
           <div className="theme-card sticky top-20">
             <div className="p-3 border-b flex items-center justify-between">
               <div>
@@ -664,20 +666,29 @@ export default function ChapterEditor() {
           </div>
         </div>
       </div>
-
-      {/* Comments Sidebar */}
-      {showComments && chapterId && bookId && (
-        <CommentsSidebar
-          chapterId={chapterId}
-          bookId={bookId}
-          canResolve={['owner', 'author', 'editor'].includes(userRole)}
-          currentUserId={user?.id}
-          onClose={() => { setShowComments(false); setCommentSelection(null); }}
-          pendingSelection={commentSelection}
-          onSelectionUsed={() => setCommentSelection(null)}
-        />
-      )}
       </div>
+
+      {/* Comments Sidebar — fixed on mobile (overlay), inline on desktop */}
+      {showComments && chapterId && bookId && (
+        <>
+          {/* Mobile overlay backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-20 lg:hidden"
+            onClick={() => { setShowComments(false); setCommentSelection(null); }}
+          />
+          <div className="fixed right-0 top-0 h-full z-30 lg:static lg:z-auto lg:h-auto">
+            <CommentsSidebar
+              chapterId={chapterId}
+              bookId={bookId}
+              canResolve={['owner', 'author', 'editor'].includes(userRole)}
+              currentUserId={user?.id}
+              onClose={() => { setShowComments(false); setCommentSelection(null); }}
+              pendingSelection={commentSelection}
+              onSelectionUsed={() => setCommentSelection(null)}
+            />
+          </div>
+        </>
+      )}
 
       {/* Inline Content Modal */}
       {showInlineModal && (

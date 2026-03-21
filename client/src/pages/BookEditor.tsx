@@ -145,13 +145,13 @@ export default function BookEditor() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Link to="/dashboard" className="text-muted hover:text-theme">
+      <div className="flex items-start gap-3 mb-6">
+        <Link to="/dashboard" className="text-muted hover:text-theme mt-1 flex-shrink-0">
           <ChevronLeft className="h-6 w-6" />
         </Link>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {editingBook ? (
             <EditBookForm
               book={book}
@@ -160,13 +160,12 @@ export default function BookEditor() {
               saving={saving}
             />
           ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">{book.title}</h1>
-                {book.subtitle && <p className="text-muted">{book.subtitle}</p>}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">{book.title}</h1>
+                {book.subtitle && <p className="text-muted text-sm truncate">{book.subtitle}</p>}
               </div>
-              <div className="flex items-center gap-2">
-                {/* My role badge */}
+              <div className="flex items-center gap-1 flex-wrap">
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[userRole].className}`}>
                   {ROLE_BADGE[userRole].label}
                 </span>
@@ -174,41 +173,24 @@ export default function BookEditor() {
                   <CollaboratorBadges collaborators={collaborators} bookId={bookId!} />
                 )}
                 {userRole === 'owner' && (
-                  <Link
-                    to={`/edit/book/${bookId}/collaborators`}
-                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                    title="Collaborators"
-                  >
+                  <Link to={`/edit/book/${bookId}/collaborators`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded" title="Collaborators">
                     <Users className="h-5 w-5" />
                   </Link>
                 )}
-                <Link
-                  to={`/edit/book/${bookId}/versions`}
-                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                  title="Version history"
-                >
+                <Link to={`/edit/book/${bookId}/versions`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded" title="Version history">
                   <History className="h-5 w-5" />
                 </Link>
                 {userRole === 'owner' && (
-                  <button
-                    onClick={() => setEditingBook(true)}
-                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                  >
+                  <button onClick={() => setEditingBook(true)} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">
                     <Edit className="h-5 w-5" />
                   </button>
                 )}
                 {userRole === 'owner' && (
-                  <Link
-                    to={`/edit/book/${bookId}/settings`}
-                    className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                  >
+                  <Link to={`/edit/book/${bookId}/settings`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">
                     <Settings className="h-5 w-5" />
                   </Link>
                 )}
-                <Link
-                  to={`/book/${bookId}`}
-                  className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                >
+                <Link to={`/book/${bookId}`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">
                   <Eye className="h-5 w-5" />
                 </Link>
               </div>
@@ -218,7 +200,7 @@ export default function BookEditor() {
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between bg-surface rounded-lg border-theme border p-4 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface rounded-lg border-theme border p-4 mb-6">
         <div className="flex items-center gap-4">
           <span className={`px-2 py-1 text-sm font-medium rounded ${
             book.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
