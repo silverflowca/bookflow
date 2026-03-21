@@ -33,11 +33,14 @@ export default function BookCollaboratorsPage() {
 
   async function loadData() {
     try {
-      const [bookData, collabData] = await Promise.all([
-        api.getBook(bookId!),
-        api.getCollaborators(bookId!),
-      ]);
+      const bookData = await api.getBook(bookId!);
       setBook(bookData);
+    } catch (err) {
+      console.error('Failed to load book:', err);
+    }
+
+    try {
+      const collabData = await api.getCollaborators(bookId!);
       setCollaborators(collabData);
     } catch (err) {
       console.error('Failed to load collaborators:', err);
@@ -222,10 +225,10 @@ export default function BookCollaboratorsPage() {
       </div>
 
       {/* Invite Modal */}
-      {showInviteModal && book && (
+      {showInviteModal && (
         <InviteModal
           bookId={bookId!}
-          bookTitle={book.title}
+          bookTitle={book?.title || ''}
           onClose={() => setShowInviteModal(false)}
           onInvited={handleInvited}
         />

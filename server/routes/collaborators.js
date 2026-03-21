@@ -11,7 +11,7 @@ router.get('/', authenticate, requireRole(['owner']), async (req, res) => {
     const { data, error } = await supabase
       .from('book_collaborators')
       .select(`
-        id, role, invited_email, invite_accepted_at, created_at,
+        id, role, invited_email, invite_token, invite_accepted_at, created_at,
         user:profiles!book_collaborators_user_id_fkey(id, display_name, email, avatar_url),
         invited_by_user:profiles!book_collaborators_invited_by_fkey(id, display_name)
       `)
