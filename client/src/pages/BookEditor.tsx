@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import api from '../lib/api';
-import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest } from '../types';
+import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
 import ReviewBanner from '../components/review/ReviewBanner';
 
@@ -25,6 +25,37 @@ export default function BookEditor() {
   const [saving, setSaving] = useState(false);
   const [editingBook, setEditingBook] = useState(false);
   const [showNewChapter, setShowNewChapter] = useState(false);
+  const [expandedChapterComments, setExpandedChapterComments] = useState<Set<string>>(new Set());
+  const [chapterComments, setChapterComments] = useState<Record<string, BookComment[]>>({});
+  const [chapterCommentsLoading, setChapterCommentsLoading] = useState<Record<string, boolean>>({});
+  const [chapterCommentsPage, setChapterCommentsPage] = useState<Record<string, number>>({});
+  const PAGE_SIZE = 5;
+
+  const toggleChapterComments = useCallback(async (chapterId: string) => {
+    setExpandedChapterComments(prev => {
+      const next = new Set(prev);
+      if (next.has(chapterId)) {
+        next.delete(chapterId);
+      } else {
+        next.add(chapterId);
+      }
+      return next;
+    });
+
+    // Fetch comments if not yet loaded
+    if (!chapterComments[chapterId]) {
+      setChapterCommentsLoading(prev => ({ ...prev, [chapterId]: true }));
+      try {
+        const data = await api.getChapterComments(chapterId);
+        setChapterComments(prev => ({ ...prev, [chapterId]: data }));
+        setChapterCommentsPage(prev => ({ ...prev, [chapterId]: 1 }));
+      } catch {
+        setChapterComments(prev => ({ ...prev, [chapterId]: [] }));
+      } finally {
+        setChapterCommentsLoading(prev => ({ ...prev, [chapterId]: false }));
+      }
+    }
+  }, [chapterComments]);
 
   useEffect(() => {
     if (bookId) {
@@ -257,44 +288,121 @@ export default function BookEditor() {
           </div>
         ) : (
           <div className="divide-y">
-            {chapters.map((chapter, index) => (
-              <div key={chapter.id} className="flex items-center gap-4 p-4 hover:bg-surface-hover">
-                <GripVertical className="h-5 w-5 text-muted cursor-move" />
-                <div className="flex-1">
-                  <Link
-                    to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                    className="font-medium hover:text-accent"
-                  >
-                    Chapter {index + 1}: {chapter.title}
-                  </Link>
-                  <div className="flex gap-3 text-sm text-muted">
-                    <span>{chapter.word_count || 0} words</span>
-                    <span>{chapter.estimated_read_time_minutes || 1} min read</span>
-                    <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
-                      {chapter.status}
-                    </span>
+            {chapters.map((chapter, index) => {
+              const isExpanded = expandedChapterComments.has(chapter.id);
+              const comments = chapterComments[chapter.id] || [];
+              const isLoadingComments = chapterCommentsLoading[chapter.id];
+              const page = chapterCommentsPage[chapter.id] || 1;
+              const visibleComments = comments.slice(0, page * PAGE_SIZE);
+              const hasMore = visibleComments.length < comments.length;
+
+              return (
+                <div key={chapter.id}>
+                  <div className="flex items-center gap-4 p-4 hover:bg-surface-hover">
+                    <GripVertical className="h-5 w-5 text-muted cursor-move" />
+                    <div className="flex-1">
+                      <Link
+                        to={`/edit/book/${bookId}/chapter/${chapter.id}`}
+                        className="font-medium hover:text-accent"
+                      >
+                        Chapter {index + 1}: {chapter.title}
+                      </Link>
+                      <div className="flex gap-3 text-sm text-muted">
+                        <span>{chapter.word_count || 0} words</span>
+                        <span>{chapter.estimated_read_time_minutes || 1} min read</span>
+                        <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
+                          {chapter.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => toggleChapterComments(chapter.id)}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded text-sm transition-colors ${
+                          isExpanded
+                            ? 'bg-accent/10 text-accent'
+                            : 'text-muted hover:text-theme hover:bg-surface-hover'
+                        }`}
+                        title="Show comments"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </button>
+                      {['owner', 'author', 'editor'].includes(userRole) && (
+                        <Link
+                          to={`/edit/book/${bookId}/chapter/${chapter.id}`}
+                          className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Link>
+                      )}
+                      {userRole === 'owner' && (
+                        <button
+                          onClick={() => handleDeleteChapter(chapter.id)}
+                          className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  {['owner', 'author', 'editor'].includes(userRole) && (
-                    <Link
-                      to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                      className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Link>
+
+                  {/* Comments accordion */}
+                  {isExpanded && (
+                    <div className="border-t border-theme bg-surface/50 px-4 py-3">
+                      {isLoadingComments ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted" />
+                        </div>
+                      ) : comments.length === 0 ? (
+                        <p className="text-sm text-muted text-center py-3">No comments on this chapter</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {visibleComments.map(comment => (
+                            <Link
+                              key={comment.id}
+                              to={`/edit/book/${bookId}/chapter/${chapter.id}?comments=1`}
+                              className="block rounded-lg border border-theme p-3 hover:bg-surface-hover transition-colors"
+                            >
+                              {comment.anchor_text && (
+                                <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-0.5 mb-1.5 truncate italic">
+                                  "{comment.anchor_text}"
+                                </p>
+                              )}
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs font-medium text-accent shrink-0">
+                                  {comment.author?.display_name || 'User'}
+                                </span>
+                                <p className="text-xs text-muted line-clamp-2 flex-1">
+                                  {comment.body}
+                                </p>
+                              </div>
+                              {comment.status === 'resolved' && (
+                                <span className="text-xs text-green-600 mt-1 inline-block">✓ Resolved</span>
+                              )}
+                            </Link>
+                          ))}
+                          {hasMore && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setChapterCommentsPage(prev => ({
+                                  ...prev,
+                                  [chapter.id]: (prev[chapter.id] || 1) + 1,
+                                }));
+                              }}
+                              className="w-full text-xs text-accent hover:underline py-2"
+                            >
+                              Load more ({comments.length - visibleComments.length} remaining)
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  {userRole === 'owner' && (
-                    <button
-                      onClick={() => handleDeleteChapter(chapter.id)}
-                      className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
