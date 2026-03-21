@@ -457,38 +457,26 @@ class ApiClient {
 
   // Book Cover Upload
   async uploadBookCover(bookId: string, file: File): Promise<{ cover_image_url: string }> {
-    // Get upload URL from FileFlow
+    // Get a Supabase signed upload URL from the server
     const { upload_url, storage_path } = await this.getUploadUrl(file.name, file.type);
 
-    // Upload directly to storage
+    // Upload directly to Supabase Storage via the signed URL
     const uploadResponse = await fetch(upload_url, {
       method: 'PUT',
       body: file,
-      headers: {
-        'Content-Type': file.type,
-      },
+      headers: { 'Content-Type': file.type },
     });
 
     if (!uploadResponse.ok) {
       throw new Error('Failed to upload cover image');
     }
 
-    // Build the public URL using environment variable or default to localhost
+    // Build the public URL — bucket is bookflow-covers
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:55321';
-    const cover_image_url = `${supabaseUrl}/storage/v1/object/public/files/${storage_path}`;
+    const cover_image_url = `${supabaseUrl}/storage/v1/object/public/bookflow-covers/${storage_path}`;
 
-    // Update the book with the cover URL
+    // Update the book record
     await this.updateBook(bookId, { cover_image_url });
-
-    // Register the file reference
-    await this.registerFile({
-      file_name: file.name,
-      file_type: file.type,
-      file_size: file.size,
-      storage_path,
-      display_name: `Cover: ${file.name}`,
-      book_id: bookId,
-    });
 
     return { cover_image_url };
   }

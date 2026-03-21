@@ -4,52 +4,30 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const DEFAULT_FILEFLOW_URL = process.env.FILEFLOW_URL || 'http://localhost:8680';
+const STORAGE_BUCKET = 'bookflow-covers';
 
-async function getUserFileflowSettings(userId) {
-  const { data } = await supabase
-    .from('app_settings')
-    .select('fileflow_url, fileflow_access_key')
-    .eq('user_id', userId)
-    .maybeSingle();
-  return {
-    url: data?.fileflow_url || DEFAULT_FILEFLOW_URL,
-    accessKey: data?.fileflow_access_key || null,
-  };
-}
-
-// Proxy file upload to FileFlow
+// Upload file directly to Supabase Storage and return a signed upload URL
 router.post('/upload', authenticate, async (req, res) => {
-  const { file_name, file_type, file_size, book_id, chapter_id, inline_content_id, display_name } = req.body;
+  const { file_name, file_type } = req.body;
+  if (!file_name || !file_type) {
+    return res.status(400).json({ error: 'file_name and file_type are required' });
+  }
 
   try {
-    const { url: fileflowUrl, accessKey } = await getUserFileflowSettings(req.user.id);
+    const ext = file_name.split('.').pop();
+    const storage_path = `${req.user.id}/${Date.now()}.${ext}`;
 
-    // Get upload URL from FileFlow
-    const authHeader = accessKey ? `Bearer ${accessKey}` : `Bearer ${req.token}`;
-    const response = await fetch(`${fileflowUrl}/api/files/upload-url`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader
-      },
-      body: JSON.stringify({
-        fileName: file_name,
-        fileType: file_type
-      })
-    });
+    // Create a signed upload URL (valid for 60 s) — no FileFlow needed
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUploadUrl(storage_path);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'FileFlow upload failed');
-    }
-
-    const uploadData = await response.json();
+    if (error) throw error;
 
     res.json({
-      upload_url: uploadData.uploadUrl,
-      storage_path: uploadData.storagePath,
-      token: uploadData.token
+      upload_url: data.signedUrl,
+      storage_path,
+      token: data.token,
     });
   } catch (err) {
     console.error('File upload error:', err);
@@ -119,22 +97,8 @@ router.get('/:fileId/url', authenticate, async (req, res) => {
       return res.json({ url: fileRef.file_url });
     }
 
-    // Otherwise get from FileFlow
-    const { url: fileflowUrl, accessKey } = await getUserFileflowSettings(req.user.id);
-    const authHeader = accessKey ? `Bearer ${accessKey}` : `Bearer ${req.token}`;
-    const response = await fetch(`${fileflowUrl}/api/storage/download/${fileRef.fileflow_file_id}`, {
-      headers: {
-        'Authorization': authHeader
-      }
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'FileFlow download failed');
-    }
-
-    const downloadData = await response.json();
-    res.json({ url: downloadData.url, fileName: downloadData.fileName });
+    // No direct URL and no fileflow_file_id — can't retrieve
+    return res.status(404).json({ error: 'File URL not available' });
   } catch (err) {
     console.error('Get file URL error:', err);
     res.status(500).json({ error: err.message });
