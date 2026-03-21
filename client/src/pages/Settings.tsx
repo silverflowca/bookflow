@@ -6,14 +6,17 @@ import api from '../lib/api';
 interface AppSettings {
   fileflow_url: string;
   fileflow_access_key: string;
+  deepgram_api_key: string;
 }
 
 export default function Settings() {
   const [settings, setSettings] = useState<AppSettings>({
     fileflow_url: '',
     fileflow_access_key: '',
+    deepgram_api_key: '',
   });
   const [showKey, setShowKey] = useState(false);
+  const [showDeepgramKey, setShowDeepgramKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -29,13 +32,14 @@ export default function Settings() {
       setSettings({
         fileflow_url: data.fileflow_url || 'http://localhost:8680',
         fileflow_access_key: data.fileflow_access_key || '',
+        deepgram_api_key: data.deepgram_api_key || '',
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
-      // Use defaults
       setSettings({
         fileflow_url: 'http://localhost:8680',
         fileflow_access_key: '',
+        deepgram_api_key: '',
       });
     }
   }
@@ -195,6 +199,43 @@ export default function Settings() {
                 <p className="font-medium truncate">{settings.fileflow_url || 'Not configured'}</p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Deepgram TTS Configuration */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-1">Text-to-Speech (Deepgram)</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Used to generate audio narration for book chapters. Get your key at{' '}
+            <a href="https://console.deepgram.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              console.deepgram.com
+            </a>.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Deepgram API Key
+            </label>
+            <div className="relative">
+              <input
+                type={showDeepgramKey ? 'text' : 'password'}
+                value={settings.deepgram_api_key}
+                onChange={(e) => setSettings({ ...settings, deepgram_api_key: e.target.value })}
+                className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Enter your Deepgram API key"
+              />
+              <button
+                type="button"
+                onClick={() => setShowDeepgramKey(!showDeepgramKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showDeepgramKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Leave empty to use the server's default key (if configured).
+            </p>
           </div>
         </div>
       </div>

@@ -1,10 +1,18 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
+import supabase from '../config/supabase.js';
 
 const router = express.Router();
 
-// Use environment variable with fallback for local development
-const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || 'e9412f8586757fed5ce6c2233c22ff9f3756e149';
+async function getDeepgramKey(userId) {
+  const { data } = await supabase
+    .from('app_settings')
+    .select('deepgram_api_key')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return (data?.deepgram_api_key) || process.env.DEEPGRAM_API_KEY || '';
+}
 
 // Generate TTS audio from text
 router.post('/generate', authenticate, async (req, res) => {
@@ -12,6 +20,11 @@ router.post('/generate', authenticate, async (req, res) => {
 
   if (!text || text.trim().length === 0) {
     return res.status(400).json({ error: 'Text is required' });
+  }
+
+  const apiKey = await getDeepgramKey(req.user.id);
+  if (!apiKey) {
+    return res.status(400).json({ error: 'Deepgram API key not configured. Add it in Settings.' });
   }
 
   // Limit text length to prevent abuse (Deepgram has limits)
@@ -22,7 +35,7 @@ router.post('/generate', authenticate, async (req, res) => {
     const response = await fetch('https://api.deepgram.com/v1/speak', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+        'Authorization': `Token ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

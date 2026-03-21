@@ -1065,8 +1065,7 @@ function TipTapNode({
 }
 
 function StartOfChapterContent({ items }: { items: InlineContent[] }) {
-  // Filter items with display_mode 'start_of_chapter'
-  const startItems = items.filter(item => item.display_mode === 'start_of_chapter');
+  const startItems = items.filter(item => item.position_in_chapter === 'start_of_chapter');
   if (startItems.length === 0) return null;
 
   return (
@@ -1080,10 +1079,7 @@ function StartOfChapterContent({ items }: { items: InlineContent[] }) {
 }
 
 function EndOfChapterContent({ items }: { items: InlineContent[] }) {
-  // Filter items with position_in_chapter 'end_of_chapter' OR display_mode 'end_of_chapter'
-  const endItems = items.filter(item =>
-    item.position_in_chapter === 'end_of_chapter' || item.display_mode === 'end_of_chapter'
-  );
+  const endItems = items.filter(item => item.position_in_chapter === 'end_of_chapter');
   if (endItems.length === 0) return null;
 
   return (

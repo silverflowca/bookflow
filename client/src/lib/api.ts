@@ -245,7 +245,7 @@ class ApiClient {
   }
 
   // Files
-  async getUploadUrl(fileName: string, fileType: string, bookId?: string): Promise<{ upload_url: string; storage_path: string; token: string; fileflow_folder_id?: string | null }> {
+  async getUploadUrl(fileName: string, fileType: string, bookId?: string): Promise<{ upload_url: string; storage_path: string; token: string; fileflow_folder_id?: string | null; use_supabase?: boolean }> {
     return this.request('/files/upload', {
       method: 'POST',
       body: JSON.stringify({ file_name: fileName, file_type: fileType, book_id: bookId }),
@@ -272,11 +272,11 @@ class ApiClient {
   }
 
   // App Settings
-  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string }> {
+  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string }> {
     return this.request('/settings');
   }
 
-  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string }): Promise<void> {
+  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string }): Promise<void> {
     return this.request('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
@@ -463,10 +463,8 @@ class ApiClient {
 
   // Book Cover Upload
   async uploadBookCover(bookId: string, file: File): Promise<{ cover_image_url: string }> {
-    // Get a signed upload URL from the server (routes to FileFlow images/ folder for this book)
-    const { upload_url, storage_path, fileflow_folder_id } = await this.getUploadUrl(file.name, file.type, bookId);
+    const { upload_url, storage_path, fileflow_folder_id, use_supabase } = await this.getUploadUrl(file.name, file.type, bookId);
 
-    // Upload directly to storage via the signed URL
     const uploadResponse = await fetch(upload_url, {
       method: 'PUT',
       body: file,
@@ -477,20 +475,19 @@ class ApiClient {
       throw new Error('Failed to upload cover image');
     }
 
-    // Register the file and get back a usable URL
     const registered = await this.registerFile({
       file_name: file.name,
       file_type: file.type,
       file_size: file.size,
       storage_path,
       fileflow_folder_id,
+      use_supabase,
       display_name: 'Cover Image',
       book_id: bookId,
     });
 
     const cover_image_url = registered.file_url || storage_path;
 
-    // Update the book record
     await this.updateBook(bookId, { cover_image_url });
 
     return { cover_image_url };
