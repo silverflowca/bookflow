@@ -58,6 +58,36 @@ export default function ChapterEditor() {
       InlineContentMark,
     ],
     content: '',
+    editorProps: {
+      transformPastedHTML(html) {
+        // Convert stray bullet-character paragraphs (•) into proper list items
+        // e.g. <p>• some item</p> → <ul><li>some item</li></ul>
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+
+        const paras = Array.from(wrapper.querySelectorAll('p'));
+        let currentUl: HTMLUListElement | null = null;
+
+        for (const p of paras) {
+          const text = p.textContent || '';
+          const match = text.match(/^[•\-\*]\s+(.*)$/u);
+          if (match) {
+            if (!currentUl) {
+              currentUl = document.createElement('ul');
+              p.parentNode!.insertBefore(currentUl, p);
+            }
+            const li = document.createElement('li');
+            li.textContent = match[1];
+            currentUl.appendChild(li);
+            p.remove();
+          } else {
+            currentUl = null;
+          }
+        }
+
+        return wrapper.innerHTML;
+      },
+    },
     onUpdate: ({ editor }) => {
       // Auto-save after 2 seconds of inactivity
       if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
