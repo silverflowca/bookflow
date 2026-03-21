@@ -16,6 +16,7 @@ import AcceptInvitePage from './pages/AcceptInvitePage';
 import BookCollaboratorsPage from './pages/BookCollaboratorsPage';
 import BookVersionsPage from './pages/BookVersionsPage';
 import PublicBookPage from './pages/PublicBookPage';
+import PublishSubmitPage from './pages/PublishSubmitPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -88,6 +89,12 @@ function AppRoutes() {
         <Route path="edit/book/:bookId/versions" element={
           <ProtectedRoute>
             <BookVersionsPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="edit/book/:bookId/submit" element={
+          <ProtectedRoute>
+            <PublishSubmitPage />
           </ProtectedRoute>
         } />
 

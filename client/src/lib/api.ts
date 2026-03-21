@@ -480,6 +480,78 @@ class ApiClient {
 
     return { cover_image_url };
   }
+
+  // Exports
+  async exportJson(bookId: string): Promise<void> {
+    const token = this.getToken();
+    const response = await fetch(`${API_URL}/books/${bookId}/export/json`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Export failed');
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    const filename = match?.[1] || `book_${bookId}.bookflow.json`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async exportPdf(bookId: string): Promise<{ download_url?: string }> {
+    return this.request(`/books/${bookId}/export/pdf`, { method: 'POST' });
+  }
+
+  async exportEpub(bookId: string): Promise<{ download_url?: string }> {
+    return this.request(`/books/${bookId}/export/epub`, { method: 'POST' });
+  }
+
+  async exportDocx(bookId: string): Promise<{ download_url?: string }> {
+    return this.request(`/books/${bookId}/export/docx`, { method: 'POST' });
+  }
+
+  async exportSubmissionPackage(bookId: string, meta?: { genres?: string[]; isbn?: string }): Promise<{ download_url?: string }> {
+    return this.request(`/books/${bookId}/export/submission-package`, {
+      method: 'POST',
+      body: JSON.stringify(meta || {}),
+    });
+  }
+
+  async getPublisherMetadata(bookId: string): Promise<Record<string, unknown>> {
+    return this.request(`/books/${bookId}/publisher-metadata`);
+  }
+
+  // Publisher Submissions
+  async getSubmissions(bookId: string): Promise<any[]> {
+    return this.request(`/books/${bookId}/submissions`);
+  }
+
+  async submitToDraft2Digital(bookId: string, data: { api_token: string; genres?: string[]; isbn?: string; price?: number }): Promise<any> {
+    return this.request(`/books/${bookId}/submit/draft2digital`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async submitToSmashwords(bookId: string, data: { api_token: string; genres?: string[]; isbn?: string; price?: number }): Promise<any> {
+    return this.request(`/books/${bookId}/submit/smashwords`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async recordManualSubmission(bookId: string, data: { platform_name: string; submission_id?: string; publisher_url?: string; note?: string }): Promise<any> {
+    return this.request(`/books/${bookId}/submit/manual`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteSubmission(bookId: string, submissionId: string): Promise<void> {
+    return this.request(`/books/${bookId}/submissions/${submissionId}`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiClient();

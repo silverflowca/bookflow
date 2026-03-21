@@ -22,6 +22,8 @@ import commentsRouter from './routes/comments.js';
 import reviewsRoutes from './routes/reviews.js';
 import notificationsRoutes from './routes/notifications.js';
 import publishRoutes from './routes/publish.js';
+import exportsRoutes from './routes/exports.js';
+import publishersRoutes from './routes/publishers.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,6 +74,8 @@ app.use('/api/books/:bookId/reviews', reviewsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/books/:bookId', publishRoutes);
 app.use('/api/public', publishRoutes);
+app.use('/api/books', exportsRoutes);
+app.use('/api/books', publishersRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);

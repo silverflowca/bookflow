@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
@@ -28,6 +28,9 @@ export default function BookEditor() {
   const [expandedChapterComments, setExpandedChapterComments] = useState<Set<string>>(new Set());
   const [chapterComments, setChapterComments] = useState<Record<string, BookComment[]>>({});
   const [chapterCommentsLoading, setChapterCommentsLoading] = useState<Record<string, boolean>>({});
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [chapterCommentsPage, setChapterCommentsPage] = useState<Record<string, number>>({});
   const PAGE_SIZE = 5;
 
@@ -125,6 +128,25 @@ export default function BookEditor() {
     await handleSaveBook({ status: newStatus, visibility: newStatus === 'published' ? 'public' : 'private' });
   }
 
+  async function handleExport(format: 'json' | 'pdf' | 'epub' | 'docx') {
+    if (!bookId) return;
+    setExporting(format);
+    setShowExportMenu(false);
+    try {
+      if (format === 'json') {
+        await api.exportJson(bookId);
+      } else {
+        const methodMap = { pdf: 'exportPdf', epub: 'exportEpub', docx: 'exportDocx' } as const;
+        const result = await api[methodMap[format]](bookId);
+        if (result?.download_url) window.open(result.download_url, '_blank');
+      }
+    } catch (err) {
+      alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setExporting(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -211,19 +233,59 @@ export default function BookEditor() {
             {chapters.length} chapters
           </span>
         </div>
-        {userRole === 'owner' && (
-          <button
-            onClick={handlePublish}
-            disabled={saving}
-            className={`px-4 py-2 rounded font-medium ${
-              book.status === 'published'
-                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
-          >
-            {book.status === 'published' ? 'Unpublish' : 'Publish'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Export dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(v => !v)}
+              disabled={!!exporting}
+              className="flex items-center gap-1.5 px-3 py-2 rounded font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200"
+            >
+              {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              {exporting ? `Exporting ${exporting.toUpperCase()}…` : 'Export'}
+              <ChevronDown size={13} />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                {(['json', 'pdf', 'epub', 'docx'] as const).map(fmt => (
+                  <button
+                    key={fmt}
+                    onClick={() => handleExport(fmt)}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    {fmt === 'json' ? 'Book JSON (backup)' : fmt.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Submit to publishers */}
+          {userRole === 'owner' && (
+            <Link
+              to={`/edit/book/${bookId}/submit`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded font-medium text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            >
+              <Send size={15} />
+              Publish to Stores
+            </Link>
+          )}
+
+          {/* Publish/Unpublish */}
+          {userRole === 'owner' && (
+            <button
+              onClick={handlePublish}
+              disabled={saving}
+              className={`px-4 py-2 rounded font-medium text-sm ${
+                book.status === 'published'
+                  ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {book.status === 'published' ? 'Unpublish' : 'Publish'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Review Banner — visible to all collaborators */}
