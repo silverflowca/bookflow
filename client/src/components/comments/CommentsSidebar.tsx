@@ -110,7 +110,7 @@ export default function CommentsSidebar({
   const openCount = comments.filter(c => c.status === 'open').length;
 
   return (
-    <div className="flex flex-col h-full w-80 border-l-2 border-theme bg-surface">
+    <div className="flex flex-col h-full w-full bg-surface">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b-2 border-theme flex-shrink-0">
         <div className="flex items-center gap-2">

@@ -442,8 +442,7 @@ export default function ChapterEditor() {
         </div>
       </header>
 
-      <div className="flex min-h-0">
-      <div className={`flex-1 ${showComments ? 'max-w-4xl' : 'max-w-5xl'} mx-auto px-4 py-6 flex gap-6 min-w-0 transition-all`}>
+      <div className="flex max-w-[1600px] mx-auto px-4 py-6 gap-6 min-w-0">
         {/* Editor */}
         <div className="flex-1 min-w-0">
           {/* Toolbar */}
@@ -616,67 +615,92 @@ export default function ChapterEditor() {
           </div>
         </div>
 
-        {/* Sidebar - Inline Content List */}
-        <div className="w-72 flex-shrink-0 hidden lg:block">
-          <div className="theme-card sticky top-20">
-            <div className="p-3 border-b flex items-center justify-between">
-              <div>
-                <h3 className="font-medium">Inline Content</h3>
-                <p className="text-xs text-muted">{inlineContents.length} items</p>
-              </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => handleAddInlineContent('audio')}
-                  className="p-1.5 text-orange-600 hover:bg-orange-50 rounded"
-                  title="Add Audio"
-                >
-                  <Play className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleAddInlineContent('video')}
-                  className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                  title="Add Video"
-                >
-                  <Video className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="max-h-[60vh] overflow-y-auto">
-              {inlineContents.length === 0 ? (
-                <div className="p-4 text-sm text-muted text-center">
-                  No inline content yet. Select text and add questions, polls, or notes.
-                </div>
-              ) : (
-                <div>
-                  {inlineContents.map((item, index) => (
-                    <InlineContentItem
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      totalItems={inlineContents.length}
-                      onToggleVisibility={handleToggleVisibility}
-                      onDelete={handleDeleteInlineContent}
-                      onMovePosition={handleMovePosition}
-                      onEdit={handleEditInlineContent}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* Right Panel — tabbed: Comments / Inline Content */}
+        <div className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 self-start max-h-[calc(100vh-6rem)]">
+          {/* Tab bar */}
+          <div className="flex border-2 border-theme rounded-t-lg overflow-hidden bg-surface flex-shrink-0">
+            <button
+              onClick={() => setShowComments(true)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
+                showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
+              }`}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Comments
+            </button>
+            <div className="w-px bg-theme" />
+            <button
+              onClick={() => setShowComments(false)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
+                !showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
+              }`}
+            >
+              <StickyNote className="h-3.5 w-3.5" />
+              Inline
+            </button>
           </div>
+
+          {/* Panel content */}
+          {showComments && chapterId && bookId ? (
+            <div className="flex-1 border-2 border-t-0 border-theme rounded-b-lg overflow-hidden flex flex-col">
+              <CommentsSidebar
+                chapterId={chapterId}
+                bookId={bookId}
+                canResolve={['owner', 'author', 'editor'].includes(userRole)}
+                currentUserId={user?.id}
+                onClose={() => { setShowComments(false); setCommentSelection(null); }}
+                pendingSelection={commentSelection}
+                onSelectionUsed={() => setCommentSelection(null)}
+              />
+            </div>
+          ) : (
+            <div className="theme-card rounded-t-none border-t-0 flex-1 overflow-hidden flex flex-col">
+              <div className="p-3 border-b flex items-center justify-between flex-shrink-0">
+                <p className="text-xs text-muted">{inlineContents.length} items</p>
+                <div className="flex gap-1">
+                  <button onClick={() => handleAddInlineContent('audio')} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded" title="Add Audio">
+                    <Play className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => handleAddInlineContent('video')} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Add Video">
+                    <Video className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {inlineContents.length === 0 ? (
+                  <div className="p-4 text-sm text-muted text-center">
+                    No inline content yet. Select text and add questions, polls, or notes.
+                  </div>
+                ) : (
+                  <div>
+                    {inlineContents.map((item, index) => (
+                      <InlineContentItem
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        totalItems={inlineContents.length}
+                        onToggleVisibility={handleToggleVisibility}
+                        onDelete={handleDeleteInlineContent}
+                        onMovePosition={handleMovePosition}
+                        onEdit={handleEditInlineContent}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-      </div>
 
-      {/* Comments Sidebar — fixed on mobile (overlay), inline on desktop */}
+      {/* Mobile overlay — comments only (inline content hidden on mobile) */}
       {showComments && chapterId && bookId && (
-        <>
-          {/* Mobile overlay backdrop */}
+        <div className="lg:hidden">
           <div
-            className="fixed inset-0 bg-black/30 z-20 lg:hidden"
+            className="fixed inset-0 bg-black/30 z-20"
             onClick={() => { setShowComments(false); setCommentSelection(null); }}
           />
-          <div className="fixed right-0 top-0 h-full z-30 lg:static lg:z-auto lg:h-auto">
+          <div className="fixed right-0 top-0 h-full z-30 w-80 border-l-2 border-theme">
             <CommentsSidebar
               chapterId={chapterId}
               bookId={bookId}
@@ -687,7 +711,7 @@ export default function ChapterEditor() {
               onSelectionUsed={() => setCommentSelection(null)}
             />
           </div>
-        </>
+        </div>
       )}
 
       {/* Inline Content Modal */}
