@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
@@ -24,6 +24,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function ChapterEditor() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [, setChapter] = useState<Chapter | null>(null);
   const [title, setTitle] = useState('');
@@ -36,7 +37,7 @@ export default function ChapterEditor() {
     selection?: { from: number; to: number; text: string };
     editingItem?: InlineContent;
   } | null>(null);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(() => searchParams.get('comments') === '1');
   const [commentSelection, setCommentSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
 
@@ -63,6 +64,17 @@ export default function ChapterEditor() {
       autoSaveTimeout = setTimeout(() => {
         handleSave(editor.getJSON(), editor.getText());
       }, 2000);
+    },
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      if (from !== to) {
+        const text = editor.state.doc.textBetween(from, to, ' ').trim();
+        if (text) {
+          setCommentSelection({ from, to, text });
+        }
+      } else {
+        setCommentSelection(null);
+      }
     },
   });
 
@@ -377,6 +389,16 @@ export default function ChapterEditor() {
                 <Save className="h-4 w-4" />
                 {saving ? 'Saving...' : 'Save'}
               </button>
+              {commentSelection && (
+                <button
+                  onClick={() => setShowComments(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors text-sm font-medium"
+                  title="Comment on selected text"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Comment on selection
+                </button>
+              )}
               <button
                 onClick={() => setShowComments(!showComments)}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded transition-colors ${

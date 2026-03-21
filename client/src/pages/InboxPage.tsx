@@ -134,15 +134,25 @@ export default function InboxPage() {
                 )}
                 <div className="flex items-center gap-3 mt-2">
                   <span className="text-xs text-muted">{timeAgo(notification.created_at)}</span>
-                  {notification.book_id && (
+                  {notification.chapter_id && notification.book_id ? (
+                    <Link
+                      to={`/edit/book/${notification.book_id}/chapter/${notification.chapter_id}?comments=1`}
+                      className="flex items-center gap-1 text-xs text-accent hover:underline"
+                      onClick={() => !notification.read_at && handleMarkRead(notification.id)}
+                    >
+                      <BookOpen className="h-3 w-3" />
+                      View chapter
+                    </Link>
+                  ) : notification.book_id ? (
                     <Link
                       to={`/edit/book/${notification.book_id}`}
                       className="flex items-center gap-1 text-xs text-accent hover:underline"
+                      onClick={() => !notification.read_at && handleMarkRead(notification.id)}
                     >
                       <BookOpen className="h-3 w-3" />
                       View book
                     </Link>
-                  )}
+                  ) : null}
                   {notification.invite_token && (
                     <Link
                       to={`/invite/${notification.invite_token}`}
