@@ -8,6 +8,9 @@ export default function BookSettings() {
   const { bookId } = useParams<{ bookId: string }>();
   const [book, setBook] = useState<Book | null>(null);
   const [settings, setSettings] = useState<BookSettingsType | null>(null);
+  const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -29,6 +32,9 @@ export default function BookSettings() {
       setBook(data);
       setSettings(data.settings || null);
       setCoverUrl(data.cover_image_url || null);
+      setTitle(data.title || '');
+      setSubtitle(data.subtitle || '');
+      setDescription(data.description || '');
     } catch (err) {
       console.error('Failed to load book:', err);
     } finally {
@@ -88,7 +94,11 @@ export default function BookSettings() {
     setSaving(true);
     setSaved(false);
     try {
-      await api.updateBookSettings(bookId, settings);
+      const [updatedBook] = await Promise.all([
+        api.updateBook(bookId, { title: title.trim(), subtitle: subtitle.trim() || undefined, description: description.trim() || undefined }),
+        api.updateBookSettings(bookId, settings),
+      ]);
+      setBook(prev => prev ? { ...prev, ...updatedBook } : null);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -160,7 +170,7 @@ export default function BookSettings() {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-theme">Book Settings</h1>
-          <p className="text-muted">{book.title}</p>
+          <p className="text-muted">{title || book.title}</p>
         </div>
       </div>
 
@@ -195,6 +205,43 @@ export default function BookSettings() {
 
       {/* Settings Form */}
       <div className="theme-section divide-y divide-[var(--color-border)]">
+        {/* Book Details */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Book Details</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-theme mb-1">Title <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 bg-surface border-2 border-theme rounded-lg focus:outline-none focus:border-accent text-theme"
+                placeholder="Book title"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-theme mb-1">Subtitle</label>
+              <input
+                type="text"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                className="w-full px-3 py-2 bg-surface border-2 border-theme rounded-lg focus:outline-none focus:border-accent text-theme"
+                placeholder="Optional subtitle"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-theme mb-1">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 bg-surface border-2 border-theme rounded-lg focus:outline-none focus:border-accent text-theme resize-none"
+                placeholder="A short description of your book"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Publishing */}
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-1 text-theme">Publishing</h2>
