@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Get all books (public + own)
 router.get('/', optionalAuth, async (req, res) => {
-  const { status, visibility, author_id, limit = 50, offset = 0 } = req.query;
+  const { status, visibility, author_id, search, limit = 50, offset = 0 } = req.query;
 
   try {
     let query = supabase
@@ -27,6 +27,7 @@ router.get('/', optionalAuth, async (req, res) => {
     if (status) query = query.eq('status', status);
     if (visibility) query = query.eq('visibility', visibility);
     if (author_id) query = query.eq('author_id', author_id);
+    if (search) query = query.ilike('title', `%${search}%`);
 
     const { data, error, count } = await query
       .order('updated_at', { ascending: false })

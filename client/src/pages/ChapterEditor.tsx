@@ -719,6 +719,7 @@ export default function ChapterEditor() {
         <InlineContentModal
           type={showInlineModal.type}
           selectedText={showInlineModal.selection?.text}
+          bookId={bookId}
           onClose={() => setShowInlineModal(null)}
           onCreate={handleCreateInlineContent}
           editingItem={showInlineModal.editingItem}

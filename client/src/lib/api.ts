@@ -119,6 +119,12 @@ class ApiClient {
     return this.request('/books/my');
   }
 
+  async searchBooks(search: string): Promise<Book[]> {
+    const qs = search.trim() ? `?search=${encodeURIComponent(search)}&limit=30` : '?limit=30';
+    const result = await this.request<{ data: Book[]; count: number }>(`/books${qs}`);
+    return result.data ?? [];
+  }
+
   async getBook(id: string): Promise<Book> {
     return this.request(`/books/${id}`);
   }
@@ -239,10 +245,10 @@ class ApiClient {
   }
 
   // Files
-  async getUploadUrl(fileName: string, fileType: string): Promise<{ upload_url: string; storage_path: string; token: string }> {
+  async getUploadUrl(fileName: string, fileType: string, bookId?: string): Promise<{ upload_url: string; storage_path: string; token: string; fileflow_folder_id?: string | null }> {
     return this.request('/files/upload', {
       method: 'POST',
-      body: JSON.stringify({ file_name: fileName, file_type: fileType }),
+      body: JSON.stringify({ file_name: fileName, file_type: fileType, book_id: bookId }),
     });
   }
 
@@ -457,10 +463,10 @@ class ApiClient {
 
   // Book Cover Upload
   async uploadBookCover(bookId: string, file: File): Promise<{ cover_image_url: string }> {
-    // Get a Supabase signed upload URL from the server
-    const { upload_url, storage_path } = await this.getUploadUrl(file.name, file.type);
+    // Get a signed upload URL from the server (routes to FileFlow images/ folder for this book)
+    const { upload_url, storage_path, fileflow_folder_id } = await this.getUploadUrl(file.name, file.type, bookId);
 
-    // Upload directly to Supabase Storage via the signed URL
+    // Upload directly to storage via the signed URL
     const uploadResponse = await fetch(upload_url, {
       method: 'PUT',
       body: file,
@@ -471,9 +477,18 @@ class ApiClient {
       throw new Error('Failed to upload cover image');
     }
 
-    // Build the public URL — bucket is bookflow-covers
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:55321';
-    const cover_image_url = `${supabaseUrl}/storage/v1/object/public/bookflow-covers/${storage_path}`;
+    // Register the file and get back a usable URL
+    const registered = await this.registerFile({
+      file_name: file.name,
+      file_type: file.type,
+      file_size: file.size,
+      storage_path,
+      fileflow_folder_id,
+      display_name: 'Cover Image',
+      book_id: bookId,
+    });
+
+    const cover_image_url = registered.file_url || storage_path;
 
     // Update the book record
     await this.updateBook(bookId, { cover_image_url });
@@ -551,6 +566,94 @@ class ApiClient {
 
   async deleteSubmission(bookId: string, submissionId: string): Promise<void> {
     return this.request(`/books/${bookId}/submissions/${submissionId}`, { method: 'DELETE' });
+  }
+
+  // ── Book Clubs ─────────────────────────────────────────────────────────────
+
+  async getMyClubs(): Promise<any[]> {
+    return this.request('/clubs');
+  }
+
+  async getPublicClubs(search?: string): Promise<any[]> {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+    return this.request(`/clubs/public${qs}`);
+  }
+
+  async createClub(data: { name: string; description?: string; cover_image_url?: string; visibility?: string; max_members?: number }): Promise<any> {
+    return this.request('/clubs', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getClub(clubId: string): Promise<any> {
+    return this.request(`/clubs/${clubId}`);
+  }
+
+  async updateClub(clubId: string, data: Partial<{ name: string; description: string; cover_image_url: string; visibility: string; max_members: number }>): Promise<any> {
+    return this.request(`/clubs/${clubId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async updateClubSettings(clubId: string, settings: Partial<{ show_member_reading_progress: boolean; show_member_answers: boolean; show_member_highlights: boolean; show_member_media: boolean }>): Promise<any> {
+    return this.request(`/clubs/${clubId}/settings`, { method: 'PUT', body: JSON.stringify(settings) });
+  }
+
+  async deleteClub(clubId: string): Promise<void> {
+    return this.request(`/clubs/${clubId}`, { method: 'DELETE' });
+  }
+
+  async inviteToClub(clubId: string, email: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/invite`, { method: 'POST', body: JSON.stringify({ email }) });
+  }
+
+  async acceptClubInvite(token: string): Promise<any> {
+    return this.request(`/clubs/accept/${token}`, { method: 'POST' });
+  }
+
+  async resendClubInvite(clubId: string, memberId: string): Promise<{ invite_token: string; invited_email: string }> {
+    return this.request(`/clubs/${clubId}/members/${memberId}/resend-invite`, { method: 'POST' });
+  }
+
+  async removeClubMember(clubId: string, memberId: string): Promise<void> {
+    return this.request(`/clubs/${clubId}/members/${memberId}`, { method: 'DELETE' });
+  }
+
+  async updateClubMemberRole(clubId: string, memberId: string, role: 'admin' | 'member'): Promise<any> {
+    return this.request(`/clubs/${clubId}/members/${memberId}`, { method: 'PUT', body: JSON.stringify({ role }) });
+  }
+
+  async addBookToClub(clubId: string, bookId: string, setCurrent?: boolean): Promise<any> {
+    return this.request(`/clubs/${clubId}/books`, { method: 'POST', body: JSON.stringify({ book_id: bookId, set_current: setCurrent }) });
+  }
+
+  async setCurrentClubBook(clubId: string, clubBookId: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/books/${clubBookId}`, { method: 'PUT', body: JSON.stringify({ is_current: true }) });
+  }
+
+  async removeBookFromClub(clubId: string, clubBookId: string): Promise<void> {
+    return this.request(`/clubs/${clubId}/books/${clubBookId}`, { method: 'DELETE' });
+  }
+
+  async getClubDiscussions(clubId: string, params?: { book_id?: string; chapter_id?: string; parent_id?: string | null }): Promise<any[]> {
+    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, v === null ? 'null' : String(v)])).toString() : '';
+    return this.request(`/clubs/${clubId}/discussions${qs}`);
+  }
+
+  async postClubDiscussion(clubId: string, data: { body: string; book_id?: string; chapter_id?: string; parent_id?: string }): Promise<any> {
+    return this.request(`/clubs/${clubId}/discussions`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateClubDiscussion(clubId: string, discussionId: string, body: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/discussions/${discussionId}`, { method: 'PUT', body: JSON.stringify({ body }) });
+  }
+
+  async deleteClubDiscussion(clubId: string, discussionId: string): Promise<void> {
+    return this.request(`/clubs/${clubId}/discussions/${discussionId}`, { method: 'DELETE' });
+  }
+
+  async getClubMemberProgress(clubId: string, memberUserId: string): Promise<any[]> {
+    return this.request(`/clubs/${clubId}/members/${memberUserId}/progress`);
+  }
+
+  async getClubMemberAnswers(clubId: string, memberUserId: string): Promise<any[]> {
+    return this.request(`/clubs/${clubId}/members/${memberUserId}/answers`);
   }
 }
 

@@ -531,6 +531,7 @@ export default function BookReader() {
         <InlineContentModal
           type={showReaderModal.type}
           selectedText={selectedText.text}
+          bookId={bookId}
           onClose={() => {
             setShowReaderModal(null);
             setSelectedText(null);

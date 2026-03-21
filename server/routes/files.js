@@ -13,7 +13,13 @@ function pickFolder(folders, mimeType) {
   return folders.root_folder_id;
 }
 
-// POST /files/upload — get a signed upload URL (FileFlow if configured, else Supabase Storage)
+// Extract the Bearer JWT from the request (passed through to FileFlow)
+function extractJwt(req) {
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+// POST /files/upload — get a signed upload URL via FileFlow
 router.post('/upload', authenticate, async (req, res) => {
   const { file_name, file_type, book_id } = req.body;
   if (!file_name || !file_type) {
@@ -21,47 +27,32 @@ router.post('/upload', authenticate, async (req, res) => {
   }
 
   try {
-    const token = await getFileFlowToken(req.user.id);
-
-    // Use FileFlow when configured
-    if (token) {
-      let folderId = null;
-      if (book_id) {
-        const { data: book } = await supabase
-          .from('books')
-          .select('title')
-          .eq('id', book_id)
-          .single();
-
-        if (book) {
-          const folders = await ensureBookFolders(book_id, book.title, token);
-          folderId = pickFolder(folders, file_type);
-        }
-      }
-
-      const client = new FileFlowClient(token);
-      const { uploadUrl, storagePath } = await client.getUploadUrl(file_name, file_type, folderId);
-
-      return res.json({
-        upload_url: uploadUrl,
-        storage_path: storagePath,
-        fileflow_folder_id: folderId,
-      });
+    const token = await getFileFlowToken(req.user.id, extractJwt(req));
+    if (!token) {
+      return res.status(503).json({ error: 'FileFlow is not configured. Add your FileFlow API key in Settings.' });
     }
 
-    // Fallback: Supabase Storage signed upload URL (bookflow-covers bucket)
-    const storagePath = `${req.user.id}/${Date.now()}_${file_name}`;
-    const { data, error } = await supabase.storage
-      .from('bookflow-covers')
-      .createSignedUploadUrl(storagePath);
+    let folderId = null;
+    if (book_id) {
+      const { data: book } = await supabase
+        .from('books')
+        .select('title')
+        .eq('id', book_id)
+        .single();
 
-    if (error) throw error;
+      if (book) {
+        const folders = await ensureBookFolders(book_id, book.title, token);
+        folderId = pickFolder(folders, file_type);
+      }
+    }
+
+    const client = new FileFlowClient(token);
+    const { uploadUrl, storagePath } = await client.getUploadUrl(file_name, file_type, folderId);
 
     return res.json({
-      upload_url: data.signedUrl,
+      upload_url: uploadUrl,
       storage_path: storagePath,
-      token: data.token,
-      fileflow_folder_id: null,
+      fileflow_folder_id: folderId,
     });
   } catch (err) {
     console.error('File upload error:', err);
@@ -69,44 +60,70 @@ router.post('/upload', authenticate, async (req, res) => {
   }
 });
 
-// POST /files/register — record uploaded file after client PUT to FileFlow signed URL
+// POST /files/register — record uploaded file after client PUT to signed URL
 router.post('/register', authenticate, async (req, res) => {
   const {
-    fileflow_file_id,
+    fileflow_file_id: providedFileflowId,
     file_type,
     display_name,
     file_url,
     storage_path,
     file_name,
+    file_size,
     book_id,
     chapter_id,
     inline_content_id,
   } = req.body;
 
   try {
-    // If we have a fileflow_file_id but no URL yet, fetch it
+    let fileflowFileId = providedFileflowId || null;
     let finalUrl = file_url;
-    if (!finalUrl && fileflow_file_id) {
-      const token = await getFileFlowToken(req.user.id);
-      if (token) {
+
+    const token = await getFileFlowToken(req.user.id, extractJwt(req));
+
+    // If uploaded via FileFlow signed URL but no fileflow_file_id yet,
+    // register the file in FileFlow now to get its ID and a usable URL.
+    const fileflow_folder_id = req.body.fileflow_folder_id || null;
+    if (!fileflowFileId && storage_path && token) {
+      try {
         const client = new FileFlowClient(token);
+        const fileRecord = await client.createFile({
+          name: file_name || display_name || 'file',
+          mime_type: file_type,
+          size_bytes: file_size || 0,
+          storage_path,
+          bucket_name: 'files',
+          folder_id: fileflow_folder_id,
+        });
+        fileflowFileId = fileRecord.id;
+        // Fetch a signed download URL
         try {
-          const { url } = await client.getDownloadUrl(fileflow_file_id);
+          const { url } = await client.getDownloadUrl(fileflowFileId);
           finalUrl = url;
-        } catch { /* fallback below */ }
+        } catch { /* use storage_path fallback */ }
+      } catch (ffErr) {
+        console.warn('[files/register] Could not register in FileFlow:', ffErr.message);
       }
     }
 
-    // Fallback: build URL from storage_path if FileFlow didn't return one
+    // If we have a fileflow_file_id but still no URL, fetch it
+    if (!finalUrl && fileflowFileId && token) {
+      try {
+        const client = new FileFlowClient(token);
+        const { url } = await client.getDownloadUrl(fileflowFileId);
+        finalUrl = url;
+      } catch { /* fallback below */ }
+    }
+
+    // Last resort: store the storage_path so the file_reference isn't lost
     if (!finalUrl && storage_path) {
-      const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:55321';
-      finalUrl = `${supabaseUrl}/storage/v1/object/public/files/${storage_path}`;
+      finalUrl = storage_path;
     }
 
     const { data, error } = await supabase
       .from('file_references')
       .insert({
-        fileflow_file_id: fileflow_file_id || null,
+        fileflow_file_id: fileflowFileId,
         file_type,
         display_name: display_name || file_name,
         file_url: finalUrl,
@@ -138,7 +155,7 @@ router.get('/:fileId/url', authenticate, async (req, res) => {
 
     // Prefer a fresh signed URL from FileFlow
     if (fileRef.fileflow_file_id) {
-      const token = await getFileFlowToken(req.user.id);
+      const token = await getFileFlowToken(req.user.id, extractJwt(req));
       if (token) {
         const client = new FileFlowClient(token);
         const { url } = await client.getDownloadUrl(fileRef.fileflow_file_id);
@@ -194,7 +211,7 @@ router.delete('/:fileId', authenticate, async (req, res) => {
 
     // Delete from FileFlow if we have the ID
     if (fileRef.fileflow_file_id) {
-      const token = await getFileFlowToken(req.user.id);
+      const token = await getFileFlowToken(req.user.id, extractJwt(req));
       if (token) {
         const client = new FileFlowClient(token);
         await client.deleteFile(fileRef.fileflow_file_id).catch(() => {});

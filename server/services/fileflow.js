@@ -109,16 +109,29 @@ export class FileFlowClient {
 }
 
 /**
- * Retrieve the FileFlow token for a user from app_settings.
+ * Retrieve the FileFlow token for a given request.
+ * Priority:
+ *  1. User's own Supabase JWT (passed directly — both apps share the same Supabase instance)
+ *  2. Per-user fileflow_access_key from app_settings
+ *  3. FILEFLOW_SERVICE_TOKEN env var
  */
-export async function getFileFlowToken(userId) {
-  const { data } = await supabase
-    .from('app_settings')
-    .select('fileflow_access_key')
-    .eq('user_id', userId)
-    .maybeSingle();
+export async function getFileFlowToken(userId, userJwt = null) {
+  // Prefer the user's own JWT — FileFlow validates it against the same Supabase instance
+  if (userJwt) return userJwt;
 
-  return (data?.fileflow_access_key) || process.env.FILEFLOW_SERVICE_TOKEN || '';
+  try {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('fileflow_access_key')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (data?.fileflow_access_key) return data.fileflow_access_key;
+  } catch {
+    // Table may not exist yet — fall through to env var
+  }
+
+  return process.env.FILEFLOW_SERVICE_TOKEN || '';
 }
 
 /**

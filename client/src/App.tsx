@@ -17,6 +17,10 @@ import BookCollaboratorsPage from './pages/BookCollaboratorsPage';
 import BookVersionsPage from './pages/BookVersionsPage';
 import PublicBookPage from './pages/PublicBookPage';
 import PublishSubmitPage from './pages/PublishSubmitPage';
+import ClubsPage from './pages/ClubsPage';
+import ClubDetailPage from './pages/ClubDetailPage';
+import ClubReadPage from './pages/ClubReadPage';
+import AcceptClubInvitePage from './pages/AcceptClubInvitePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -60,6 +64,7 @@ function AppRoutes() {
 
         {/* Invite acceptance — works with or without auth */}
         <Route path="invite/:token" element={<AcceptInvitePage />} />
+        <Route path="clubs/accept/:token" element={<AcceptClubInvitePage />} />
 
         {/* Protected editing routes */}
         <Route path="edit/book/:bookId" element={
@@ -107,6 +112,25 @@ function AppRoutes() {
         <Route path="settings" element={
           <ProtectedRoute>
             <Settings />
+          </ProtectedRoute>
+        } />
+
+        {/* Book Clubs */}
+        <Route path="clubs" element={
+          <ProtectedRoute>
+            <ClubsPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="clubs/:clubId" element={
+          <ProtectedRoute>
+            <ClubDetailPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="clubs/:clubId/read/:bookId" element={
+          <ProtectedRoute>
+            <ClubReadPage />
           </ProtectedRoute>
         } />
       </Route>

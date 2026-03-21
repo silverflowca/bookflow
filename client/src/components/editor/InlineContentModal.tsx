@@ -14,13 +14,14 @@ import {
 interface Props {
   type: InlineContent['content_type'];
   selectedText?: string;
+  bookId?: string;
   onClose: () => void;
   onCreate: (data: Partial<InlineContent>) => void;
   editingItem?: InlineContent; // For edit mode
   onUpdate?: (id: string, data: Partial<InlineContent>) => void; // For edit mode
 }
 
-export default function InlineContentModal({ type, selectedText, onClose, onCreate, editingItem, onUpdate }: Props) {
+export default function InlineContentModal({ type, selectedText, bookId, onClose, onCreate, editingItem, onUpdate }: Props) {
   const isEditing = !!editingItem;
 
   const titles: Record<string, string> = {
@@ -72,8 +73,8 @@ export default function InlineContentModal({ type, selectedText, onClose, onCrea
           {type === 'highlight' && <HighlightForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as HighlightData} isEditing={isEditing} />}
           {type === 'note' && <NoteForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as NoteData} isEditing={isEditing} />}
           {type === 'link' && <LinkForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as LinkData} isEditing={isEditing} />}
-          {type === 'audio' && <MediaForm type="audio" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} />}
-          {type === 'video' && <MediaForm type="video" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} />}
+          {type === 'audio' && <MediaForm type="audio" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
+          {type === 'video' && <MediaForm type="video" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
           
           {type === 'select' && <SelectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SelectData} isEditing={isEditing} />}
           {type === 'multiselect' && <MultiselectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MultiselectData} isEditing={isEditing} />}
@@ -465,7 +466,7 @@ function LinkForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
   );
 }
 
-function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isEditing }: { type: 'audio' | 'video'; onSubmit: (data: Partial<InlineContent>) => void; onClose: () => void; maxDuration?: number; initialData?: MediaData; isEditing?: boolean }) {
+function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isEditing, bookId }: { type: 'audio' | 'video'; onSubmit: (data: Partial<InlineContent>) => void; onClose: () => void; maxDuration?: number; initialData?: MediaData; isEditing?: boolean; bookId?: string }) {
   const [mode, setMode] = useState<'url' | 'upload' | 'record'>(initialData?.url ? 'url' : 'url');
   const [url, setUrl] = useState(initialData?.url || '');
   const [title, setTitle] = useState(initialData?.title || '');
@@ -598,7 +599,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
 
     try {
       // Get upload URL from BookFlow API (which proxies to FileFlow)
-      const { upload_url, storage_path } = await api.getUploadUrl(file.name, file.type);
+      const { upload_url, storage_path, fileflow_folder_id } = await api.getUploadUrl(file.name, file.type, bookId);
 
       // Upload directly to storage
       const uploadResponse = await fetch(upload_url, {
@@ -619,7 +620,9 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
         file_type: file.type,
         file_size: file.size,
         storage_path,
+        fileflow_folder_id,
         display_name: file.name,
+        book_id: bookId,
       });
 
       setUploadedFile({
@@ -654,7 +657,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
           const file = new File([recordedBlob], fileName, { type: recordedBlob.type });
 
           // Get upload URL
-          const { upload_url, storage_path } = await api.getUploadUrl(fileName, file.type);
+          const { upload_url, storage_path, fileflow_folder_id } = await api.getUploadUrl(fileName, file.type, bookId);
 
           // Upload
           const uploadResponse = await fetch(upload_url, {
@@ -671,7 +674,9 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
             file_type: file.type,
             file_size: file.size,
             storage_path,
+            fileflow_folder_id,
             display_name: title || `Recording ${new Date().toLocaleDateString()}`,
+            book_id: bookId,
           });
 
           mediaUrl = registered.file_url || storage_path;

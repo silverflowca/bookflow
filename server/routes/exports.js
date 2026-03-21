@@ -10,6 +10,11 @@ import { FileFlowClient, getFileFlowToken, ensureBookFolders } from '../services
 
 const router = express.Router({ mergeParams: true });
 
+function extractJwt(req) {
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
 async function fetchBookFull(bookId) {
   const { data: book, error } = await supabase
     .from('books')
@@ -36,8 +41,8 @@ async function fetchBookFull(bookId) {
   };
 }
 
-async function uploadToBackups(bookId, bookTitle, buffer, fileName, mimeType, userId) {
-  const token = await getFileFlowToken(userId);
+async function uploadToBackups(bookId, bookTitle, buffer, fileName, mimeType, userId, jwt = null) {
+  const token = await getFileFlowToken(userId, jwt);
   if (!token) return null;
   const folders = await ensureBookFolders(bookId, bookTitle, token);
   const client = new FileFlowClient(token);
@@ -120,7 +125,7 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
     browser = null;
 
     const fileName = `${(book.title || 'book').replace(/[^a-z0-9]/gi, '_')}.pdf`;
-    const result = await uploadToBackups(req.params.bookId, book.title, Buffer.from(pdfBuffer), fileName, 'application/pdf', req.user.id);
+    const result = await uploadToBackups(req.params.bookId, book.title, Buffer.from(pdfBuffer), fileName, 'application/pdf', req.user.id, extractJwt(req));
 
     if (result) return res.json(result);
 
@@ -160,7 +165,7 @@ router.post('/:bookId/export/epub', authenticate, requireRole(['owner', 'author'
     fs.unlinkSync(tmpFile);
 
     const fileName = `${(book.title || 'book').replace(/[^a-z0-9]/gi, '_')}.epub`;
-    const result = await uploadToBackups(req.params.bookId, book.title, epubBuffer, fileName, 'application/epub+zip', req.user.id);
+    const result = await uploadToBackups(req.params.bookId, book.title, epubBuffer, fileName, 'application/epub+zip', req.user.id, extractJwt(req));
 
     if (result) return res.json(result);
 
@@ -231,7 +236,7 @@ router.post('/:bookId/export/docx', authenticate, requireRole(['owner', 'author'
 
     const fileName = `${(book.title || 'book').replace(/[^a-z0-9]/gi, '_')}.docx`;
     const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    const result = await uploadToBackups(req.params.bookId, book.title, docxBuffer, fileName, mimeType, req.user.id);
+    const result = await uploadToBackups(req.params.bookId, book.title, docxBuffer, fileName, mimeType, req.user.id, extractJwt(req));
 
     if (result) return res.json(result);
 
@@ -309,7 +314,7 @@ router.post('/:bookId/export/submission-package', authenticate, requireRole(['ow
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
     const zipName = `${safeName}_submission.zip`;
-    const result = await uploadToBackups(req.params.bookId, book.title, zipBuffer, zipName, 'application/zip', req.user.id);
+    const result = await uploadToBackups(req.params.bookId, book.title, zipBuffer, zipName, 'application/zip', req.user.id, extractJwt(req));
 
     if (result) return res.json(result);
 

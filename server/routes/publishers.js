@@ -6,6 +6,11 @@ import { FileFlowClient, getFileFlowToken, ensureBookFolders } from '../services
 
 const router = express.Router({ mergeParams: true });
 
+function extractJwt(req) {
+  const auth = req.headers.authorization || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
 // ── Helper: fetch book + chapters ─────────────────────────────────────────────
 async function fetchBookFull(bookId) {
   const { data: book, error } = await supabase
@@ -33,7 +38,7 @@ async function fetchBookFull(bookId) {
 }
 
 // ── Helper: build or reuse EPUB in FileFlow ───────────────────────────────────
-async function getOrBuildEpub(bookId, book, userId) {
+async function getOrBuildEpub(bookId, book, userId, jwt = null) {
   let Epub;
   try { Epub = (await import('epub-gen')).default; }
   catch { throw new Error('EPUB generation requires epub-gen. Run: npm install epub-gen'); }
@@ -58,7 +63,7 @@ async function getOrBuildEpub(bookId, book, userId) {
   const epubBuffer = fs.readFileSync(tmpFile);
   fs.unlinkSync(tmpFile);
 
-  const token = await getFileFlowToken(userId);
+  const token = await getFileFlowToken(userId, jwt);
   if (token) {
     const folders = await ensureBookFolders(bookId, book.title, token);
     const client = new FileFlowClient(token);
@@ -137,7 +142,7 @@ router.post('/:bookId/submit/draft2digital', authenticate, requireRole(['owner',
     const book = await fetchBookFull(req.params.bookId);
     if (!book.title) return res.status(400).json({ error: 'Book must have a title before submitting' });
 
-    const { buffer: epubBuffer } = await getOrBuildEpub(req.params.bookId, book, req.user.id);
+    const { buffer: epubBuffer } = await getOrBuildEpub(req.params.bookId, book, req.user.id, extractJwt(req));
 
     // Build multipart form for D2D API
     const FormData = (await import('form-data')).default;
@@ -199,7 +204,7 @@ router.post('/:bookId/submit/smashwords', authenticate, requireRole(['owner', 'a
     const book = await fetchBookFull(req.params.bookId);
     if (!book.title) return res.status(400).json({ error: 'Book must have a title before submitting' });
 
-    const { buffer: epubBuffer } = await getOrBuildEpub(req.params.bookId, book, req.user.id);
+    const { buffer: epubBuffer } = await getOrBuildEpub(req.params.bookId, book, req.user.id, extractJwt(req));
 
     const FormData = (await import('form-data')).default;
     const form = new FormData();

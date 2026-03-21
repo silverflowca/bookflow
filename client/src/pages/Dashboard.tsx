@@ -143,6 +143,26 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Book Clubs Quick Link */}
+      <div className="mt-10">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="h-5 w-5 text-accent" />
+          <h2 className="text-lg font-semibold text-theme">Book Clubs</h2>
+        </div>
+        <Link
+          to="/clubs"
+          className="flex items-center gap-4 theme-section rounded-xl p-4 hover:shadow-md transition-shadow group w-full sm:w-fit"
+        >
+          <div className="h-12 w-12 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+            <Users className="h-6 w-6 text-indigo-400" />
+          </div>
+          <div>
+            <p className="font-medium text-theme group-hover:text-accent transition-colors">My Clubs</p>
+            <p className="text-xs text-muted">Read and discuss books with others</p>
+          </div>
+        </Link>
+      </div>
+
       {/* New Book Modal */}
       {showNewBookModal && (
         <NewBookModal
