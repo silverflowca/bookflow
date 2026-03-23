@@ -127,11 +127,17 @@ router.post('/register', authenticate, async (req, res) => {
           folder_id: fileflow_folder_id,
         });
         fileflowFileId = fileRecord.id;
-        // Fetch a signed download URL
+        // Fetch a signed download URL from FileFlow
         try {
           const { url } = await client.getDownloadUrl(fileflowFileId);
           finalUrl = url;
-        } catch { /* use storage_path fallback */ }
+        } catch {
+          // Fall back to constructing the Supabase public URL from storage_path
+          // FileFlow stores files in the 'files' bucket in Supabase Storage
+          if (storage_path && !storage_path.startsWith('http')) {
+            finalUrl = `${SUPABASE_URL}/storage/v1/object/public/files/${storage_path}`;
+          }
+        }
       } catch (ffErr) {
         console.warn('[files/register] Could not register in FileFlow:', ffErr.message);
       }
@@ -146,9 +152,11 @@ router.post('/register', authenticate, async (req, res) => {
       } catch { /* fallback below */ }
     }
 
-    // Last resort: store the storage_path so the file_reference isn't lost
+    // Last resort: construct a public Supabase URL from the storage_path
     if (!finalUrl && storage_path) {
-      finalUrl = storage_path;
+      finalUrl = storage_path.startsWith('http')
+        ? storage_path
+        : `${SUPABASE_URL}/storage/v1/object/public/files/${storage_path}`;
     }
 
     const { data, error } = await supabase
@@ -199,6 +207,42 @@ router.get('/:fileId/url', authenticate, async (req, res) => {
     return res.status(404).json({ error: 'File URL not available' });
   } catch (err) {
     console.error('Get file URL error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /files/:fileId/img — image proxy: redirects to a fresh signed URL (no auth required)
+// Used so cover_image_url can be a stable /api/files/:id/img URL that never expires
+router.get('/:fileId/img', async (req, res) => {
+  try {
+    const { data: fileRef, error: refError } = await supabase
+      .from('file_references')
+      .select('fileflow_file_id, file_url, book_id')
+      .eq('id', req.params.fileId)
+      .single();
+
+    if (refError || !fileRef) return res.status(404).json({ error: 'Not found' });
+
+    // If it's a FileFlow file, use a service token to get a fresh signed URL
+    if (fileRef.fileflow_file_id) {
+      const serviceToken = process.env.FILEFLOW_SERVICE_TOKEN || '';
+      if (serviceToken) {
+        try {
+          const client = new FileFlowClient(serviceToken);
+          const { url } = await client.getDownloadUrl(fileRef.fileflow_file_id);
+          return res.redirect(302, url);
+        } catch { /* fall through to file_url */ }
+      }
+    }
+
+    // For Supabase Storage or fallback — redirect directly to stored URL
+    if (fileRef.file_url && fileRef.file_url.startsWith('http')) {
+      return res.redirect(302, fileRef.file_url);
+    }
+
+    return res.status(404).json({ error: 'Image URL not available' });
+  } catch (err) {
+    console.error('Image proxy error:', err);
     res.status(500).json({ error: err.message });
   }
 });
