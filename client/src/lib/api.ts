@@ -12,6 +12,7 @@ import type {
   ReviewRequest,
   UserNotification,
   CollaboratorRole,
+  ActivityEvent,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -651,6 +652,19 @@ class ApiClient {
 
   async getClubMemberAnswers(clubId: string, memberUserId: string): Promise<any[]> {
     return this.request(`/clubs/${clubId}/members/${memberUserId}/answers`);
+  }
+
+  // Activity / Audit Trail
+  async getBookActivity(
+    bookId: string,
+    params?: { type?: string; limit?: number; offset?: number }
+  ): Promise<{ events: ActivityEvent[]; total: number; hasMore: boolean }> {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set('type', params.type);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    const query = qs.toString() ? `?${qs}` : '';
+    return this.request(`/books/${bookId}/activity${query}`);
   }
 }
 

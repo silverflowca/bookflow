@@ -159,6 +159,17 @@ export interface UserNotification {
   chapter?: Pick<Chapter, 'id' | 'title'>;
 }
 
+export type ActivityEventType = 'version' | 'comment' | 'inline_content' | 'change_log';
+
+export interface ActivityEvent {
+  id: string;
+  event_type: ActivityEventType;
+  created_at: string;
+  actor?: { id: string; display_name: string; avatar_url?: string } | null;
+  description: string;
+  meta: Record<string, unknown>;
+}
+
 // Inline content types
 export type InlineContentType =
   | 'question' | 'poll' | 'highlight' | 'note' | 'link' | 'audio' | 'video'

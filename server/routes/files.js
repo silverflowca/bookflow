@@ -30,7 +30,9 @@ router.post('/upload', authenticate, async (req, res) => {
   }
 
   try {
-    const token = await getFileFlowToken(req.user.id, extractJwt(req));
+    const jwt = extractJwt(req);
+    const token = await getFileFlowToken(req.user.id, jwt);
+    console.log('[files/upload] token present:', !!token, '| jwt present:', !!jwt, '| file:', file_name, file_type);
 
     // ── FileFlow path ──────────────────────────────────────────────────────────
     if (token) {

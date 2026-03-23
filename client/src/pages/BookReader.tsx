@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, Square, Loader2,
-  User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code
+  User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -425,6 +425,17 @@ export default function BookReader() {
                 </>
               )}
             </button>
+            {/* Edit button — visible to book author only */}
+            {isAuthor && chapterId && (
+              <Link
+                to={`/edit/book/${bookId}/chapter/${chapterId}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-surface-hover text-theme hover:bg-primary-100 hover:text-primary-700 transition-colors ml-2"
+                title="Back to editor"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="hidden sm:inline">Edit</span>
+              </Link>
+            )}
           </div>
         </header>
 

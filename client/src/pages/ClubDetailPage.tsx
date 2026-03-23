@@ -969,31 +969,34 @@ export default function ClubDetailPage() {
         <div className="space-y-4">
           {/* Post form */}
           <div className="theme-section rounded-xl p-4">
-            {replyingTo && (
-              <div className="flex items-center gap-2 text-xs text-muted mb-2">
-                <span>Replying to a message</span>
-                <button onClick={() => setReplyingTo(null)} className="text-red-400 hover:text-red-300">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-            <form onSubmit={handlePost} className="flex gap-3">
+            <form onSubmit={handlePost} className="space-y-2">
               <textarea
                 ref={postRef}
                 value={postBody}
                 onChange={e => setPostBody(e.target.value)}
                 placeholder={replyingTo ? 'Write a reply…' : 'Start a discussion…'}
-                className="flex-1 px-3 py-2 theme-input rounded-lg text-sm resize-none"
+                className="w-full px-3 py-2 theme-input rounded-lg text-sm resize-none"
                 rows={2}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost(e as any); } }}
               />
-              <button
-                type="submit"
-                disabled={posting || !postBody.trim()}
-                className="self-end flex items-center gap-1 theme-button-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-              >
-                {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
+              <div className="flex items-center justify-between">
+                {replyingTo ? (
+                  <div className="flex items-center gap-1.5 text-xs text-muted">
+                    <span>Replying to a message</span>
+                    <button type="button" onClick={() => setReplyingTo(null)} className="text-red-400 hover:text-red-300">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : <span />}
+                <button
+                  type="submit"
+                  disabled={posting || !postBody.trim()}
+                  className="flex items-center gap-1.5 theme-button-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+                >
+                  {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {replyingTo ? 'Reply' : 'Post'}
+                </button>
+              </div>
             </form>
           </div>
 
