@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, BookOpen, Loader2, ChevronDown, ChevronUp,
-  MessageSquare, Eye, Star, Volume2, Video, Highlighter,
+  MessageSquare, Eye, Volume2, Highlighter,
 } from 'lucide-react';
 import api from '../lib/api';
 

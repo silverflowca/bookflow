@@ -5,7 +5,7 @@ import {
   Loader2, ChevronDown, User
 } from 'lucide-react';
 import api from '../lib/api';
-import type { Book, ActivityEvent } from '../types';
+import type { Book, ActivityEvent, ActivityEventType } from '../types';
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();

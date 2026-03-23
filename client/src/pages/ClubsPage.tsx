@@ -36,9 +36,9 @@ function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-theme text-sm leading-tight">{club.name}</h3>
           {club.visibility === 'public' ? (
-            <Globe className="h-4 w-4 text-muted flex-shrink-0 mt-0.5" title="Public" />
+            <span title="Public"><Globe className="h-4 w-4 text-muted flex-shrink-0 mt-0.5" /></span>
           ) : (
-            <Lock className="h-4 w-4 text-muted flex-shrink-0 mt-0.5" title="Private" />
+            <span title="Private"><Lock className="h-4 w-4 text-muted flex-shrink-0 mt-0.5" /></span>
           )}
         </div>
         {club.description && (

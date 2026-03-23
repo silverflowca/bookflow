@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Users, BookOpen, MessageSquare, Settings, Plus, Trash2,
   Crown, Shield, UserMinus, ChevronRight, Loader2, Send,
-  Globe, Lock, Star, Eye, ArrowLeft,
+  Globe, Lock, Star, ArrowLeft,
   X, Check, Mail, Search, Copy,
 } from 'lucide-react';
 import api from '../lib/api';
@@ -79,8 +79,8 @@ function timeAgo(dateStr: string) {
 }
 
 function RoleIcon({ role }: { role: string }) {
-  if (role === 'owner') return <Crown className="h-3.5 w-3.5 text-yellow-500" title="Owner" />;
-  if (role === 'admin') return <Shield className="h-3.5 w-3.5 text-blue-500" title="Admin" />;
+  if (role === 'owner') return <span title="Owner"><Crown className="h-3.5 w-3.5 text-yellow-500" /></span>;
+  if (role === 'admin') return <span title="Admin"><Shield className="h-3.5 w-3.5 text-blue-500" /></span>;
   return null;
 }
 
@@ -728,8 +728,8 @@ export default function ClubDetailPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-theme">{club.name}</h1>
                 {club.visibility === 'public'
-                  ? <Globe className="h-5 w-5 text-muted" title="Public" />
-                  : <Lock className="h-5 w-5 text-muted" title="Private" />
+                  ? <span title="Public"><Globe className="h-5 w-5 text-muted" /></span>
+                  : <span title="Private"><Lock className="h-5 w-5 text-muted" /></span>
                 }
               </div>
               {club.description && <p className="text-muted mt-1">{club.description}</p>}

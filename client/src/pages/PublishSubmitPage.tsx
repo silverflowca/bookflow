@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Download, Send, Package, Clock, CheckCircle, XCircle, AlertCircle, Loader2, Trash2, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Send, Package, Clock, CheckCircle, XCircle, AlertCircle, Loader2, Trash2, ExternalLink } from 'lucide-react';
 import api from '../lib/api';
 
 type Tab = 'package' | 'direct' | 'history';
