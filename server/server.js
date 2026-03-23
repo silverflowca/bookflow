@@ -35,12 +35,19 @@ const app = express();
 const PORT = process.env.PORT || 8682;
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:5177',
+  'http://127.0.0.1:5177',
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(s => s.trim()) : []),
+];
+
 const corsOptions = {
-  origin: [
-    'http://localhost:5177',
-    'http://127.0.0.1:5177',
-    process.env.CLIENT_URL
-  ].filter(Boolean),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
