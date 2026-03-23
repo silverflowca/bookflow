@@ -36,22 +36,31 @@ router.post('/upload', authenticate, async (req, res) => {
 
     // ── FileFlow path ──────────────────────────────────────────────────────────
     if (token) {
-      let folderId = null;
-      if (book_id) {
-        const { data: book } = await supabase
-          .from('books')
-          .select('title')
-          .eq('id', book_id)
-          .single();
-        if (book) {
-          const folders = await ensureBookFolders(book_id, book.title, token);
-          folderId = pickFolder(folders, file_type);
+      try {
+        let folderId = null;
+        if (book_id) {
+          try {
+            const { data: book } = await supabase
+              .from('books')
+              .select('title')
+              .eq('id', book_id)
+              .single();
+            if (book) {
+              const folders = await ensureBookFolders(book_id, book.title, token);
+              folderId = pickFolder(folders, file_type);
+            }
+          } catch (folderErr) {
+            console.warn('[files/upload] Could not ensure FileFlow folders:', folderErr.message);
+          }
         }
-      }
 
-      const client = new FileFlowClient(token);
-      const { uploadUrl, storagePath } = await client.getUploadUrl(file_name, file_type, folderId);
-      return res.json({ upload_url: uploadUrl, storage_path: storagePath, fileflow_folder_id: folderId });
+        const client = new FileFlowClient(token);
+        const { uploadUrl, storagePath } = await client.getUploadUrl(file_name, file_type, folderId);
+        return res.json({ upload_url: uploadUrl, storage_path: storagePath, fileflow_folder_id: folderId });
+      } catch (ffErr) {
+        console.warn('[files/upload] FileFlow unavailable, falling back to Supabase Storage:', ffErr.message);
+        // fall through to Supabase Storage
+      }
     }
 
     // ── Supabase Storage fallback ──────────────────────────────────────────────
