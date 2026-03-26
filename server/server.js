@@ -26,6 +26,7 @@ import exportsRoutes from './routes/exports.js';
 import publishersRoutes from './routes/publishers.js';
 import clubsRoutes from './routes/clubs.js';
 import activityRoutes from './routes/activity.js';
+import formResponsesRoutes from './routes/form-responses.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -87,6 +88,7 @@ app.use('/api/books', exportsRoutes);
 app.use('/api/books', publishersRoutes);
 app.use('/api/clubs', clubsRoutes);
 app.use('/api/books/:bookId/activity', activityRoutes);
+app.use('/api', formResponsesRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);

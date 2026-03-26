@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import supabase from '../config/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { FileFlowClient, getFileFlowToken, ensureBookFolders } from '../services/fileflow.js';
@@ -7,6 +8,12 @@ const router = express.Router();
 const SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost:55321';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const STORAGE_BUCKET = 'bookflow-covers';
+const MEDIA_BUCKET = 'files';
+
+// In-memory multer for cover uploads (max 5 MB)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// In-memory multer for audio/video media (max 500 MB)
+const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
 // Determine which FileFlow folder to use based on file MIME type
 function pickFolder(folders, mimeType) {
@@ -66,7 +73,7 @@ router.post('/upload', authenticate, async (req, res) => {
     // ── Supabase Storage fallback ──────────────────────────────────────────────
     const storagePath = `covers/${req.user.id}/${Date.now()}_${file_name}`;
     const signedRes = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/sign/${STORAGE_BUCKET}/${storagePath}`,
+      `${SUPABASE_URL}/storage/v1/object/upload/sign/${STORAGE_BUCKET}/${storagePath}`,
       {
         method: 'POST',
         headers: {
@@ -83,13 +90,112 @@ router.post('/upload', authenticate, async (req, res) => {
       throw new Error(err.message || 'Failed to get Supabase upload URL');
     }
 
-    const { signedURL } = await signedRes.json();
+    const { url: signedURL } = await signedRes.json();
     const uploadUrl = signedURL.startsWith('http') ? signedURL : `${SUPABASE_URL}${signedURL}`;
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`;
 
     return res.json({ upload_url: uploadUrl, storage_path: publicUrl, fileflow_folder_id: null, use_supabase: true });
   } catch (err) {
     console.error('File upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /files/cover — direct server-side cover image upload to Supabase Storage
+router.post('/cover', authenticate, upload.single('cover'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const { book_id } = req.body;
+    if (!book_id) return res.status(400).json({ error: 'book_id is required' });
+
+    const ext = req.file.originalname.split('.').pop() || 'jpg';
+    const storagePath = `covers/${req.user.id}/${Date.now()}.${ext}`;
+
+    // Upload directly using service key
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${storagePath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Content-Type': req.file.mimetype,
+          'x-upsert': 'true',
+        },
+        body: req.file.buffer,
+      }
+    );
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || `Storage upload failed (${uploadRes.status})`);
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`;
+
+    // Update book record
+    const { error: updateErr } = await supabase
+      .from('books')
+      .update({ cover_image_url: publicUrl })
+      .eq('id', book_id);
+    if (updateErr) throw updateErr;
+
+    res.json({ cover_image_url: publicUrl });
+  } catch (err) {
+    console.error('[files/cover] upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /files/media — direct server-side audio/video upload to Supabase Storage
+router.post('/media', authenticate, uploadMedia.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const { book_id, display_name } = req.body;
+
+    const ext = req.file.originalname.split('.').pop() || 'webm';
+    const folder = req.file.mimetype.startsWith('video/') ? 'videos' : 'audio';
+    const storagePath = `${folder}/${req.user.id}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+    // Upload directly using service key
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${storagePath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Content-Type': req.file.mimetype,
+          'x-upsert': 'true',
+        },
+        body: req.file.buffer,
+      }
+    );
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || `Storage upload failed (${uploadRes.status})`);
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${MEDIA_BUCKET}/${storagePath}`;
+
+    // Insert file_references record
+    const { data, error: dbErr } = await supabase
+      .from('file_references')
+      .insert({
+        file_type: req.file.mimetype,
+        display_name: display_name || req.file.originalname,
+        file_url: publicUrl,
+        book_id: book_id || null,
+      })
+      .select()
+      .single();
+
+    if (dbErr) throw dbErr;
+
+    res.status(201).json({ ...data, file_url: publicUrl });
+  } catch (err) {
+    console.error('[files/media] upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });

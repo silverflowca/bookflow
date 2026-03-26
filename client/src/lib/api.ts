@@ -13,6 +13,8 @@ import type {
   UserNotification,
   CollaboratorRole,
   ActivityEvent,
+  FormResponse,
+  AllFormResponsesResult,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -231,6 +233,22 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  // Form Responses
+  async submitFormResponse(contentId: string, responseData: any): Promise<FormResponse> {
+    return this.request(`/form-responses/${contentId}`, {
+      method: 'POST',
+      body: JSON.stringify({ response_data: responseData }),
+    });
+  }
+
+  async getMyFormResponse(contentId: string): Promise<FormResponse | null> {
+    return this.request(`/form-responses/${contentId}/mine`);
+  }
+
+  async getAllFormResponses(contentId: string): Promise<AllFormResponsesResult> {
+    return this.request(`/form-responses/${contentId}/all`);
   }
 
   // Reading Progress
@@ -462,36 +480,47 @@ class ApiClient {
     return this.request('/books/collaborating');
   }
 
-  // Book Cover Upload
+  // Book Cover Upload — sends file directly to server which uploads to Supabase Storage
   async uploadBookCover(bookId: string, file: File): Promise<{ cover_image_url: string }> {
-    const { upload_url, storage_path, fileflow_folder_id, use_supabase } = await this.getUploadUrl(file.name, file.type, bookId);
+    const token = this.getToken();
+    const formData = new FormData();
+    formData.append('cover', file);
+    formData.append('book_id', bookId);
 
-    const uploadResponse = await fetch(upload_url, {
-      method: 'PUT',
-      body: file,
-      headers: { 'Content-Type': file.type },
+    const response = await fetch(`${API_URL}/files/cover`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
     });
 
-    if (!uploadResponse.ok) {
-      throw new Error('Failed to upload cover image');
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || `Upload failed (${response.status})`);
     }
 
-    const registered = await this.registerFile({
-      file_name: file.name,
-      file_type: file.type,
-      file_size: file.size,
-      storage_path,
-      fileflow_folder_id,
-      use_supabase,
-      display_name: 'Cover Image',
-      book_id: bookId,
+    return response.json();
+  }
+
+  // Media (audio/video) Upload — sends file directly to server which uploads to Supabase Storage
+  async uploadMedia(file: File, bookId?: string, displayName?: string): Promise<{ file_url: string }> {
+    const token = this.getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    if (bookId) formData.append('book_id', bookId);
+    if (displayName) formData.append('display_name', displayName);
+
+    const response = await fetch(`${API_URL}/files/media`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
     });
 
-    const cover_image_url = registered.file_url || storage_path;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as any).error || `Upload failed (${response.status})`);
+    }
 
-    await this.updateBook(bookId, { cover_image_url });
-
-    return { cover_image_url };
+    return response.json();
   }
 
   // Exports

@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS bookflow.inline_content (
     created_by UUID NOT NULL REFERENCES bookflow.profiles(id) ON DELETE CASCADE,
     is_author_content BOOLEAN DEFAULT FALSE,
     visibility TEXT DEFAULT 'private' CHECK (visibility IN ('author_only', 'all_readers', 'private')),
+    response_visibility TEXT DEFAULT 'private' CHECK (response_visibility IN ('private', 'members_only', 'all_readers')),
     position_in_chapter TEXT DEFAULT 'inline' CHECK (position_in_chapter IN ('inline', 'end_of_chapter', 'start_of_chapter')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -351,7 +352,27 @@ CREATE POLICY "question_answers_manage" ON bookflow.question_answers FOR ALL
 
 -- Form Responses
 CREATE POLICY "form_responses_select" ON bookflow.form_responses FOR SELECT
-    USING (user_id = auth.uid());
+    USING (
+        user_id = auth.uid()
+        OR EXISTS (
+            SELECT 1 FROM bookflow.inline_content ic
+            JOIN bookflow.books b ON b.id = ic.book_id
+            WHERE ic.id = inline_content_id AND b.author_id = auth.uid()
+        )
+        OR EXISTS (
+            SELECT 1 FROM bookflow.inline_content ic
+            WHERE ic.id = inline_content_id AND ic.response_visibility = 'all_readers'
+        )
+        OR EXISTS (
+            SELECT 1 FROM bookflow.inline_content ic
+            JOIN bookflow.club_books cb ON cb.book_id = ic.book_id
+            JOIN bookflow.club_members cm1 ON cm1.club_id = cb.club_id
+                AND cm1.user_id = auth.uid() AND cm1.invite_accepted_at IS NOT NULL
+            JOIN bookflow.club_members cm2 ON cm2.club_id = cb.club_id
+                AND cm2.user_id = bookflow.form_responses.user_id AND cm2.invite_accepted_at IS NOT NULL
+            WHERE ic.id = inline_content_id AND ic.response_visibility = 'members_only'
+        )
+    );
 CREATE POLICY "form_responses_manage" ON bookflow.form_responses FOR ALL
     USING (user_id = auth.uid());
 

@@ -3,14 +3,16 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, Square, Loader2,
-  User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil
+  User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
+  Check, AlertCircle, Users, Lock, Globe
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import type {
   Book, Chapter, InlineContent, InlineContentType, QuestionData, PollData, MediaData, LinkData, NoteData, HighlightData,
-  SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData
+  SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData,
+  AllFormResponsesResult,
 } from '../types';
 
 export default function BookReader() {
@@ -453,7 +455,7 @@ export default function BookReader() {
             <h1 className="text-3xl font-bold mb-6">{chapter.title}</h1>
 
             {/* Start of Chapter Content */}
-            <StartOfChapterContent items={inlineContent} />
+            <StartOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} />
 
             <div className="reader-content text-lg text-theme leading-relaxed">
               <ChapterContent
@@ -465,7 +467,7 @@ export default function BookReader() {
             </div>
 
             {/* End of Chapter Questions */}
-            <EndOfChapterContent items={inlineContent} />
+            <EndOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} />
 
             {/* Navigation */}
             <nav className="flex justify-between items-center mt-12 pt-8 border-t">
@@ -512,6 +514,8 @@ export default function BookReader() {
         <InlineContentPanel
           content={activeContent}
           onClose={() => setActiveContent(null)}
+          isAuthor={isAuthor}
+          userId={user?.id}
         />
       )}
 
@@ -1075,7 +1079,7 @@ function TipTapNode({
   }
 }
 
-function StartOfChapterContent({ items }: { items: InlineContent[] }) {
+function StartOfChapterContent({ items, isAuthor, userId }: { items: InlineContent[]; isAuthor: boolean; userId?: string }) {
   const startItems = items.filter(item => item.position_in_chapter === 'start_of_chapter');
   if (startItems.length === 0) return null;
 
@@ -1083,13 +1087,13 @@ function StartOfChapterContent({ items }: { items: InlineContent[] }) {
     <div className="mb-8 pb-6 border-b space-y-4">
       <h3 className="text-lg font-semibold text-theme">Before You Begin</h3>
       {startItems.map((item) => (
-        <InlineContentBlock key={item.id} content={item} />
+        <InlineContentBlock key={item.id} content={item} isAuthor={isAuthor} userId={userId} />
       ))}
     </div>
   );
 }
 
-function EndOfChapterContent({ items }: { items: InlineContent[] }) {
+function EndOfChapterContent({ items, isAuthor, userId }: { items: InlineContent[]; isAuthor: boolean; userId?: string }) {
   const endItems = items.filter(item => item.position_in_chapter === 'end_of_chapter');
   if (endItems.length === 0) return null;
 
@@ -1097,13 +1101,13 @@ function EndOfChapterContent({ items }: { items: InlineContent[] }) {
     <div className="mt-12 pt-8 border-t space-y-6">
       <h2 className="text-xl font-bold">Chapter Review</h2>
       {endItems.map((item) => (
-        <InlineContentBlock key={item.id} content={item} />
+        <InlineContentBlock key={item.id} content={item} isAuthor={isAuthor} userId={userId} />
       ))}
     </div>
   );
 }
 
-function InlineContentBlock({ content }: { content: InlineContent }) {
+function InlineContentBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   if (content.content_type === 'question') {
     return <QuestionBlock content={content} />;
   }
@@ -1123,22 +1127,22 @@ function InlineContentBlock({ content }: { content: InlineContent }) {
     return <HighlightBlock content={content} />;
   }
   if (content.content_type === 'select') {
-    return <SelectBlock content={content} />;
+    return <SelectBlock content={content} isAuthor={isAuthor} userId={userId} />;
   }
   if (content.content_type === 'multiselect') {
-    return <MultiselectBlock content={content} />;
+    return <MultiselectBlock content={content} isAuthor={isAuthor} userId={userId} />;
   }
   if (content.content_type === 'textbox') {
-    return <TextboxBlock content={content} />;
+    return <TextboxBlock content={content} isAuthor={isAuthor} userId={userId} />;
   }
   if (content.content_type === 'textarea') {
-    return <TextareaBlock content={content} />;
+    return <TextareaBlock content={content} isAuthor={isAuthor} userId={userId} />;
   }
   if (content.content_type === 'radio') {
-    return <RadioBlock content={content} />;
+    return <RadioBlock content={content} isAuthor={isAuthor} userId={userId} />;
   }
   if (content.content_type === 'checkbox') {
-    return <CheckboxBlock content={content} />;
+    return <CheckboxBlock content={content} isAuthor={isAuthor} userId={userId} />;
   }
   if (content.content_type === 'code_block') {
     return <CodeBlockDisplay content={content} />;
@@ -1436,22 +1440,152 @@ function PollBlock({ content }: { content: InlineContent }) {
   );
 }
 
+// ─── Form Response Helpers ───────────────────────────────────────────────────
+
+// Small save status indicator shown in the top-right of form blocks
+function SaveStatusDot({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (status === 'idle') return null;
+  if (status === 'saving') return (
+    <span className="flex items-center gap-1 text-xs text-muted">
+      <Loader2 className="h-3 w-3 animate-spin" />
+    </span>
+  );
+  if (status === 'saved') return (
+    <span className="flex items-center gap-1 text-xs text-green-600">
+      <Check className="h-3 w-3" />
+      <span>Saved</span>
+    </span>
+  );
+  return (
+    <span title="Failed to save" className="flex items-center gap-1 text-xs text-red-500">
+      <AlertCircle className="h-3 w-3" />
+    </span>
+  );
+}
+
+// Author-only: small pill toggle for response visibility
+function VisibilityToggle({ content }: { content: InlineContent }) {
+  const [vis, setVis] = useState<'private' | 'members_only' | 'all_readers'>(
+    content.response_visibility || 'private'
+  );
+
+  const handleChange = (newVis: typeof vis) => {
+    setVis(newVis);
+    api.updateInlineContent(content.id, { response_visibility: newVis }).catch(() => {});
+  };
+
+  const options: { value: typeof vis; icon: React.ReactNode; label: string }[] = [
+    { value: 'private', icon: <Lock className="h-3 w-3" />, label: 'Private' },
+    { value: 'members_only', icon: <Users className="h-3 w-3" />, label: 'Club' },
+    { value: 'all_readers', icon: <Globe className="h-3 w-3" />, label: 'All' },
+  ];
+
+  return (
+    <div className="flex items-center rounded-full border border-theme bg-surface overflow-hidden text-xs">
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => handleChange(opt.value)}
+          title={opt.label}
+          className={`flex items-center gap-1 px-2 py-0.5 transition-colors ${
+            vis === opt.value
+              ? 'bg-primary-100 text-primary-700'
+              : 'text-muted hover:text-theme'
+          }`}
+        >
+          {opt.icon}
+          <span className="hidden sm:inline">{opt.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Author-only: response summary shown below a form block
+function ResponseSummary({ result, type }: { result: AllFormResponsesResult; type: 'choice' | 'text' }) {
+  const [expanded, setExpanded] = useState(false);
+  if (result.total === 0) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-theme/20">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-1.5 text-xs text-muted hover:text-theme transition-colors"
+      >
+        <ChevronRight className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+        <span>{result.total} {result.total === 1 ? 'response' : 'responses'}</span>
+      </button>
+
+      {expanded && (
+        <div className="mt-2 space-y-1.5">
+          {type === 'choice' && result.aggregates && result.aggregates.options.map(opt => (
+            <div key={opt.id} className="space-y-0.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-theme truncate">{opt.text}</span>
+                <span className="text-muted ml-2 shrink-0">{opt.count} ({opt.percent}%)</span>
+              </div>
+              <div className="h-1.5 bg-theme/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary-400 rounded-full transition-all"
+                  style={{ width: `${opt.percent}%` }}
+                />
+              </div>
+            </div>
+          ))}
+
+          {type === 'text' && result.responses.map(r => (
+            <div key={r.id} className="flex gap-2 text-xs">
+              <span className="font-medium text-theme shrink-0">{r.user?.display_name || 'User'}:</span>
+              <span className="text-muted truncate">{String(r.response_data?.value || '').slice(0, 100)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Select dropdown block
-function SelectBlock({ content }: { content: InlineContent }) {
+function SelectBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   const data = content.content_data as SelectData;
   const [value, setValue] = useState(data.default_value || '');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setValue(r.response_data.value); }).catch(() => {});
+    if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor]);
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    if (!userId) return;
+    setSaveStatus('saving');
+    api.submitFormResponse(content.id, { value: newValue })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .catch(() => setSaveStatus('error'));
+  };
 
   return (
     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <ChevronRight className="h-5 w-5 text-accent" />
-        <span className="font-medium text-indigo-800">Select</span>
-        {data.required && <span className="text-red-500 text-sm">*</span>}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ChevronRight className="h-5 w-5 text-accent" />
+          <span className="font-medium text-indigo-800">Select</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAuthor && <VisibilityToggle content={content} />}
+          <SaveStatusDot status={saveStatus} />
+        </div>
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <select
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         className="w-full p-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-surface"
       >
         <option value="">{data.placeholder || 'Select an option...'}</option>
@@ -1459,27 +1593,46 @@ function SelectBlock({ content }: { content: InlineContent }) {
           <option key={opt.id} value={opt.id}>{opt.text}</option>
         ))}
       </select>
+      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
   );
 }
 
 // Multiselect block
-function MultiselectBlock({ content }: { content: InlineContent }) {
+function MultiselectBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   const data = content.content_data as MultiselectData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
 
-  const toggleOption = (id: string) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+  useEffect(() => {
+    if (!userId) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor]);
+
+  const handleToggle = (id: string) => {
+    const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+    setSelected(newSelected);
+    if (!userId) return;
+    setSaveStatus('saving');
+    api.submitFormResponse(content.id, { value: newSelected })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .catch(() => setSaveStatus('error'));
   };
 
   return (
     <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <List className="h-5 w-5 text-violet-600" />
-        <span className="font-medium text-violet-800">Multi-Select</span>
-        {data.required && <span className="text-red-500 text-sm">*</span>}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <List className="h-5 w-5 text-violet-600" />
+          <span className="font-medium text-violet-800">Multi-Select</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAuthor && <VisibilityToggle content={content} />}
+          <SaveStatusDot status={saveStatus} />
+        </div>
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <div className="space-y-2">
@@ -1495,34 +1648,58 @@ function MultiselectBlock({ content }: { content: InlineContent }) {
             <input
               type="checkbox"
               checked={selected.includes(opt.id)}
-              onChange={() => toggleOption(opt.id)}
+              onChange={() => handleToggle(opt.id)}
               className="rounded border-violet-400 text-violet-600 focus:ring-violet-500"
             />
             <span>{opt.text}</span>
           </label>
         ))}
       </div>
+      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
   );
 }
 
 // Text input block
-function TextboxBlock({ content }: { content: InlineContent }) {
+function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+    if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor]);
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    if (!userId) return;
+    setSaveStatus('saving');
+    api.submitFormResponse(content.id, { value: newValue })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .catch(() => setSaveStatus('error'));
+  };
 
   return (
     <div className="bg-surface-hover border border-theme rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Type className="h-5 w-5 text-muted" />
-        <span className="font-medium text-theme">Text Input</span>
-        {data.required && <span className="text-red-500 text-sm">*</span>}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Type className="h-5 w-5 text-muted" />
+          <span className="font-medium text-theme">Text Input</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAuthor && <VisibilityToggle content={content} />}
+          <SaveStatusDot status={saveStatus} />
+        </div>
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <input
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={data.placeholder || ''}
         maxLength={data.max_length}
         className="w-full p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500"
@@ -1530,26 +1707,50 @@ function TextboxBlock({ content }: { content: InlineContent }) {
       {data.max_length && (
         <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
       )}
+      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="text" />}
     </div>
   );
 }
 
 // Textarea block
-function TextareaBlock({ content }: { content: InlineContent }) {
+function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+    if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor]);
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    if (!userId) return;
+    setSaveStatus('saving');
+    api.submitFormResponse(content.id, { value: newValue })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .catch(() => setSaveStatus('error'));
+  };
 
   return (
     <div className="bg-surface-hover border border-theme rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <AlignLeft className="h-5 w-5 text-muted" />
-        <span className="font-medium text-theme">Text Area</span>
-        {data.required && <span className="text-red-500 text-sm">*</span>}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <AlignLeft className="h-5 w-5 text-muted" />
+          <span className="font-medium text-theme">Text Area</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAuthor && <VisibilityToggle content={content} />}
+          <SaveStatusDot status={saveStatus} />
+        </div>
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <textarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={data.placeholder || ''}
         rows={data.rows || 4}
         maxLength={data.max_length}
@@ -1558,21 +1759,45 @@ function TextareaBlock({ content }: { content: InlineContent }) {
       {data.max_length && (
         <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
       )}
+      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="text" />}
     </div>
   );
 }
 
 // Radio button block
-function RadioBlock({ content }: { content: InlineContent }) {
+function RadioBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   const data = content.content_data as RadioData;
   const [selected, setSelected] = useState(data.default_value || '');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor]);
+
+  const handleChange = (optId: string) => {
+    setSelected(optId);
+    if (!userId) return;
+    setSaveStatus('saving');
+    api.submitFormResponse(content.id, { value: optId })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .catch(() => setSaveStatus('error'));
+  };
 
   return (
     <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Circle className="h-5 w-5 text-orange-600" />
-        <span className="font-medium text-orange-800">Choose One</span>
-        {data.required && <span className="text-red-500 text-sm">*</span>}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Circle className="h-5 w-5 text-orange-600" />
+          <span className="font-medium text-orange-800">Choose One</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAuthor && <VisibilityToggle content={content} />}
+          <SaveStatusDot status={saveStatus} />
+        </div>
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <div className="space-y-2">
@@ -1589,34 +1814,53 @@ function RadioBlock({ content }: { content: InlineContent }) {
               type="radio"
               name={`radio-${content.id}`}
               checked={selected === opt.id}
-              onChange={() => setSelected(opt.id)}
+              onChange={() => handleChange(opt.id)}
               className="border-orange-400 text-orange-600 focus:ring-orange-500"
             />
             <span>{opt.text}</span>
           </label>
         ))}
       </div>
+      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
   );
 }
 
 // Checkbox block
-function CheckboxBlock({ content }: { content: InlineContent }) {
+function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
   const data = content.content_data as CheckboxData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
 
-  const toggleOption = (id: string) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+  useEffect(() => {
+    if (!userId) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor]);
+
+  const handleToggle = (id: string) => {
+    const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+    setSelected(newSelected);
+    if (!userId) return;
+    setSaveStatus('saving');
+    api.submitFormResponse(content.id, { value: newSelected })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .catch(() => setSaveStatus('error'));
   };
 
   return (
     <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <CheckSquare className="h-5 w-5 text-teal-600" />
-        <span className="font-medium text-teal-800">Select All That Apply</span>
-        {data.required && <span className="text-red-500 text-sm">*</span>}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <CheckSquare className="h-5 w-5 text-teal-600" />
+          <span className="font-medium text-teal-800">Select All That Apply</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          {isAuthor && <VisibilityToggle content={content} />}
+          <SaveStatusDot status={saveStatus} />
+        </div>
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <div className="space-y-2">
@@ -1632,7 +1876,7 @@ function CheckboxBlock({ content }: { content: InlineContent }) {
             <input
               type="checkbox"
               checked={selected.includes(opt.id)}
-              onChange={() => toggleOption(opt.id)}
+              onChange={() => handleToggle(opt.id)}
               className="rounded border-teal-400 text-teal-600 focus:ring-teal-500"
             />
             <span>{opt.text}</span>
@@ -1644,6 +1888,7 @@ function CheckboxBlock({ content }: { content: InlineContent }) {
           Select at least {data.min_selections} option{data.min_selections > 1 ? 's' : ''}
         </p>
       )}
+      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
   );
 }
@@ -1955,10 +2200,14 @@ function InlineScripture({ content }: { content: InlineContent }) {
 
 function InlineContentPanel({
   content,
-  onClose
+  onClose,
+  isAuthor,
+  userId,
 }: {
   content: InlineContent;
   onClose: () => void;
+  isAuthor?: boolean;
+  userId?: string;
 }) {
   return (
     <div className="fixed inset-y-0 right-0 w-80 bg-surface border-l border-theme shadow-lg z-30 flex flex-col">
@@ -1984,7 +2233,7 @@ function InlineContentPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <InlineContentBlock content={content} />
+        <InlineContentBlock content={content} isAuthor={isAuthor} userId={userId} />
       </div>
     </div>
   );

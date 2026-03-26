@@ -193,6 +193,7 @@ export interface InlineContent {
   created_by: string;
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
+  response_visibility?: 'private' | 'members_only' | 'all_readers';
   position_in_chapter: 'inline' | 'end_of_chapter' | 'start_of_chapter';
   display_mode?: InlineDisplayMode; // How the content is displayed to readers
   created_at: string;
@@ -321,6 +322,22 @@ export interface FormResponse {
   response_data: any;
   created_at: string;
   updated_at: string;
+}
+
+export interface FormResponseWithUser extends FormResponse {
+  user: { id: string; display_name: string; avatar_url?: string };
+}
+
+export interface FormResponseAggregate {
+  counts: Record<string, number>;
+  total: number;
+  options: { id: string; text: string; count: number; percent: number }[];
+}
+
+export interface AllFormResponsesResult {
+  responses: FormResponseWithUser[];
+  aggregates: FormResponseAggregate | null;
+  total: number;
 }
 
 // Poll and Question responses

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Plus, Trash2, Upload, Link as LinkIcon, Mic, Video, Square, Circle } from 'lucide-react';
+import { X, Plus, Trash2, Upload, Link as LinkIcon, Mic, Video, Square, Circle, Lock, Users, Globe } from 'lucide-react';
 import api from '../../lib/api';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
@@ -21,8 +21,14 @@ interface Props {
   onUpdate?: (id: string, data: Partial<InlineContent>) => void; // For edit mode
 }
 
+const FORM_TYPES = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox'];
+
 export default function InlineContentModal({ type, selectedText, bookId, onClose, onCreate, editingItem, onUpdate }: Props) {
   const isEditing = !!editingItem;
+  const isFormType = FORM_TYPES.includes(type);
+  const [responseVisibility, setResponseVisibility] = useState<'private' | 'members_only' | 'all_readers'>(
+    editingItem?.response_visibility || 'private'
+  );
 
   const titles: Record<string, string> = {
     question: isEditing ? 'Edit Question' : 'Add Question',
@@ -43,10 +49,11 @@ export default function InlineContentModal({ type, selectedText, bookId, onClose
   };
 
   const handleSubmit = (data: Partial<InlineContent>) => {
+    const payload = isFormType ? { ...data, response_visibility: responseVisibility } : data;
     if (isEditing && onUpdate && editingItem) {
-      onUpdate(editingItem.id, data);
+      onUpdate(editingItem.id, payload);
     } else {
-      onCreate(data);
+      onCreate(payload);
     }
   };
 
@@ -64,6 +71,33 @@ export default function InlineContentModal({ type, selectedText, bookId, onClose
           <div className="px-4 pt-4">
             <p className="text-sm text-gray-500">Selected text:</p>
             <p className="text-sm bg-gray-100 p-2 rounded mt-1 italic">"{selectedText}"</p>
+          </div>
+        )}
+
+        {isFormType && (
+          <div className="px-4 pt-4">
+            <p className="text-xs text-gray-500 mb-1.5">Who can see responses?</p>
+            <div className="flex items-center gap-1">
+              {([
+                { value: 'private' as const, icon: <Lock className="h-3 w-3" />, label: 'Private (only me)' },
+                { value: 'members_only' as const, icon: <Users className="h-3 w-3" />, label: 'Club members' },
+                { value: 'all_readers' as const, icon: <Globe className="h-3 w-3" />, label: 'All readers' },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setResponseVisibility(opt.value)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
+                    responseVisibility === opt.value
+                      ? 'bg-blue-50 border-blue-400 text-blue-700'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                  }`}
+                >
+                  {opt.icon}
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -598,38 +632,10 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
     setUploadProgress(0);
 
     try {
-      // Get upload URL from BookFlow API (which proxies to FileFlow)
-      const { upload_url, storage_path, fileflow_folder_id } = await api.getUploadUrl(file.name, file.type, bookId);
-
-      // Upload directly to storage
-      const uploadResponse = await fetch(upload_url, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
-      }
-
-      // Register the file
-      const registered = await api.registerFile({
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        storage_path,
-        fileflow_folder_id,
-        display_name: file.name,
-        book_id: bookId,
-      });
-
-      setUploadedFile({
-        url: registered.file_url || storage_path,
-        name: file.name,
-      });
-      setTitle(file.name.replace(/\.[^/.]+$/, '')); // Set title from filename without extension
+      const displayName = file.name.replace(/\.[^/.]+$/, '');
+      const result = await api.uploadMedia(file, bookId, displayName);
+      setUploadedFile({ url: result.file_url, name: file.name });
+      setTitle(displayName);
       setUploadProgress(100);
     } catch (err) {
       console.error('Upload failed:', err);
@@ -654,32 +660,11 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
 
         try {
           const fileName = `recording_${Date.now()}.webm`;
-          const file = new File([recordedBlob], fileName, { type: recordedBlob.type });
+          const file = new File([recordedBlob], fileName, { type: recordedBlob.type || 'audio/webm' });
+          const displayName = title || `Recording ${new Date().toLocaleDateString()}`;
 
-          // Get upload URL
-          const { upload_url, storage_path, fileflow_folder_id } = await api.getUploadUrl(fileName, file.type, bookId);
-
-          // Upload
-          const uploadResponse = await fetch(upload_url, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': file.type },
-          });
-
-          if (!uploadResponse.ok) throw new Error('Upload failed');
-
-          // Register
-          const registered = await api.registerFile({
-            file_name: fileName,
-            file_type: file.type,
-            file_size: file.size,
-            storage_path,
-            fileflow_folder_id,
-            display_name: title || `Recording ${new Date().toLocaleDateString()}`,
-            book_id: bookId,
-          });
-
-          mediaUrl = registered.file_url || storage_path;
+          const result = await api.uploadMedia(file, bookId, displayName);
+          mediaUrl = result.file_url;
           finalDuration = recordingTime;
           setUploadProgress(100);
         } catch (err) {

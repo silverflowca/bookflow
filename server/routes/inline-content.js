@@ -76,7 +76,8 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
     anchor_text,
     content_data,
     visibility,
-    position_in_chapter
+    position_in_chapter,
+    response_visibility,
   } = req.body;
 
   try {
@@ -125,7 +126,8 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
         created_by: req.user.id,
         is_author_content: isAuthor,
         visibility: isAuthor ? (visibility || 'all_readers') : (visibility || 'private'),
-        position_in_chapter: position_in_chapter || 'inline'
+        position_in_chapter: position_in_chapter || 'inline',
+        response_visibility: response_visibility || 'private',
       })
       .select(`
         *,
@@ -144,7 +146,7 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
 
 // Update inline content
 router.put('/inline-content/:id', authenticate, async (req, res) => {
-  const { content_data, visibility, anchor_text, position_in_chapter, start_offset, end_offset } = req.body;
+  const { content_data, visibility, anchor_text, position_in_chapter, start_offset, end_offset, response_visibility } = req.body;
 
   try {
     // Check ownership
@@ -172,6 +174,7 @@ router.put('/inline-content/:id', authenticate, async (req, res) => {
     if (position_in_chapter !== undefined) updateData.position_in_chapter = position_in_chapter;
     if (start_offset !== undefined) updateData.start_offset = start_offset;
     if (end_offset !== undefined) updateData.end_offset = end_offset;
+    if (response_visibility !== undefined) updateData.response_visibility = response_visibility;
 
     const { data, error } = await supabase
       .from('inline_content')

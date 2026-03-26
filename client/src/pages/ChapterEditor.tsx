@@ -476,7 +476,7 @@ export default function ChapterEditor() {
         {/* Editor */}
         <div className="flex-1 min-w-0">
           {/* Toolbar */}
-          <div className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap">
+          <div className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap sticky top-12 z-20 shadow-sm">
             <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBold().run()}
               active={editor?.isActive('bold')}
