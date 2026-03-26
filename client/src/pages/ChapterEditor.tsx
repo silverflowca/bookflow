@@ -254,10 +254,11 @@ export default function ChapterEditor() {
           .run();
       }
 
-      setInlineContents([...inlineContents, created]);
+      setInlineContents(prev => [...prev, created]);
       setShowInlineModal(null);
     } catch (err) {
       console.error('Failed to create inline content:', err);
+      alert('Failed to add content: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
