@@ -683,6 +683,60 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/members/${memberUserId}/answers`);
   }
 
+  // ── Club Chat ─────────────────────────────────────────────────────────────
+
+  async getClubChatMessages(clubId: string, params?: { before?: string; limit?: number }): Promise<{ messages: any[]; hasMore: boolean }> {
+    const qs = new URLSearchParams();
+    if (params?.before) qs.set('before', params.before);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString() ? `?${qs}` : '';
+    return this.request(`/clubs/${clubId}/chat/messages${query}`);
+  }
+
+  async sendClubChatMessage(clubId: string, data: Record<string, any>): Promise<any> {
+    return this.request(`/clubs/${clubId}/chat/messages`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async editClubChatMessage(clubId: string, msgId: string, body: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/chat/messages/${msgId}`, { method: 'PUT', body: JSON.stringify({ body }) });
+  }
+
+  async deleteClubChatMessage(clubId: string, msgId: string): Promise<void> {
+    return this.request(`/clubs/${clubId}/chat/messages/${msgId}`, { method: 'DELETE' });
+  }
+
+  async getClubChatSettings(clubId: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/chat/settings`);
+  }
+
+  async updateClubChatSettings(clubId: string, settings: Record<string, any>): Promise<any> {
+    return this.request(`/clubs/${clubId}/chat/settings`, { method: 'PUT', body: JSON.stringify(settings) });
+  }
+
+  async getClubChatPrefs(clubId: string): Promise<{ notification_mode: string }> {
+    return this.request(`/clubs/${clubId}/chat/prefs`);
+  }
+
+  async updateClubChatPrefs(clubId: string, notification_mode: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/chat/prefs`, { method: 'PUT', body: JSON.stringify({ notification_mode }) });
+  }
+
+  async markClubChatRead(clubId: string, last_message_id: string): Promise<void> {
+    return this.request(`/clubs/${clubId}/chat/read`, { method: 'POST', body: JSON.stringify({ last_message_id }) });
+  }
+
+  async getClubChatUnreadCount(clubId: string): Promise<{ count: number }> {
+    return this.request(`/clubs/${clubId}/chat/unread-count`);
+  }
+
+  async getClubChatUnreadAll(): Promise<Record<string, number>> {
+    return this.request(`/clubs/chat/unread-all`);
+  }
+
+  async ensureClubChatFolder(clubId: string): Promise<{ folder_id: string | null }> {
+    return this.request(`/clubs/${clubId}/chat/ensure-folder`, { method: 'POST', body: '{}' });
+  }
+
   // Activity / Audit Trail
   async getBookActivity(
     bookId: string,

@@ -25,9 +25,11 @@ import publishRoutes from './routes/publish.js';
 import exportsRoutes from './routes/exports.js';
 import publishersRoutes from './routes/publishers.js';
 import clubsRoutes from './routes/clubs.js';
+import clubChatRoutes from './routes/club-chat.js';
 import activityRoutes from './routes/activity.js';
 import formResponsesRoutes from './routes/form-responses.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
+import { startStatusCron } from './services/chat-status.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +89,8 @@ app.use('/api/public', publishRoutes);
 app.use('/api/books', exportsRoutes);
 app.use('/api/books', publishersRoutes);
 app.use('/api/clubs', clubsRoutes);
+app.use('/api/clubs/:clubId/chat', clubChatRoutes);
+app.use('/api/clubs/chat', clubChatRoutes);  // for /unread-all (no clubId)
 app.use('/api/books/:bookId/activity', activityRoutes);
 app.use('/api', formResponsesRoutes);
 
@@ -123,6 +127,9 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+// Start chat status cron jobs
+startStatusCron().catch(err => console.error('Failed to start status cron:', err.message));
 
 // Start server
 app.listen(PORT, () => {

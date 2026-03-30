@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import ClubChatPanel from '../components/chat/ClubChatPanel';
+import { useChatUnread } from '../hooks/useChatUnread';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -522,7 +524,7 @@ function PendingInviteRow({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type PanelTab = 'overview' | 'members' | 'books' | 'discussions' | 'settings';
+type PanelTab = 'overview' | 'members' | 'books' | 'discussions' | 'chat' | 'settings';
 
 export default function ClubDetailPage() {
   const { clubId } = useParams<{ clubId: string }>();
@@ -531,6 +533,7 @@ export default function ClubDetailPage() {
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<PanelTab>('overview');
+  const { counts: chatUnread, clearClub: clearChatUnread } = useChatUnread();
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [discLoading, setDiscLoading] = useState(false);
   const [postBody, setPostBody] = useState('');
@@ -707,6 +710,11 @@ export default function ClubDetailPage() {
     { key: 'members', label: `Members (${acceptedMembers.length})`, icon: <Users className="h-4 w-4" /> },
     { key: 'books', label: `Books (${club.books?.length ?? 0})`, icon: <BookOpen className="h-4 w-4" /> },
     { key: 'discussions', label: 'Discussions', icon: <MessageSquare className="h-4 w-4" /> },
+    {
+      key: 'chat' as PanelTab,
+      label: chatUnread[clubId!] > 0 ? `Chat (${chatUnread[clubId!]})` : 'Chat',
+      icon: <MessageSquare className="h-4 w-4" />,
+    },
     ...(isAdmin ? [{ key: 'settings' as PanelTab, label: 'Settings', icon: <Settings className="h-4 w-4" /> }] : []),
   ];
 
@@ -1023,6 +1031,19 @@ export default function ClubDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Chat ── */}
+      {tab === 'chat' && clubId && (
+        <div className="theme-section rounded-xl overflow-hidden" style={{ height: '600px' }} onClick={() => clearChatUnread(clubId)}>
+          <ClubChatPanel
+            clubId={clubId}
+            clubName={club.name}
+            bookId={currentBook?.book_id}
+            chatAudioFolderId={(club as any).chat_audio_fileflow_folder_id}
+            isAdmin={isAdmin}
+          />
         </div>
       )}
 

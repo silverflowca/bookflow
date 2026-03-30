@@ -23,6 +23,7 @@ type FilterType = 'all' | 'open' | 'resolved';
 
 export default function CommentsSidebar({
   chapterId,
+  bookId,
   canResolve,
   currentUserId,
   onClose,
@@ -220,6 +221,7 @@ export default function CommentsSidebar({
               key={comment.id}
               comment={comment}
               chapterId={chapterId}
+              bookId={bookId}
               canResolve={canResolve}
               currentUserId={currentUserId}
               onResolved={handleResolved}

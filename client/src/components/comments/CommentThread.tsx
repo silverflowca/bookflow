@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { MoreVertical, Check, Trash2, Reply, Loader2 } from 'lucide-react';
+import { MoreVertical, Check, Trash2, Reply, Loader2, Share2 } from 'lucide-react';
 import api from '../../lib/api';
 import type { BookComment } from '../../types';
+import ShareToClubModal from '../chat/ShareToClubModal';
 
 interface CommentThreadProps {
   comment: BookComment;
   chapterId: string;
+  bookId?: string;
   canResolve: boolean;
   onResolved?: (commentId: string) => void;
   onDeleted?: (commentId: string) => void;
@@ -26,6 +28,7 @@ function timeAgo(dateStr: string) {
 export default function CommentThread({
   comment,
   chapterId,
+  bookId,
   canResolve,
   onResolved,
   onDeleted,
@@ -37,6 +40,7 @@ export default function CommentThread({
   const [submitting, setSubmitting] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const isOwn = comment.author_id === currentUserId || comment.author?.id === currentUserId;
   const isResolved = comment.status === 'resolved';
@@ -133,6 +137,15 @@ export default function CommentThread({
                 <Reply className="h-3.5 w-3.5" />
                 Reply
               </button>
+              {bookId && (
+                <button
+                  onClick={() => { setShowMenu(false); setShowShareModal(true); }}
+                  className="w-full text-left px-3 py-2 flex items-center gap-2 text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  Share to Club Chat
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -210,7 +223,28 @@ export default function CommentThread({
               Resolve
             </button>
           )}
+          {bookId && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-1 text-xs text-muted hover:text-theme transition-colors"
+            >
+              <Share2 className="h-3 w-3" />
+              Share to Chat
+            </button>
+          )}
         </div>
+      )}
+
+      {showShareModal && bookId && (
+        <ShareToClubModal
+          bookId={bookId}
+          chapterId={chapterId}
+          snippetText={comment.anchor_text || comment.body.slice(0, 200)}
+          offsetStart={comment.selection_start}
+          offsetEnd={comment.selection_end}
+          commentId={comment.id}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
 import { authenticate, optionalAuth, requireAuthor } from '../middleware/auth.js';
+import { postCompletionUpdate } from '../services/chat-status.js';
 
 const router = express.Router();
 
@@ -275,6 +276,14 @@ router.put('/:id/progress', authenticate, async (req, res) => {
   const { current_chapter_id, scroll_position, percent_complete } = req.body;
 
   try {
+    // Fetch previous progress to detect chapter change / completion
+    const { data: prev } = await supabase
+      .from('reading_progress')
+      .select('current_chapter_id, percent_complete, completed_at')
+      .eq('user_id', req.user.id)
+      .eq('book_id', req.params.id)
+      .maybeSingle();
+
     const progressData = {
       user_id: req.user.id,
       book_id: req.params.id,
@@ -285,6 +294,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
     };
 
     // Set completed_at if 100%
+    const justCompleted = percent_complete >= 100 && !prev?.completed_at;
     if (percent_complete >= 100) {
       progressData.completed_at = new Date().toISOString();
     }
@@ -296,6 +306,18 @@ router.put('/:id/progress', authenticate, async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Fire chat status update if chapter changed or book completed (non-blocking)
+    const chapterChanged = current_chapter_id && current_chapter_id !== prev?.current_chapter_id;
+    if (justCompleted || chapterChanged) {
+      postCompletionUpdate(
+        req.user.id,
+        req.params.id,
+        current_chapter_id,
+        percent_complete,
+        justCompleted
+      ).catch(err => console.error('chat-status trigger error:', err.message));
+    }
 
     res.json(data);
   } catch (err) {

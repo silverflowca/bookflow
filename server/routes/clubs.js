@@ -6,7 +6,7 @@ import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 
 // ── Helper: check club membership/role ────────────────────────────────────────
-async function getClubRole(clubId, userId) {
+export async function getClubRole(clubId, userId) {
   const { data: club } = await supabase
     .from('book_clubs')
     .select('id, created_by')
@@ -148,6 +148,9 @@ router.post('/', authenticate, async (req, res) => {
 
     // Default settings
     await supabase.from('club_settings').insert({ club_id: club.id });
+
+    // Default chat settings
+    await supabase.schema('bookflow').from('club_chat_settings').insert({ club_id: club.id });
 
     res.status(201).json(club);
   } catch (err) {

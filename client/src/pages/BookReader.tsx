@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, Square, Loader2,
@@ -17,10 +17,12 @@ import type {
 
 export default function BookReader() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId?: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
+  const highlightApplied = useRef(false);
   const [inlineContent, setInlineContent] = useState<InlineContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showToc, setShowToc] = useState(false);
@@ -164,6 +166,7 @@ export default function BookReader() {
   useEffect(() => {
     if (chapterId) {
       loadChapter();
+      highlightApplied.current = false;
       // Stop TTS when chapter changes
       if (ttsAudio) {
         ttsAudio.pause();
@@ -185,6 +188,72 @@ export default function BookReader() {
       }
     };
   }, [ttsAudio]);
+
+  // Deep-link: highlight text range from chat snippet (?offset=start&highlight=end)
+  useEffect(() => {
+    const offsetStart = parseInt(searchParams.get('offset') || '', 10);
+    const offsetEnd = parseInt(searchParams.get('highlight') || '', 10);
+    if (!chapter || isNaN(offsetStart) || isNaN(offsetEnd) || highlightApplied.current) return;
+
+    // Wait for DOM to render the content
+    const timer = setTimeout(() => {
+      const container = document.querySelector('.reader-content');
+      if (!container) return;
+
+      // Walk all text nodes and find the character at the given offsets
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      let charCount = 0;
+      let startNode: Text | null = null;
+      let startOffset = 0;
+      let endNode: Text | null = null;
+      let endOffset = 0;
+      let node: Node | null;
+
+      while ((node = walker.nextNode())) {
+        const text = node as Text;
+        const len = text.length;
+        if (!startNode && charCount + len > offsetStart) {
+          startNode = text;
+          startOffset = offsetStart - charCount;
+        }
+        if (!endNode && charCount + len >= offsetEnd) {
+          endNode = text;
+          endOffset = offsetEnd - charCount;
+          break;
+        }
+        charCount += len;
+      }
+
+      if (startNode && endNode) {
+        try {
+          const range = document.createRange();
+          range.setStart(startNode, Math.min(startOffset, startNode.length));
+          range.setEnd(endNode, Math.min(endOffset, endNode.length));
+
+          // Highlight using a mark element
+          const mark = document.createElement('mark');
+          mark.style.cssText = 'background: rgba(99,102,241,0.25); border-radius: 2px; padding: 0 1px;';
+          mark.setAttribute('data-chat-highlight', '1');
+          range.surroundContents(mark);
+
+          // Scroll into view
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+          // Remove highlight after 6 seconds
+          setTimeout(() => mark.replaceWith(...Array.from(mark.childNodes)), 6000);
+
+          highlightApplied.current = true;
+        } catch {
+          // Range may span multiple elements — fall back to scroll only
+          const rect = (startNode.parentElement ?? container).getBoundingClientRect();
+          window.scrollTo({ top: rect.top + window.scrollY - 120, behavior: 'smooth' });
+          highlightApplied.current = true;
+        }
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [chapter, searchParams]);
 
   async function loadBook() {
     try {
