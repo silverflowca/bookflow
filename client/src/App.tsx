@@ -22,6 +22,9 @@ import ClubsPage from './pages/ClubsPage';
 import ClubDetailPage from './pages/ClubDetailPage';
 import ClubReadPage from './pages/ClubReadPage';
 import AcceptClubInvitePage from './pages/AcceptClubInvitePage';
+import LiveSchedule from './pages/live/LiveSchedule';
+import LiveEpisode from './pages/live/LiveEpisode';
+import LiveDashboard from './pages/live/LiveDashboard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -138,6 +141,25 @@ function AppRoutes() {
         <Route path="clubs/:clubId/read/:bookId" element={
           <ProtectedRoute>
             <ClubReadPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Live Show */}
+        <Route path="live" element={
+          <ProtectedRoute>
+            <LiveSchedule />
+          </ProtectedRoute>
+        } />
+
+        <Route path="live/episode/:id" element={
+          <ProtectedRoute>
+            <LiveEpisode />
+          </ProtectedRoute>
+        } />
+
+        <Route path="live/episode/:id/dashboard" element={
+          <ProtectedRoute>
+            <LiveDashboard />
           </ProtectedRoute>
         } />
       </Route>

@@ -21,6 +21,8 @@ router.get('/', authenticate, async (req, res) => {
         fileflow_url: process.env.FILEFLOW_URL || 'http://localhost:8680',
         fileflow_access_key: '',
         deepgram_api_key: '',
+        restream_client_id: '',
+        restream_client_secret: '',
       });
     }
 
@@ -28,6 +30,8 @@ router.get('/', authenticate, async (req, res) => {
       fileflow_url: data.fileflow_url,
       fileflow_access_key: data.fileflow_access_key || '',
       deepgram_api_key: data.deepgram_api_key || '',
+      restream_client_id: data.restream_client_id || '',
+      restream_client_secret: data.restream_client_secret || '',
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -37,7 +41,7 @@ router.get('/', authenticate, async (req, res) => {
 
 // Update app settings
 router.put('/', authenticate, async (req, res) => {
-  const { fileflow_url, fileflow_access_key, deepgram_api_key } = req.body;
+  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret } = req.body;
 
   try {
     const { data, error } = await supabase
@@ -47,6 +51,8 @@ router.put('/', authenticate, async (req, res) => {
         fileflow_url,
         fileflow_access_key,
         deepgram_api_key: deepgram_api_key || '',
+        restream_client_id: restream_client_id || '',
+        restream_client_secret: restream_client_secret || '',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
@@ -60,6 +66,8 @@ router.put('/', authenticate, async (req, res) => {
       fileflow_url: data.fileflow_url,
       fileflow_access_key: data.fileflow_access_key || '',
       deepgram_api_key: data.deepgram_api_key || '',
+      restream_client_id: data.restream_client_id || '',
+      restream_client_secret: data.restream_client_secret || '',
     });
   } catch (err) {
     console.error('Update settings error:', err);

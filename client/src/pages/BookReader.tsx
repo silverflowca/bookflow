@@ -41,6 +41,10 @@ export default function BookReader() {
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [ttsAudio, setTtsAudio] = useState<HTMLAudioElement | null>(null);
 
+  // Live episode banner
+  const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string; guest_invite_url?: string; live_shows?: { guest_invite_url?: string } } | null>(null);
+  const [liveBannerDismissed, setLiveBannerDismissed] = useState(false);
+
   // Check if current user is the author
   const isAuthor = book?.author_id === user?.id;
 
@@ -188,6 +192,22 @@ export default function BookReader() {
       }
     };
   }, [ttsAudio]);
+
+  // Poll for a live episode for this book
+  useEffect(() => {
+    if (!bookId) return;
+    let interval: number;
+    const check = async () => {
+      try {
+        const r = await api.getLiveEpisodes({ status: 'live' });
+        const ep = (r.episodes ?? []).find((e: any) => e.live_shows?.book_id === bookId || e.chapter?.book_id === bookId);
+        setLiveEpisode(ep ?? null);
+      } catch { /* silent */ }
+    };
+    check();
+    interval = window.setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, [bookId]);
 
   // Deep-link: highlight text range from chat snippet (?offset=start&highlight=end)
   useEffect(() => {
@@ -454,6 +474,29 @@ export default function BookReader() {
 
       {/* Main Content */}
       <main className="flex-1 min-w-0 relative">
+        {/* Live Episode Banner */}
+        {liveEpisode && !liveBannerDismissed && (
+          <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="animate-pulse font-bold shrink-0">🔴 LIVE NOW</span>
+              <span className="truncate font-medium">{liveEpisode.title}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {(liveEpisode.guest_invite_url || liveEpisode.live_shows?.guest_invite_url) && (
+                <a
+                  href={liveEpisode.guest_invite_url || liveEpisode.live_shows?.guest_invite_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-white text-red-700 px-3 py-1 rounded text-xs font-bold hover:bg-red-50 transition-colors"
+                >
+                  Join Live ↗
+                </a>
+              )}
+              <button onClick={() => setLiveBannerDismissed(true)} className="opacity-70 hover:opacity-100 text-white text-lg leading-none">×</button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <header className="sticky top-0 bg-surface border-b border-theme z-10">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">

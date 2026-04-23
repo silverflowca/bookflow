@@ -1,10 +1,194 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
 import ReviewBanner from '../components/review/ReviewBanner';
+
+// ── Publish Modal ─────────────────────────────────────────────────────────────
+function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
+  book: Book;
+  bookId: string;
+  onClose: () => void;
+  onPublished: (b: Partial<Book>) => void;
+  onUnpublished: (b: Partial<Book>) => void;
+}) {
+  const origin = window.location.origin;
+  const publicUrl = book.slug ? `${origin}/read/${book.slug}` : null;
+  const shareUrl = book.share_token ? `${origin}/read/share/${book.share_token}` : null;
+  const directUrl = `${origin}/book/${bookId}`;
+
+  const [publishing, setPublishing] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [inviteEmails, setInviteEmails] = useState('');
+  const [inviteMsg, setInviteMsg] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteSent, setInviteSent] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const r = await api.publishBook(bookId);
+      onPublished(r);
+    } finally { setPublishing(false); }
+  };
+
+  const handleUnpublish = async () => {
+    if (!confirm('Unpublish this book? Public readers will no longer be able to access it.')) return;
+    setPublishing(true);
+    try {
+      const r = await api.unpublishBook(bookId);
+      onUnpublished(r);
+    } finally { setPublishing(false); }
+  };
+
+  const handleInvite = async () => {
+    const emails = inviteEmails.split(/[\s,;]+/).map(e => e.trim()).filter(Boolean);
+    if (!emails.length) return;
+    setInviting(true);
+    try {
+      const r = await api.inviteReaders(bookId, emails, inviteMsg);
+      if (r.manual) {
+        setInviteSent({ ok: true, text: `No email server configured. Share this link manually: ${r.url}` });
+      } else {
+        setInviteSent({ ok: true, text: `Invite sent to ${r.sent} ${r.sent === 1 ? 'person' : 'people'}!` });
+      }
+      setInviteEmails('');
+      setInviteMsg('');
+    } catch (err: any) {
+      setInviteSent({ ok: false, text: err.message || 'Failed to send invite' });
+    } finally { setInviting(false); }
+  };
+
+  const isPublished = book.status === 'published';
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={`px-6 py-4 flex items-center justify-between ${isPublished ? 'bg-green-600' : 'bg-accent'}`}>
+          <div className="flex items-center gap-2 text-white">
+            {isPublished ? <Globe className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+            <span className="font-bold text-lg">{isPublished ? 'Published' : 'Publish Book'}</span>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Status + action */}
+          {!isPublished ? (
+            <div>
+              <p className="text-muted text-sm mb-4">Publishing makes your book publicly accessible via a unique URL. You can unpublish at any time.</p>
+              <button onClick={handlePublish} disabled={publishing} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                {publishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Globe className="h-5 w-5" />}
+                {publishing ? 'Publishing…' : 'Publish Now'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Public URL */}
+              {publicUrl && (
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 mb-1.5">
+                    <Globe className="h-3.5 w-3.5" /> Public URL
+                  </div>
+                  <div className="flex gap-2">
+                    <a href={publicUrl} target="_blank" rel="noreferrer" className="flex-1 text-xs bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 px-3 py-2 rounded-lg truncate hover:underline">
+                      {publicUrl}
+                    </a>
+                    <button onClick={() => copy(publicUrl, 'public')} className="px-3 py-2 rounded-lg border border-theme text-muted hover:bg-surface-hover text-xs shrink-0">
+                      {copied === 'public' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Private share link */}
+              {shareUrl && (
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted mb-1.5">
+                    <Lock className="h-3.5 w-3.5" /> Private share link (no login required)
+                  </div>
+                  <div className="flex gap-2">
+                    <input readOnly value={shareUrl} className="flex-1 text-xs theme-input px-3 py-2 rounded-lg truncate" />
+                    <button onClick={() => copy(shareUrl, 'share')} className="px-3 py-2 rounded-lg border border-theme text-muted hover:bg-surface-hover text-xs shrink-0">
+                      {copied === 'share' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Direct authenticated link */}
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted mb-1.5">
+                  Direct link (for signed-in users)
+                </div>
+                <div className="flex gap-2">
+                  <input readOnly value={directUrl} className="flex-1 text-xs theme-input px-3 py-2 rounded-lg truncate" />
+                  <button onClick={() => copy(directUrl, 'direct')} className="px-3 py-2 rounded-lg border border-theme text-muted hover:bg-surface-hover text-xs shrink-0">
+                    {copied === 'direct' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Email invite */}
+          {isPublished && (
+            <div className="border-t border-theme pt-5">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-theme mb-3">
+                <Mail className="h-4 w-4 text-accent" /> Invite Readers by Email
+              </div>
+              <input
+                className="w-full theme-input rounded-lg px-3 py-2 text-sm mb-2"
+                placeholder="reader@example.com, another@example.com"
+                value={inviteEmails}
+                onChange={e => setInviteEmails(e.target.value)}
+              />
+              <textarea
+                className="w-full theme-input rounded-lg px-3 py-2 text-sm resize-none mb-2"
+                rows={2}
+                placeholder="Personal message (optional)"
+                value={inviteMsg}
+                onChange={e => setInviteMsg(e.target.value)}
+              />
+              {inviteSent && (
+                <p className={`text-xs mb-2 ${inviteSent.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteSent.text}</p>
+              )}
+              <button
+                onClick={handleInvite}
+                disabled={inviting || !inviteEmails.trim()}
+                className="w-full theme-button-primary py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                {inviting ? 'Sending…' : 'Send Invite'}
+              </button>
+            </div>
+          )}
+
+          {/* Unpublish + go to stores */}
+          <div className="flex gap-2 pt-1">
+            {isPublished && (
+              <button onClick={handleUnpublish} disabled={publishing} className="flex-1 px-4 py-2 rounded-lg border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors">
+                Unpublish
+              </button>
+            )}
+            <Link to={`/edit/book/${bookId}/submit`} onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-theme text-muted text-sm font-medium hover:bg-surface-hover transition-colors text-center flex items-center justify-center gap-1.5">
+              <Send className="h-3.5 w-3.5" /> Submit to Stores
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const ROLE_BADGE: Record<CollaboratorRole, { label: string; className: string }> = {
   owner:    { label: 'Owner',    className: 'bg-purple-100 text-purple-800' },
@@ -30,6 +214,7 @@ export default function BookEditor() {
   const [chapterCommentsLoading, setChapterCommentsLoading] = useState<Record<string, boolean>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [chapterCommentsPage, setChapterCommentsPage] = useState<Record<string, number>>({});
   const PAGE_SIZE = 5;
@@ -120,12 +305,6 @@ export default function BookEditor() {
     } catch (err) {
       console.error('Failed to delete chapter:', err);
     }
-  }
-
-  async function handlePublish() {
-    if (!bookId) return;
-    const newStatus = book?.status === 'published' ? 'draft' : 'published';
-    await handleSaveBook({ status: newStatus, visibility: newStatus === 'published' ? 'public' : 'private' });
   }
 
   async function handleExport(format: 'json' | 'pdf' | 'epub' | 'docx') {
@@ -260,33 +439,32 @@ export default function BookEditor() {
             )}
           </div>
 
-          {/* Submit to publishers */}
-          {userRole === 'owner' && (
-            <Link
-              to={`/edit/book/${bookId}/submit`}
-              className="flex items-center gap-1.5 px-3 py-2 rounded font-medium text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-            >
-              <Send size={15} />
-              Publish to Stores
-            </Link>
-          )}
-
-          {/* Publish/Unpublish */}
+          {/* Publish button → opens modal */}
           {userRole === 'owner' && (
             <button
-              onClick={handlePublish}
-              disabled={saving}
-              className={`px-4 py-2 rounded font-medium text-sm ${
+              onClick={() => setShowPublishModal(true)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded font-medium text-sm transition-colors ${
                 book.status === 'published'
-                  ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
-              {book.status === 'published' ? 'Unpublish' : 'Publish'}
+              {book.status === 'published' ? <><Globe size={14} /> Published</> : <><Globe size={14} /> Publish</>}
             </button>
           )}
         </div>
       </div>
+
+      {/* Publish modal */}
+      {showPublishModal && book && (
+        <PublishModal
+          book={book}
+          bookId={bookId!}
+          onClose={() => setShowPublishModal(false)}
+          onPublished={(b) => { setBook(prev => prev ? { ...prev, ...b } : prev); }}
+          onUnpublished={(b) => { setBook(prev => prev ? { ...prev, ...b } : prev); }}
+        />
+      )}
 
       {/* Review Banner — visible to all collaborators */}
       {['owner', 'author', 'reviewer'].includes(userRole) && (

@@ -28,6 +28,7 @@ export default function ChapterEditor() {
   const { user } = useAuth();
   const [, setChapter] = useState<Chapter | null>(null);
   const [title, setTitle] = useState('');
+  const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -122,6 +123,24 @@ export default function ChapterEditor() {
       if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
     };
   }, [chapterId, bookId]);
+
+  // Poll for a live episode presenting this chapter/book
+  useEffect(() => {
+    if (!bookId) return;
+    let interval: number;
+    const check = async () => {
+      try {
+        const r = await api.getLiveEpisodes({ status: 'live' });
+        const ep = (r.episodes ?? []).find((e: any) =>
+          e.chapter_id === chapterId || e.live_shows?.book_id === bookId
+        );
+        setLiveEpisode(ep ?? null);
+      } catch { /* silent */ }
+    };
+    check();
+    interval = window.setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, [bookId, chapterId]);
 
   async function loadChapter() {
     try {
@@ -389,6 +408,19 @@ export default function ChapterEditor() {
 
   return (
     <div className="min-h-screen bg-surface-hover">
+      {/* Live Episode Banner */}
+      {liveEpisode && (
+        <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="animate-pulse font-bold shrink-0">🔴 PRESENTING LIVE</span>
+            <span className="font-medium truncate">{liveEpisode.title}</span>
+          </div>
+          <Link to={`/live/episode/${liveEpisode.id}/dashboard`} className="bg-white text-red-700 px-3 py-1 rounded text-xs font-bold hover:bg-red-50 transition-colors shrink-0">
+            Control Room →
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-surface border-b border-theme sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-3 py-2">

@@ -1,4 +1,5 @@
 import express from 'express';
+import nodemailer from 'nodemailer';
 import { supabase } from '../config/supabase.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { buildSnapshot } from './versions.js';
@@ -146,6 +147,76 @@ router.get('/books/share/:token', async (req, res) => {
 
     res.json({ ...book, chapters: chapters || [] });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/books/:bookId/invite — email a reader invite
+router.post('/invite', authenticate, requireRole(['owner', 'author']), async (req, res) => {
+  const { emails, message } = req.body;
+  if (!emails?.length) return res.status(400).json({ error: 'No emails provided' });
+
+  try {
+    // Get book + sender profile
+    const { data: book } = await supabase
+      .from('books')
+      .select('id, title, slug, share_token, visibility')
+      .eq('id', req.params.bookId)
+      .single();
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name, email')
+      .eq('id', req.user.id)
+      .single();
+
+    const origin = process.env.CLIENT_URL?.split(',')[0]?.trim() || 'http://localhost:5177';
+    const readUrl = book.slug
+      ? `${origin}/read/${book.slug}`
+      : book.share_token
+        ? `${origin}/read/share/${book.share_token}`
+        : `${origin}/book/${book.id}`;
+
+    const senderName = profile?.display_name || 'A BookFlow author';
+
+    // Set up transporter
+    const smtpHost = process.env.SMTP_HOST;
+    if (!smtpHost) {
+      // No SMTP configured — return the link for manual sharing
+      return res.json({ ok: true, manual: true, url: readUrl });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    const personalNote = message ? `<p style="margin:16px 0;font-style:italic;color:#555;">"${message}"</p>` : '';
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+        <h2 style="margin:0 0 8px;">${book.title}</h2>
+        <p style="color:#666;margin:0 0 16px;">${senderName} invited you to read their book on BookFlow.</p>
+        ${personalNote}
+        <a href="${readUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">Read Now →</a>
+        <p style="margin-top:24px;font-size:12px;color:#999;">Or copy this link: ${readUrl}</p>
+      </div>`;
+
+    const emailList = Array.isArray(emails) ? emails : [emails];
+    await Promise.all(emailList.map(to =>
+      transporter.sendMail({
+        from: `"${senderName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+        to,
+        subject: `${senderName} invited you to read "${book.title}"`,
+        html,
+      })
+    ));
+
+    res.json({ ok: true, sent: emailList.length });
+  } catch (err) {
+    console.error('Invite email error:', err);
     res.status(500).json({ error: err.message });
   }
 });

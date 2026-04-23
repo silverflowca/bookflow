@@ -291,14 +291,41 @@ class ApiClient {
   }
 
   // App Settings
-  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string }> {
+  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string }> {
     return this.request('/settings');
   }
 
-  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string }): Promise<void> {
+  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string }): Promise<void> {
     return this.request('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
+    });
+  }
+
+  async getRestreamStatus(): Promise<{ connected: boolean; has_credentials: boolean; has_token: boolean; expires_at: string | null }> {
+    return this.request('/live/restream/status');
+  }
+
+  async disconnectRestream(): Promise<{ ok: boolean }> {
+    return this.request('/live/restream/disconnect', { method: 'POST' });
+  }
+
+  async getRestreamStreamStatus(): Promise<{ channels: any[]; profile: any }> {
+    return this.request('/live/restream/stream-status');
+  }
+
+  async restreamGoLive(): Promise<{ ok: boolean; channels_enabled: number }> {
+    return this.request('/live/restream/go-live', { method: 'POST' });
+  }
+
+  async scheduleRestreamBroadcast(episodeId: string): Promise<{ ok: boolean; broadcast: any; message?: string }> {
+    return this.request(`/live/episodes/${episodeId}/schedule-restream`, { method: 'POST' });
+  }
+
+  async postRecap(episodeId: string, data: { recording_url?: string; message?: string }): Promise<{ ok: boolean; recap: string; message?: string }> {
+    return this.request(`/live/episodes/${episodeId}/post-recap`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 
@@ -473,6 +500,13 @@ class ApiClient {
 
   async getSharedBook(token: string): Promise<Book & { chapters: Chapter[] }> {
     return this.request(`/public/books/share/${token}`);
+  }
+
+  async inviteReaders(bookId: string, emails: string[], message?: string): Promise<{ ok: boolean; sent?: number; manual?: boolean; url?: string }> {
+    return this.request(`/books/${bookId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ emails, message }),
+    });
   }
 
   // Collaborator books (books user is a collaborator on)
@@ -735,6 +769,88 @@ class ApiClient {
 
   async ensureClubChatFolder(clubId: string): Promise<{ folder_id: string | null }> {
     return this.request(`/clubs/${clubId}/chat/ensure-folder`, { method: 'POST', body: '{}' });
+  }
+
+  // ── LiveFlow ────────────────────────────────────────────────────────────────
+
+  async getLiveShows(): Promise<{ shows: any[] }> {
+    return this.request('/live/shows');
+  }
+
+  async createLiveShow(data: any): Promise<{ show: any }> {
+    return this.request('/live/shows', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateLiveShow(id: string, data: any): Promise<{ show: any }> {
+    return this.request(`/live/shows/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  async deleteLiveShow(id: string): Promise<{ ok: boolean }> {
+    return this.request(`/live/shows/${id}`, { method: 'DELETE' });
+  }
+
+  async getLiveEpisodes(params?: { status?: string; show_id?: string }): Promise<{ episodes: any[] }> {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.show_id) qs.set('show_id', params.show_id);
+    const query = qs.toString() ? `?${qs}` : '';
+    return this.request(`/live/episodes${query}`);
+  }
+
+  async createLiveEpisode(data: any): Promise<{ episode: any }> {
+    return this.request('/live/episodes', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async generateNextEpisode(show_id: string): Promise<{ episode: any }> {
+    return this.request('/live/episodes/generate', { method: 'POST', body: JSON.stringify({ show_id }) });
+  }
+
+  async getLiveEpisode(id: string): Promise<{ episode: any }> {
+    return this.request(`/live/episodes/${id}`);
+  }
+
+  async updateLiveEpisode(id: string, data: any): Promise<{ episode: any }> {
+    return this.request(`/live/episodes/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  async buildSlideDeck(episodeId: string): Promise<{ deck: any; slideCount: number }> {
+    return this.request(`/live/episodes/${episodeId}/build-deck`, { method: 'POST', body: '{}' });
+  }
+
+  async pushToFreeshow(episodeId: string): Promise<{ ok: boolean; error?: string }> {
+    return this.request(`/live/episodes/${episodeId}/push-freeshow`, { method: 'POST', body: '{}' });
+  }
+
+  async startLiveEpisode(episodeId: string): Promise<{ episode: any }> {
+    return this.request(`/live/episodes/${episodeId}/start`, { method: 'POST', body: '{}' });
+  }
+
+  async endLiveEpisode(episodeId: string): Promise<{ episode: any }> {
+    return this.request(`/live/episodes/${episodeId}/end`, { method: 'POST', body: '{}' });
+  }
+
+  async getLiveChat(episodeId: string): Promise<{ messages: any[] }> {
+    return this.request(`/live/episodes/${episodeId}/chat`);
+  }
+
+  async flagLiveRequest(episodeId: string, data: { message_id?: string; type: string; body: string }): Promise<{ request: any }> {
+    return this.request(`/live/episodes/${episodeId}/flag`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getLiveRequests(episodeId: string): Promise<{ requests: any[] }> {
+    return this.request(`/live/episodes/${episodeId}/requests`);
+  }
+
+  async resolveLiveRequest(requestId: string): Promise<{ request: any }> {
+    return this.request(`/live/requests/${requestId}/resolve`, { method: 'PATCH', body: '{}' });
+  }
+
+  async getFreeshowStatus(): Promise<{ ok: boolean; connected: boolean; message?: string }> {
+    return this.request('/live/freeshow/status');
+  }
+
+  async freeshowAction(action: string, data?: any): Promise<{ ok: boolean; result?: string }> {
+    return this.request('/live/freeshow/action', { method: 'POST', body: JSON.stringify({ action, data }) });
   }
 
   // Activity / Audit Trail

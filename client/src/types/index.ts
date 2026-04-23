@@ -387,3 +387,84 @@ export interface AuthResponse {
   };
   profile?: Profile;
 }
+
+// ── LiveFlow types ────────────────────────────────────────────────────────────
+
+export type LiveRecurrence = 'weekly' | 'biweekly' | 'monthly' | 'none';
+export type LiveEpisodeStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+export type LiveRequestType = 'prayer' | 'question' | 'comment';
+export type LivePlatform = 'youtube' | 'facebook' | 'twitch' | 'restream';
+
+export interface LiveShow {
+  id: string;
+  title: string;
+  description?: string;
+  book_id?: string;
+  host_user_id: string;
+  restream_channel_id?: string;
+  guest_invite_url?: string;
+  recurrence: LiveRecurrence;
+  recurrence_day?: number;   // 0=Sun..6=Sat
+  recurrence_time?: string;  // HH:MM
+  timezone: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // joined
+  books?: { id: string; title: string; cover_image_url?: string };
+}
+
+export interface LiveSlide {
+  id: string;
+  type: 'title' | 'heading' | 'content' | 'scripture' | 'list' | 'discussion' | 'closing';
+  text?: string;
+  reference?: string;   // for scripture slides
+  items?: string[];     // for list slides
+}
+
+export interface LiveSlideDeck {
+  name: string;
+  slides: LiveSlide[];
+}
+
+export interface LiveEpisode {
+  id: string;
+  show_id?: string;
+  title: string;
+  chapter_id?: string;
+  scheduled_at: string;
+  started_at?: string;
+  ended_at?: string;
+  status: LiveEpisodeStatus;
+  restream_session_id?: string;
+  youtube_broadcast_id?: string;
+  recording_url?: string;
+  guest_invite_url?: string;
+  slide_deck?: LiveSlideDeck;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  // joined
+  live_shows?: { host_user_id: string; title: string; book_id?: string; guest_invite_url?: string };
+  chapters?: { id: string; title: string; content?: any };
+}
+
+export interface LiveChatMessage {
+  id: string;
+  episode_id: string;
+  platform: LivePlatform;
+  platform_user?: string;
+  body: string;
+  received_at: string;
+}
+
+export interface LiveRequest {
+  id: string;
+  episode_id: string;
+  source_message_id?: string;
+  body: string;
+  type: LiveRequestType;
+  flagged_by?: string;
+  resolved: boolean;
+  created_at: string;
+}

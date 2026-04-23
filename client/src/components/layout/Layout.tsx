@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 
 export default function Layout() {
@@ -99,6 +99,9 @@ export default function Layout() {
                   <Link to="/clubs" className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <Users className="h-4 w-4" /> Clubs
                   </Link>
+                  <Link to="/live" className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <Radio className="h-4 w-4" /> Live
+                  </Link>
                   <Link to="/dashboard" className="flex items-center gap-1 theme-button-primary px-4 py-2 rounded-md text-sm font-medium">
                     <Plus className="h-4 w-4" /> New Book
                   </Link>
@@ -162,6 +165,9 @@ export default function Layout() {
                 </Link>
                 <Link to="/clubs" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
                   <Users className="h-4 w-4 text-accent" /> Book Clubs
+                </Link>
+                <Link to="/live" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
+                  <Radio className="h-4 w-4 text-accent" /> Live Shows
                 </Link>
                 <Link to="/dashboard" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium theme-button-primary px-3 rounded-md">
                   <Plus className="h-4 w-4" /> New Book

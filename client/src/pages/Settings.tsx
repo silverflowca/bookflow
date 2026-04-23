@@ -1,30 +1,54 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio } from 'lucide-react';
 import api from '../lib/api';
 
 interface AppSettings {
   fileflow_url: string;
   fileflow_access_key: string;
   deepgram_api_key: string;
+  restream_client_id: string;
+  restream_client_secret: string;
 }
 
 export default function Settings() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [settings, setSettings] = useState<AppSettings>({
     fileflow_url: '',
     fileflow_access_key: '',
     deepgram_api_key: '',
+    restream_client_id: '',
+    restream_client_secret: '',
   });
   const [showKey, setShowKey] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
+  const [showRestreamSecret, setShowRestreamSecret] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'failed'>('unknown');
+  const [restreamStatus, setRestreamStatus] = useState<{ connected: boolean; has_credentials: boolean } | null>(null);
+  const [restreamConnecting, setRestreamConnecting] = useState(false);
+  const [restreamMsg, setRestreamMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadSettings();
+    loadRestreamStatus();
   }, []);
+
+  // Handle OAuth callback redirect: ?restream=connected or ?restream=error
+  useEffect(() => {
+    const restream = searchParams.get('restream');
+    if (restream === 'connected') {
+      setRestreamMsg({ type: 'success', text: 'Restream connected successfully!' });
+      loadRestreamStatus();
+      setSearchParams({}, { replace: true });
+    } else if (restream === 'error') {
+      const msg = searchParams.get('msg') || 'unknown_error';
+      setRestreamMsg({ type: 'error', text: `Restream connection failed: ${msg}` });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   async function loadSettings() {
     try {
@@ -33,6 +57,8 @@ export default function Settings() {
         fileflow_url: data.fileflow_url || 'http://localhost:8680',
         fileflow_access_key: data.fileflow_access_key || '',
         deepgram_api_key: data.deepgram_api_key || '',
+        restream_client_id: data.restream_client_id || '',
+        restream_client_secret: data.restream_client_secret || '',
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -40,8 +66,40 @@ export default function Settings() {
         fileflow_url: 'http://localhost:8680',
         fileflow_access_key: '',
         deepgram_api_key: '',
+        restream_client_id: '',
+        restream_client_secret: '',
       });
     }
+  }
+
+  async function loadRestreamStatus() {
+    try {
+      const status = await api.getRestreamStatus();
+      setRestreamStatus(status);
+    } catch { /* silent */ }
+  }
+
+  async function connectRestream() {
+    // Save credentials first so the server can read them during OAuth
+    setRestreamConnecting(true);
+    try {
+      await api.updateAppSettings(settings);
+      // Redirect to server OAuth initiation endpoint
+      const serverBase = import.meta.env.VITE_API_URL || 'http://localhost:8682';
+      window.location.href = `${serverBase}/api/live/restream/auth`;
+    } catch (err) {
+      setRestreamMsg({ type: 'error', text: 'Save failed before connecting.' });
+      setRestreamConnecting(false);
+    }
+  }
+
+  async function disconnectRestream() {
+    if (!confirm('Disconnect Restream? You will need to re-authorize to use chat.')) return;
+    try {
+      await api.disconnectRestream();
+      setRestreamStatus(s => s ? { ...s, connected: false, has_token: false } as any : null);
+      setRestreamMsg({ type: 'success', text: 'Restream disconnected.' });
+    } catch { /* silent */ }
   }
 
   async function handleSave() {
@@ -236,6 +294,95 @@ export default function Settings() {
             <p className="text-xs text-gray-500 mt-1">
               Leave empty to use the server's default key (if configured).
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Restream OAuth */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Radio className="h-5 w-5 text-orange-500" />
+            <h2 className="text-lg font-semibold">Restream Integration</h2>
+            {restreamStatus?.connected && (
+              <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" /> Connected
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mb-6">
+            Connect Restream to pull unified chat (YouTube + Facebook + Twitch) into your Live control room.
+            Create an OAuth app at{' '}
+            <a href="https://developers.restream.io" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              developers.restream.io
+            </a>{' '}
+            to get your Client ID and Secret.
+          </p>
+
+          {restreamMsg && (
+            <div className={`mb-4 flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${restreamMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {restreamMsg.type === 'success' ? <CheckCircle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+              {restreamMsg.text}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
+              <input
+                type="text"
+                value={settings.restream_client_id}
+                onChange={(e) => setSettings({ ...settings, restream_client_id: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Your Restream OAuth app client_id"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Client Secret</label>
+              <div className="relative">
+                <input
+                  type={showRestreamSecret ? 'text' : 'password'}
+                  value={settings.restream_client_secret}
+                  onChange={(e) => setSettings({ ...settings, restream_client_secret: e.target.value })}
+                  className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Your Restream OAuth app client_secret"
+                />
+                <button type="button" onClick={() => setShowRestreamSecret(!showRestreamSecret)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showRestreamSecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Set your Restream app's redirect URI to:{' '}
+                <code className="bg-gray-100 px-1 rounded text-xs">
+                  {(import.meta.env.VITE_API_URL || 'http://localhost:8682')}/api/live/restream/callback
+                </code>
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3">
+            {restreamStatus?.connected ? (
+              <button
+                type="button"
+                onClick={disconnectRestream}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors"
+              >
+                Disconnect Restream
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={connectRestream}
+                disabled={restreamConnecting || !settings.restream_client_id || !settings.restream_client_secret}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+              >
+                <Radio className="h-4 w-4" />
+                {restreamConnecting ? 'Redirecting…' : 'Connect with Restream'}
+              </button>
+            )}
+            {!restreamStatus?.connected && restreamStatus?.has_credentials && (
+              <span className="text-xs text-gray-500">Credentials saved — click Connect to authorize</span>
+            )}
           </div>
         </div>
       </div>
