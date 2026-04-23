@@ -567,7 +567,14 @@ router.get('/restream/status', authenticate, async (req, res) => {
 });
 
 // GET /api/live/restream/auth — start OAuth flow (redirect user to Restream)
-router.get('/restream/auth', authenticate, async (req, res) => {
+// Accepts token via query param because the browser performs a full redirect (no Auth header)
+router.get('/restream/auth', async (req, res) => {
+  // Allow token via ?token= query param (browser redirect) or Authorization header
+  const token = req.query.token || req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: 'Invalid token' });
+  req.user = user;
   try {
     const creds = await getRestreamSettings(req.user.id);
     if (!creds.restream_client_id) {

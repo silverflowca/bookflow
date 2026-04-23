@@ -88,7 +88,8 @@ export default function Settings() {
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8682';
       // VITE_API_URL may be '/api' (relative) or 'https://host/api' — strip trailing /api for OAuth redirect
       const serverBase = apiBase.replace(/\/api$/, '') || window.location.origin;
-      window.location.href = `${serverBase}/api/live/restream/auth`;
+      const jwt = localStorage.getItem('bookflow_token') || '';
+      window.location.href = `${serverBase}/api/live/restream/auth?token=${encodeURIComponent(jwt)}`;
     } catch (err) {
       setRestreamMsg({ type: 'error', text: 'Save failed before connecting.' });
       setRestreamConnecting(false);
