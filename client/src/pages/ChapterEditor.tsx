@@ -61,11 +61,21 @@ export default function ChapterEditor() {
     content: '',
     editorProps: {
       transformPastedHTML(html) {
-        // Convert stray bullet-character paragraphs (•) into proper list items
-        // e.g. <p>• some item</p> → <ul><li>some item</li></ul>
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;
 
+        // Strip <mark> tags (TipTap Highlight) — unwrap to plain text nodes
+        wrapper.querySelectorAll('mark').forEach(mark => {
+          mark.replaceWith(...Array.from(mark.childNodes));
+        });
+
+        // Strip inline-content spans (question/poll/highlight markers) — unwrap
+        wrapper.querySelectorAll('span[data-inline-content]').forEach(span => {
+          span.replaceWith(...Array.from(span.childNodes));
+        });
+
+        // Convert stray bullet-character paragraphs (•) into proper list items
+        // e.g. <p>• some item</p> → <ul><li>some item</li></ul>
         const paras = Array.from(wrapper.querySelectorAll('p'));
         let currentUl: HTMLUListElement | null = null;
 
