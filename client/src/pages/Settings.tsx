@@ -85,7 +85,9 @@ export default function Settings() {
     try {
       await api.updateAppSettings(settings);
       // Redirect to server OAuth initiation endpoint
-      const serverBase = import.meta.env.VITE_API_URL || 'http://localhost:8682';
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8682';
+      // VITE_API_URL may be '/api' (relative) or 'https://host/api' — strip trailing /api for OAuth redirect
+      const serverBase = apiBase.replace(/\/api$/, '') || window.location.origin;
       window.location.href = `${serverBase}/api/live/restream/auth`;
     } catch (err) {
       setRestreamMsg({ type: 'error', text: 'Save failed before connecting.' });
@@ -354,7 +356,7 @@ export default function Settings() {
               <p className="text-xs text-gray-500 mt-1">
                 Set your Restream app's redirect URI to:{' '}
                 <code className="bg-gray-100 px-1 rounded text-xs">
-                  {(import.meta.env.VITE_API_URL || 'http://localhost:8682')}/api/live/restream/callback
+                  {(import.meta.env.VITE_API_URL || 'http://localhost:8682').replace(/\/api$/, '') || window.location.origin}/api/live/restream/callback
                 </code>
               </p>
             </div>
