@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../../lib/api';
-import type { LiveEpisode, LiveSlide, LiveChatMessage, LiveRequest } from '../../types';
+import type { LiveEpisode, LiveSlide, LiveChatMessage, LiveRequest, LiveQueueItem, LiveQueueGroup, LiveSendTarget } from '../../types';
+
+const TARGET_LABELS: Record<string, string> = {
+  chat: '💬', lower_third: '📺', caption: '🔤',
+};
 
 const PLATFORM_ICON: Record<string, string> = {
   youtube: '▶', facebook: 'f', twitch: '🎮', restream: '📡',
@@ -34,6 +38,18 @@ export default function LiveDashboard() {
   const [goingLiveRestream, setGoingLiveRestream] = useState(false);
   const streamPollRef = useRef<number | null>(null);
 
+  // Left panel tab: slides | queue
+  const [leftTab, setLeftTab] = useState<'slides' | 'queue'>('slides');
+
+  // Queue
+  const [_queueGroups, setQueueGroups] = useState<LiveQueueGroup[]>([]);
+  const [queueItems, setQueueItems] = useState<LiveQueueItem[]>([]);
+  const [sendingQueueItem, setSendingQueueItem] = useState<string | null>(null);
+  const [freeText, setFreeText] = useState('');
+  const [freeTargets, setFreeTargets] = useState<LiveSendTarget[]>(['chat']);
+  const [sendingFree, setSendingFree] = useState(false);
+  const [sendMsg, setSendMsg] = useState('');
+
   const loadChat = useCallback(async () => {
     if (!id) return;
     const [c, r] = await Promise.all([
@@ -54,6 +70,12 @@ export default function LiveDashboard() {
 
     loadChat();
     pollRef.current = window.setInterval(loadChat, 4000);
+
+    // Load queue
+    api.getQueue(id).then(r => {
+      setQueueGroups(r.groups || []);
+      setQueueItems(r.items || []);
+    }).catch(() => {});
 
     // Poll Restream stream status every 30s
     const loadStreamStatus = () => {
@@ -120,6 +142,33 @@ export default function LiveDashboard() {
     setRequests(prev => [...prev, r.request]);
   };
 
+  const sendQueueItem = async (item: LiveQueueItem, targets: LiveSendTarget[]) => {
+    setSendingQueueItem(item.id);
+    setSendMsg('');
+    try {
+      await api.sendQueueItem(item.id, targets);
+      setSendMsg(`✅ Sent "${item.label}"`);
+      setQueueItems(prev => prev.map(i => i.id === item.id
+        ? { ...i, sent_at: new Date().toISOString(), sent_targets: targets }
+        : i));
+    } catch (e: any) {
+      setSendMsg(`❌ ${e.message}`);
+    } finally { setSendingQueueItem(null); }
+  };
+
+  const sendFreeNow = async () => {
+    if (!id || !freeText.trim() || freeTargets.length === 0) return;
+    setSendingFree(true);
+    setSendMsg('');
+    try {
+      await api.sendNow(id, { text: freeText, targets: freeTargets });
+      setSendMsg(`✅ Sent to ${freeTargets.join(', ')}`);
+      setFreeText('');
+    } catch (e: any) {
+      setSendMsg(`❌ ${e.message}`);
+    } finally { setSendingFree(false); }
+  };
+
   const endShow = async () => {
     if (!id) return;
     if (!confirm('End this live show?')) return;
@@ -155,44 +204,114 @@ export default function LiveDashboard() {
       {/* 3-panel layout */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* LEFT — Slide control */}
-        <div className="w-64 shrink-0 flex flex-col border-r border-theme overflow-hidden">
-          {/* FreeShow controls */}
-          <div className="p-3 border-b border-theme">
-            <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">FreeShow Control</div>
-            <div className="flex gap-2">
-              <button onClick={prevSlide} className="flex-1 px-2 py-2 rounded-lg text-sm border border-theme text-muted hover:bg-surface-hover transition-colors">← Prev</button>
-              <button onClick={nextSlide} className="flex-1 px-2 py-2 rounded-lg text-sm theme-button-primary">Next →</button>
-            </div>
-            <div className="text-xs text-muted text-center mt-2">
-              {slides.length > 0 ? `Slide ${currentSlide + 1} / ${slides.length}` : 'No deck loaded'}
-            </div>
-          </div>
-
-          {/* Slide list */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {slides.length === 0 && (
-              <div className="text-center text-muted text-xs py-8">
-                No slide deck.<br />Build one in Episode settings.
-              </div>
-            )}
-            {slides.map((slide, i) => (
-              <button
-                key={slide.id}
-                onClick={() => goToSlide(i)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${i === currentSlide ? 'bg-accent text-white' : 'hover:bg-surface-hover text-theme'}`}
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span>{SLIDE_TYPE_ICON[slide.type]}</span>
-                  <span className="opacity-60 font-mono">{i + 1}</span>
-                  <span className="capitalize opacity-70">{slide.type}</span>
-                </div>
-                <div className="truncate opacity-80">
-                  {slide.text?.slice(0, 50) || slide.reference || slide.items?.[0] || ''}
-                </div>
+        {/* LEFT — Slides / Queue */}
+        <div className="w-72 shrink-0 flex flex-col border-r border-theme overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b border-theme shrink-0">
+            {(['slides', 'queue'] as const).map(tab => (
+              <button key={tab} onClick={() => setLeftTab(tab)}
+                className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${leftTab === tab ? 'text-accent border-b-2 border-accent' : 'text-muted hover:text-theme'}`}>
+                {tab === 'slides' ? '🎬 Slides' : '📋 Queue'}
               </button>
             ))}
           </div>
+
+          {leftTab === 'slides' && (
+            <>
+              <div className="p-3 border-b border-theme shrink-0">
+                <div className="flex gap-2">
+                  <button onClick={prevSlide} className="flex-1 px-2 py-2 rounded-lg text-sm border border-theme text-muted hover:bg-surface-hover transition-colors">← Prev</button>
+                  <button onClick={nextSlide} className="flex-1 px-2 py-2 rounded-lg text-sm theme-button-primary">Next →</button>
+                </div>
+                <div className="text-xs text-muted text-center mt-2">
+                  {slides.length > 0 ? `Slide ${currentSlide + 1} / ${slides.length}` : 'No deck loaded'}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {slides.length === 0 && (
+                  <div className="text-center text-muted text-xs py-8">No slide deck.<br />Build one in Episode settings.</div>
+                )}
+                {slides.map((slide, i) => (
+                  <button key={slide.id} onClick={() => goToSlide(i)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${i === currentSlide ? 'bg-accent text-white' : 'hover:bg-surface-hover text-theme'}`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span>{SLIDE_TYPE_ICON[slide.type]}</span>
+                      <span className="opacity-60 font-mono">{i + 1}</span>
+                      <span className="capitalize opacity-70">{slide.type}</span>
+                    </div>
+                    <div className="truncate opacity-80">
+                      {slide.text?.slice(0, 50) || slide.reference || slide.items?.[0] || ''}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {leftTab === 'queue' && (
+            <div className="flex flex-col flex-1 overflow-hidden">
+              {/* Queue items */}
+              <div className="flex-1 overflow-y-auto divide-y divide-theme">
+                {queueItems.length === 0 && (
+                  <div className="text-center text-muted text-xs py-8 px-3">
+                    Queue empty.<br />
+                    <Link to="/live/bible" className="text-accent underline">Browse Bible →</Link>
+                  </div>
+                )}
+                {queueItems.map(item => (
+                  <div key={item.id} className={`px-3 py-2 ${item.sent_at ? 'opacity-40' : ''}`}>
+                    <div className="text-xs font-semibold text-accent mb-0.5 flex items-center justify-between">
+                      <span className="truncate">{item.label}</span>
+                      {item.sent_at && <span className="text-green-500 shrink-0 ml-1">✅</span>}
+                    </div>
+                    <p className="text-xs text-muted line-clamp-1 mb-1.5">{item.body}</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {(['chat', 'lower_third', 'caption'] as LiveSendTarget[]).map(t => (
+                        <button key={t} disabled={sendingQueueItem === item.id}
+                          onClick={() => sendQueueItem(item, [t])}
+                          className="px-1.5 py-0.5 text-xs rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 hover:bg-indigo-200 transition-colors disabled:opacity-40"
+                          title={t.replace('_', ' ')}>
+                          {TARGET_LABELS[t]}
+                        </button>
+                      ))}
+                      <button disabled={sendingQueueItem === item.id}
+                        onClick={() => sendQueueItem(item, ['chat', 'lower_third', 'caption'])}
+                        className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200 transition-colors disabled:opacity-40">
+                        All
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Send msg */}
+              {sendMsg && (
+                <div className={`px-3 py-1.5 text-xs border-t border-theme ${sendMsg.startsWith('❌') ? 'text-red-500' : 'text-green-600'}`}>
+                  {sendMsg}
+                </div>
+              )}
+
+              {/* Freetext send */}
+              <div className="p-3 border-t border-theme shrink-0 space-y-2">
+                <textarea className="w-full theme-input rounded-lg px-2 py-1.5 text-xs resize-none" rows={2}
+                  placeholder="Send anything now…"
+                  value={freeText} onChange={e => setFreeText(e.target.value)} />
+                <div className="flex gap-2 flex-wrap">
+                  {(['chat', 'lower_third', 'caption'] as LiveSendTarget[]).map(t => (
+                    <label key={t} className="flex items-center gap-1 text-xs cursor-pointer">
+                      <input type="checkbox" checked={freeTargets.includes(t)}
+                        onChange={() => setFreeTargets(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])} />
+                      {TARGET_LABELS[t]}
+                    </label>
+                  ))}
+                </div>
+                <button onClick={sendFreeNow} disabled={sendingFree || !freeText.trim() || freeTargets.length === 0}
+                  className="w-full py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors disabled:opacity-40">
+                  {sendingFree ? 'Sending…' : '→ Send Now'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* CENTER — Current slide preview + stream embed */}

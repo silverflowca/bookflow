@@ -864,4 +864,290 @@ router.post('/webhook/restream', async (req, res) => {
   }
 });
 
+// ── Bible ──────────────────────────────────────────────────────────────────────
+
+// GET /api/live/bible/books
+router.get('/bible/books', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('bible_verses')
+      .select('book_name, book_order')
+      .order('book_order')
+      .order('book_name');
+    if (error) throw error;
+    // deduplicate
+    const seen = new Set();
+    const books = (data || []).filter(r => {
+      if (seen.has(r.book_name)) return false;
+      seen.add(r.book_name);
+      return true;
+    });
+    res.json(books);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/live/bible/search?q=
+router.get('/bible/search', authenticate, async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+    if (!q || q.length < 2) return res.json([]);
+    const { data, error } = await supabase
+      .from('bible_verses')
+      .select('book_name, chapter, verse, text')
+      .ilike('text', `%${q}%`)
+      .limit(30);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/live/bible/:book/chapters
+router.get('/bible/:book/chapters', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('bible_verses')
+      .select('chapter')
+      .eq('book_name', req.params.book)
+      .order('chapter');
+    if (error) throw error;
+    const chapters = [...new Set((data || []).map(r => r.chapter))];
+    res.json(chapters);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/live/bible/:book/:chapter
+router.get('/bible/:book/:chapter', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('bible_verses')
+      .select('verse, text')
+      .eq('book_name', req.params.book)
+      .eq('chapter', parseInt(req.params.chapter))
+      .order('verse');
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Queue ──────────────────────────────────────────────────────────────────────
+
+// GET /api/live/episodes/:id/queue
+router.get('/episodes/:id/queue', authenticate, async (req, res) => {
+  try {
+    const { data: groups } = await supabase
+      .from('live_queue_groups')
+      .select('*')
+      .eq('episode_id', req.params.id)
+      .order('sort_order');
+
+    const { data: items, error } = await supabase
+      .from('live_queue_items')
+      .select('*')
+      .eq('episode_id', req.params.id)
+      .order('sort_order');
+
+    if (error) throw error;
+    res.json({ groups: groups || [], items: items || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/live/episodes/:id/queue — add item
+router.post('/episodes/:id/queue', authenticate, async (req, res) => {
+  try {
+    const { type = 'verse', label, body, book_ref, chapter_ref, verse_start, verse_end, group_id, sort_order } = req.body;
+    if (!label || !body) return res.status(400).json({ error: 'label and body required' });
+
+    // auto sort_order = max + 1
+    const { data: last } = await supabase
+      .from('live_queue_items')
+      .select('sort_order')
+      .eq('episode_id', req.params.id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .single();
+
+    const { data, error } = await supabase
+      .from('live_queue_items')
+      .insert({
+        episode_id: req.params.id,
+        type, label, body, book_ref, chapter_ref, verse_start, verse_end,
+        group_id: group_id || null,
+        sort_order: sort_order ?? ((last?.sort_order ?? -1) + 1),
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/live/queue/:itemId — edit / reorder
+router.patch('/queue/:itemId', authenticate, async (req, res) => {
+  try {
+    const allowed = ['label', 'body', 'sort_order', 'group_id'];
+    const updates = {};
+    for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+
+    const { data, error } = await supabase
+      .from('live_queue_items')
+      .update(updates)
+      .eq('id', req.params.itemId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/live/queue/:itemId
+router.delete('/queue/:itemId', authenticate, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('live_queue_items')
+      .delete()
+      .eq('id', req.params.itemId);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Queue Groups
+// POST /api/live/episodes/:id/queue/groups
+router.post('/episodes/:id/queue/groups', authenticate, async (req, res) => {
+  try {
+    const { label, sort_order } = req.body;
+    if (!label) return res.status(400).json({ error: 'label required' });
+    const { data, error } = await supabase
+      .from('live_queue_groups')
+      .insert({ episode_id: req.params.id, label, sort_order: sort_order ?? 0 })
+      .select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/live/queue/groups/:groupId
+router.patch('/queue/groups/:groupId', authenticate, async (req, res) => {
+  try {
+    const { label, sort_order } = req.body;
+    const { data, error } = await supabase
+      .from('live_queue_groups')
+      .update({ label, sort_order })
+      .eq('id', req.params.groupId)
+      .select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/live/queue/groups/:groupId
+router.delete('/queue/groups/:groupId', authenticate, async (req, res) => {
+  try {
+    await supabase.from('live_queue_groups').delete().eq('id', req.params.groupId);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Send to Restream ───────────────────────────────────────────────────────────
+
+function formatChatText(item) {
+  if (item.type === 'verse' || item.book_ref) {
+    return `✝️ ${item.label} — "${item.body}"`;
+  }
+  return `📖 ${item.label}: ${item.body}`;
+}
+
+function formatLowerThird(item) {
+  return {
+    title: item.label,
+    subtitle: item.body.length > 120 ? item.body.slice(0, 117) + '…' : item.body,
+  };
+}
+
+async function sendToRestream(token, targets, item) {
+  const results = {};
+
+  if (targets.includes('chat')) {
+    const text = formatChatText(item);
+    const r = await fetch('https://api.restream.io/v2/chat/message', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    results.chat = r.ok ? 'sent' : `error ${r.status}`;
+  }
+
+  if (targets.includes('lower_third')) {
+    const { title, subtitle } = formatLowerThird(item);
+    const r = await fetch('https://api.restream.io/v2/overlay/lower-third', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, subtitle }),
+    });
+    results.lower_third = r.ok ? 'sent' : `error ${r.status}`;
+  }
+
+  if (targets.includes('caption')) {
+    // Split multi-verse body into sentences, send sequentially
+    const lines = item.body.split(/(?<=[.!?])\s+/).filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      const captionText = i === 0 ? `${item.label} — ${lines[i]}` : lines[i];
+      await fetch('https://api.restream.io/v2/captions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: captionText }),
+      });
+      if (i < lines.length - 1) await new Promise(r => setTimeout(r, 2500));
+    }
+    results.caption = 'sent';
+  }
+
+  return results;
+}
+
+// POST /api/live/queue/:itemId/send
+router.post('/queue/:itemId/send', authenticate, async (req, res) => {
+  try {
+    const { targets = ['chat'] } = req.body; // targets: ['chat','lower_third','caption']
+
+    const { data: item, error: itemErr } = await supabase
+      .from('live_queue_items')
+      .select('*')
+      .eq('id', req.params.itemId)
+      .single();
+    if (itemErr || !item) return res.status(404).json({ error: 'Queue item not found' });
+
+    const token = await getValidAccessToken(req.user.id);
+    if (!token) return res.status(401).json({ error: 'Restream not connected. Go to Settings to connect.' });
+
+    const results = await sendToRestream(token, targets, item);
+
+    // Mark as sent
+    await supabase
+      .from('live_queue_items')
+      .update({ sent_at: new Date().toISOString(), sent_targets: targets })
+      .eq('id', req.params.itemId);
+
+    res.json({ ok: true, results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/live/episodes/:id/send-now  — send freetext immediately
+router.post('/episodes/:id/send-now', authenticate, async (req, res) => {
+  try {
+    const { text, label = 'Custom', targets = ['chat'] } = req.body;
+    if (!text) return res.status(400).json({ error: 'text required' });
+
+    const token = await getValidAccessToken(req.user.id);
+    if (!token) return res.status(401).json({ error: 'Restream not connected.' });
+
+    const item = { type: 'custom', label, body: text, book_ref: null };
+    const results = await sendToRestream(token, targets, item);
+    res.json({ ok: true, results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
+

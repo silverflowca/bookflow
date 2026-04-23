@@ -25,6 +25,8 @@ import AcceptClubInvitePage from './pages/AcceptClubInvitePage';
 import LiveSchedule from './pages/live/LiveSchedule';
 import LiveEpisode from './pages/live/LiveEpisode';
 import LiveDashboard from './pages/live/LiveDashboard';
+import LiveBible from './pages/live/LiveBible';
+import LiveQueue from './pages/live/LiveQueue';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -160,6 +162,18 @@ function AppRoutes() {
         <Route path="live/episode/:id/dashboard" element={
           <ProtectedRoute>
             <LiveDashboard />
+          </ProtectedRoute>
+        } />
+
+        <Route path="live/bible" element={
+          <ProtectedRoute>
+            <LiveBible />
+          </ProtectedRoute>
+        } />
+
+        <Route path="live/episode/:id/queue" element={
+          <ProtectedRoute>
+            <LiveQueue />
           </ProtectedRoute>
         } />
       </Route>

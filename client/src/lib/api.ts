@@ -329,6 +329,53 @@ class ApiClient {
     });
   }
 
+  // Bible
+  async getBibleBooks(): Promise<{ book_name: string; book_order: number }[]> {
+    return this.request('/live/bible/books');
+  }
+  async getBibleChapters(book: string): Promise<number[]> {
+    return this.request(`/live/bible/${encodeURIComponent(book)}/chapters`);
+  }
+  async getBibleChapter(book: string, chapter: number): Promise<{ verse: number; text: string }[]> {
+    return this.request(`/live/bible/${encodeURIComponent(book)}/${chapter}`);
+  }
+  async searchBible(q: string): Promise<{ book_name: string; chapter: number; verse: number; text: string }[]> {
+    return this.request(`/live/bible/search?q=${encodeURIComponent(q)}`);
+  }
+
+  // Queue
+  async getQueue(episodeId: string): Promise<{ groups: any[]; items: any[] }> {
+    return this.request(`/live/episodes/${episodeId}/queue`);
+  }
+  async addQueueItem(episodeId: string, data: {
+    type?: string; label: string; body: string;
+    book_ref?: string; chapter_ref?: number; verse_start?: number; verse_end?: number;
+    group_id?: string; sort_order?: number;
+  }): Promise<any> {
+    return this.request(`/live/episodes/${episodeId}/queue`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateQueueItem(itemId: string, data: { label?: string; body?: string; sort_order?: number; group_id?: string | null }): Promise<any> {
+    return this.request(`/live/queue/${itemId}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+  async deleteQueueItem(itemId: string): Promise<void> {
+    return this.request(`/live/queue/${itemId}`, { method: 'DELETE' });
+  }
+  async sendQueueItem(itemId: string, targets: string[]): Promise<{ ok: boolean; results: Record<string, string> }> {
+    return this.request(`/live/queue/${itemId}/send`, { method: 'POST', body: JSON.stringify({ targets }) });
+  }
+  async sendNow(episodeId: string, data: { text: string; label?: string; targets: string[] }): Promise<{ ok: boolean; results: Record<string, string> }> {
+    return this.request(`/live/episodes/${episodeId}/send-now`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async createQueueGroup(episodeId: string, label: string, sort_order?: number): Promise<any> {
+    return this.request(`/live/episodes/${episodeId}/queue/groups`, { method: 'POST', body: JSON.stringify({ label, sort_order }) });
+  }
+  async updateQueueGroup(groupId: string, data: { label?: string; sort_order?: number }): Promise<any> {
+    return this.request(`/live/queue/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+  async deleteQueueGroup(groupId: string): Promise<void> {
+    return this.request(`/live/queue/groups/${groupId}`, { method: 'DELETE' });
+  }
+
   async testFileFlowConnection(url: string): Promise<{ success: boolean; error?: string }> {
     return this.request('/settings/test-fileflow', {
       method: 'POST',

@@ -468,3 +468,38 @@ export interface LiveRequest {
   resolved: boolean;
   created_at: string;
 }
+
+export type LiveSendTarget = 'chat' | 'lower_third' | 'caption';
+
+export interface LiveQueueGroup {
+  id: string;
+  episode_id: string;
+  label: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface LiveQueueItem {
+  id: string;
+  episode_id: string;
+  group_id?: string | null;
+  type: 'verse' | 'passage' | 'custom';
+  label: string;
+  body: string;
+  book_ref?: string | null;
+  chapter_ref?: number | null;
+  verse_start?: number | null;
+  verse_end?: number | null;
+  sort_order: number;
+  sent_at?: string | null;
+  sent_targets?: LiveSendTarget[] | null;
+  created_at: string;
+}
+
+export interface BibleVerse {
+  book_name: string;
+  book_order: number;
+  chapter: number;
+  verse: number;
+  text: string;
+}
