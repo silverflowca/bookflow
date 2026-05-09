@@ -1,0 +1,217 @@
+import { NodeViewWrapper } from '@tiptap/react';
+import type { NodeViewProps } from '@tiptap/react';
+import type {
+  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData,
+} from '../../types/index';
+
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox';
+type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
+
+// ─── Inline widget previews (read-only) ─────────────────────────────────────
+
+function FormPreview({ contentType, contentData }: { contentType: FormType; contentData: any }) {
+  switch (contentType) {
+    case 'textbox': {
+      const d = contentData as TextboxData;
+      return (
+        <span className="inline-flex items-center gap-1 ml-1 align-middle" data-testid="inline-form-preview-textbox">
+          <input
+            type="text"
+            placeholder={d.placeholder || d.label || 'Type here…'}
+            defaultValue={d.default_value || ''}
+            maxLength={d.max_length}
+            readOnly
+            tabIndex={-1}
+            className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none"
+            style={{ minWidth: 120, maxWidth: 200 }}
+          />
+        </span>
+      );
+    }
+    case 'textarea': {
+      const d = contentData as TextareaData;
+      return (
+        <span className="inline-flex items-start gap-1 ml-1 align-middle" data-testid="inline-form-preview-textarea">
+          <textarea
+            placeholder={d.placeholder || d.label || 'Type here…'}
+            defaultValue={d.default_value || ''}
+            readOnly
+            tabIndex={-1}
+            rows={Math.min(d.rows || 2, 2)}
+            className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none resize-none"
+            style={{ minWidth: 140, maxWidth: 220 }}
+          />
+        </span>
+      );
+    }
+    case 'select': {
+      const d = contentData as SelectData;
+      return (
+        <span className="inline-flex items-center gap-1 ml-1 align-middle" data-testid="inline-form-preview-select">
+          <select disabled tabIndex={-1}
+            className="px-2 py-0.5 text-sm border border-indigo-300 rounded bg-indigo-50 pointer-events-none"
+            style={{ minWidth: 100 }}>
+            {d.placeholder && <option value="">{d.placeholder}</option>}
+            {(d.options || []).map(opt => (
+              <option key={opt.id} value={opt.id}>{opt.text}</option>
+            ))}
+          </select>
+        </span>
+      );
+    }
+    case 'multiselect': {
+      const d = contentData as MultiselectData;
+      return (
+        <span className="inline-flex items-center gap-1 ml-1 align-middle flex-wrap" data-testid="inline-form-preview-multiselect">
+          {(d.options || []).slice(0, 3).map(opt => (
+            <span key={opt.id} className="px-1.5 py-0.5 text-xs bg-violet-100 text-violet-700 border border-violet-200 rounded-full">
+              {opt.text}
+            </span>
+          ))}
+          {(d.options || []).length > 3 && (
+            <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">
+              +{(d.options || []).length - 3}
+            </span>
+          )}
+        </span>
+      );
+    }
+    case 'radio': {
+      const d = contentData as RadioData;
+      return (
+        <span className="inline-flex items-center gap-2 ml-1 align-middle" data-testid="inline-form-preview-radio">
+          {(d.options || []).slice(0, 3).map(opt => (
+            <label key={opt.id} className="inline-flex items-center gap-1 text-sm cursor-default">
+              <input type="radio" readOnly tabIndex={-1} disabled className="pointer-events-none" />
+              <span>{opt.text}</span>
+            </label>
+          ))}
+          {(d.options || []).length > 3 && (
+            <span className="text-xs text-gray-400">+{(d.options || []).length - 3} more</span>
+          )}
+        </span>
+      );
+    }
+    case 'checkbox': {
+      const d = contentData as CheckboxData;
+      return (
+        <span className="inline-flex items-center gap-2 ml-1 align-middle" data-testid="inline-form-preview-checkbox">
+          {(d.options || []).slice(0, 3).map(opt => (
+            <label key={opt.id} className="inline-flex items-center gap-1 text-sm cursor-default">
+              <input type="checkbox" readOnly tabIndex={-1} disabled className="pointer-events-none" />
+              <span>{opt.text}</span>
+            </label>
+          ))}
+          {(d.options || []).length > 3 && (
+            <span className="text-xs text-gray-400">+{(d.options || []).length - 3} more</span>
+          )}
+        </span>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const TYPE_LABEL: Record<FormType, string> = {
+  textbox: 'Text Input',
+  textarea: 'Text Area',
+  select: 'Dropdown',
+  multiselect: 'Multi-Select',
+  radio: 'Radio',
+  checkbox: 'Checkbox',
+};
+
+// Per-type colour tokens used for the inline pill
+const TYPE_COLOR: Record<FormType, string> = {
+  textbox:     'bg-blue-50   border-blue-200   text-blue-700',
+  textarea:    'bg-blue-50   border-blue-200   text-blue-700',
+  select:      'bg-indigo-50 border-indigo-200 text-indigo-700',
+  multiselect: 'bg-violet-50 border-violet-200 text-violet-700',
+  radio:       'bg-orange-50 border-orange-200 text-orange-700',
+  checkbox:    'bg-teal-50   border-teal-200   text-teal-700',
+};
+
+// Location badge styles for non-inline placements
+const POSITION_META: Record<Exclude<Position, 'inline'>, { label: string; classes: string; icon: string }> = {
+  start_of_chapter: {
+    label: 'Start of chapter',
+    classes: 'bg-blue-50 border-blue-300 text-blue-600',
+    icon: '↑',
+  },
+  end_of_chapter: {
+    label: 'End of chapter',
+    classes: 'bg-amber-50 border-amber-300 text-amber-700',
+    icon: '↓',
+  },
+};
+
+// ─── Main component ──────────────────────────────────────────────────────────
+
+export function InlineFormNodeView({ node, selected }: NodeViewProps) {
+  const { contentId, contentType, anchorText, contentData, position } = node.attrs as {
+    contentId: string;
+    contentType: FormType;
+    anchorText: string;
+    contentData: unknown | null;
+    position: Position;
+  };
+
+  const isInline = !position || position === 'inline';
+  const colorClass = TYPE_COLOR[contentType] ?? 'bg-gray-50 border-gray-200 text-gray-700';
+  const label = TYPE_LABEL[contentType] ?? contentType;
+  const ringClass = selected ? ' ring-2 ring-offset-1 ring-blue-400' : '';
+
+  // ── Non-inline: compact location marker ──────────────────────────────────
+  if (!isInline) {
+    const meta = POSITION_META[position as Exclude<Position, 'inline'>];
+    return (
+      <NodeViewWrapper
+        as="span"
+        className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${meta?.classes ?? 'bg-gray-50 border-gray-200 text-gray-600'}${ringClass}`}
+        data-content-id={contentId}
+        data-content-type={contentType}
+        data-testid="inline-form-node"
+      >
+        {/* Anchor text */}
+        <span className="font-medium underline decoration-dotted underline-offset-2" data-testid="inline-form-anchor">
+          {anchorText}
+        </span>
+        {/* Location indicator */}
+        <span className="text-xs opacity-70 font-normal" data-testid="inline-form-badge">
+          {meta?.icon} {label} · {meta?.label}
+        </span>
+      </NodeViewWrapper>
+    );
+  }
+
+  // ── Inline: full anchor + type badge + live widget preview ────────────────
+  return (
+    <NodeViewWrapper
+      as="span"
+      className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass}`}
+      data-content-id={contentId}
+      data-content-type={contentType}
+      data-testid="inline-form-node"
+    >
+      {/* Anchor text */}
+      <span className="font-medium underline decoration-dotted underline-offset-2" data-testid="inline-form-anchor">
+        {anchorText}
+      </span>
+
+      {/* Type badge */}
+      <span className="text-xs opacity-60 font-normal" data-testid="inline-form-badge">
+        [{label}]
+      </span>
+
+      {/* Live widget preview */}
+      {contentData && (
+        <FormPreview contentType={contentType} contentData={contentData} />
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+export default InlineFormNodeView;

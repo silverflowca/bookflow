@@ -56,6 +56,7 @@ export interface BookSettings {
   max_media_duration?: number;
   show_author_highlights: boolean;
   show_author_notes: boolean;
+  show_inline_form_preview?: boolean;
 }
 
 // Chapter types

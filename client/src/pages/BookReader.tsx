@@ -143,6 +143,9 @@ export default function BookReader() {
   // Filter inline content based on selected filter
   const filteredInlineContent = useMemo(() => {
     return inlineContent.filter(ic => {
+      // Exclude items positioned at start/end of chapter — rendered separately
+      if (ic.position_in_chapter === 'start_of_chapter' || ic.position_in_chapter === 'end_of_chapter') return false;
+
       // Always show all to author
       if (isAuthor) {
         if (contentFilter === 'author') return ic.is_author_content;
@@ -745,6 +748,33 @@ function ChapterContent({
 
   // If we have TipTap JSON, render it properly
   if (parsedContent && parsedContent.type === 'doc' && parsedContent.content) {
+    // Pre-assign each inline content item to exactly one text node, before any rendering.
+    // This avoids mutating a Set during render (which breaks under React StrictMode double-invoke).
+    const assignedIds = new Set<string>();
+    const assignmentMap = new Map<string, InlineContent[]>(); // nodeKey → items assigned to it
+
+    function collectTextNodes(nodes: any[], prefix: string) {
+      nodes.forEach((node: any, i: number) => {
+        const key = `${prefix}-${i}`;
+        if (node.type === 'text' && node.text) {
+          const matches = inlineContent.filter(
+            ic => ic.anchor_text && node.text.includes(ic.anchor_text) && !assignedIds.has(ic.id)
+          );
+          if (matches.length > 0) {
+            assignmentMap.set(key, matches);
+            matches.forEach(ic => assignedIds.add(ic.id));
+          }
+        }
+        if (node.content) collectTextNodes(node.content, key);
+      });
+    }
+    collectTextNodes(parsedContent.content, 'n');
+
+    const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox'];
+    const unmatched = inlineContent.filter(
+      ic => formTypes.includes(ic.content_type) && (!ic.position_in_chapter || ic.position_in_chapter === 'inline') && !ic.anchor_text && !assignedIds.has(ic.id)
+    );
+
     return (
       <div className="prose prose-lg max-w-none">
         {parsedContent.content.map((node: any, index: number) => (
@@ -753,7 +783,14 @@ function ChapterContent({
             node={node}
             inlineContent={inlineContent}
             onContentClick={onContentClick}
+            assignmentMap={assignmentMap}
+            nodeKeyPrefix={`n-${index}`}
           />
+        ))}
+        {unmatched.map(ic => (
+          <div key={ic.id} id={`reader-inline-${ic.id}`} className="my-3 p-3 border border-theme rounded-lg bg-surface-hover">
+            <InlineFormElement content={ic} />
+          </div>
         ))}
       </div>
     );
@@ -762,7 +799,7 @@ function ChapterContent({
   // Fallback to plain text rendering with inline content markers
   const text = contentText || '';
   const markers = inlineContent
-    .filter(i => i.position_in_chapter === 'inline')
+    .filter(i => !i.position_in_chapter || i.position_in_chapter === 'inline')
     .sort((a, b) => a.start_offset - b.start_offset);
 
   if (markers.length === 0) {
@@ -823,6 +860,18 @@ function ChapterContent({
   }
 
   return <div>{elements}</div>;
+}
+
+// Briefly flash a ring on an element to draw attention
+function pulseElement(el: HTMLElement) {
+  el.classList.add('ring-2', 'ring-accent', 'ring-offset-2', 'rounded');
+  setTimeout(() => el.classList.remove('ring-2', 'ring-accent', 'ring-offset-2', 'rounded'), 1500);
+}
+
+// Scroll to inline mark in text and pulse it
+function scrollToInline(id: string) {
+  const target = document.getElementById(`reader-inline-${id}`);
+  if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(target); }
 }
 
 // Helper to get CSS class for inline content type
@@ -923,6 +972,9 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
         case 'highlight':
           content = <mark className="bg-yellow-200 px-0.5">{content}</mark>;
           break;
+        case 'inlineContentMark':
+          // Handled by TipTapNode via anchor_text matching — skip to avoid double render
+          break;
       }
     });
   }
@@ -934,259 +986,171 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
 function TipTapNode({
   node,
   inlineContent,
-  onContentClick
+  onContentClick,
+  assignmentMap,
+  nodeKeyPrefix,
+  usedIds,
 }: {
   node: any;
   inlineContent: InlineContent[];
   onContentClick: (content: InlineContent) => void;
+  assignmentMap?: Map<string, InlineContent[]>;
+  nodeKeyPrefix?: string;
+  usedIds?: Set<string>;
 }) {
   if (!node) return null;
 
+  const childProps = { inlineContent, onContentClick, assignmentMap, nodeKeyPrefix };
+
+  const renderChildren = (children: any[], keyPrefix: string) =>
+    children.map((child: any, i: number) => (
+      <TipTapNode key={i} node={child} {...childProps} nodeKeyPrefix={`${keyPrefix}-${i}`} />
+    ));
+
   switch (node.type) {
     case 'paragraph':
-      if (!node.content || node.content.length === 0) {
-        return <p className="min-h-[1.5em]">&nbsp;</p>;
-      }
-      return (
-        <p className="mb-4">
-          {node.content.map((child: any, index: number) => (
-            <TipTapNode
-              key={index}
-              node={child}
-              inlineContent={inlineContent}
-              onContentClick={onContentClick}
-            />
-          ))}
-        </p>
-      );
+      if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]">&nbsp;</p>;
+      return <p className="mb-4">{renderChildren(node.content, nodeKeyPrefix || 'p')}</p>;
 
-    case 'heading':
+    case 'heading': {
       const HeadingTag = `h${node.attrs?.level || 2}` as keyof JSX.IntrinsicElements;
-      const headingClasses: Record<number, string> = {
-        1: 'text-3xl font-bold mb-4 mt-6',
-        2: 'text-2xl font-bold mb-3 mt-5',
-        3: 'text-xl font-semibold mb-2 mt-4',
-        4: 'text-lg font-semibold mb-2 mt-3',
-      };
-      return (
-        <HeadingTag className={headingClasses[node.attrs?.level] || headingClasses[2]}>
-          {node.content?.map((child: any, index: number) => (
-            <TipTapNode
-              key={index}
-              node={child}
-              inlineContent={inlineContent}
-              onContentClick={onContentClick}
-            />
-          ))}
-        </HeadingTag>
-      );
+      const hClasses: Record<number, string> = { 1: 'text-3xl font-bold mb-4 mt-6', 2: 'text-2xl font-bold mb-3 mt-5', 3: 'text-xl font-semibold mb-2 mt-4', 4: 'text-lg font-semibold mb-2 mt-3' };
+      return <HeadingTag className={hClasses[node.attrs?.level] || hClasses[2]}>{renderChildren(node.content || [], nodeKeyPrefix || 'h')}</HeadingTag>;
+    }
 
     case 'bulletList':
-      return (
-        <ul className="list-disc list-inside mb-4 space-y-1">
-          {node.content?.map((child: any, index: number) => (
-            <TipTapNode
-              key={index}
-              node={child}
-              inlineContent={inlineContent}
-              onContentClick={onContentClick}
-            />
-          ))}
-        </ul>
-      );
+      return <ul className="list-disc list-inside mb-4 space-y-1">{renderChildren(node.content || [], nodeKeyPrefix || 'ul')}</ul>;
 
     case 'orderedList':
-      return (
-        <ol className="list-decimal list-inside mb-4 space-y-1">
-          {node.content?.map((child: any, index: number) => (
-            <TipTapNode
-              key={index}
-              node={child}
-              inlineContent={inlineContent}
-              onContentClick={onContentClick}
-            />
-          ))}
-        </ol>
-      );
+      return <ol className="list-decimal list-inside mb-4 space-y-1">{renderChildren(node.content || [], nodeKeyPrefix || 'ol')}</ol>;
 
     case 'listItem':
-      return (
-        <li>
-          {node.content?.map((child: any, index: number) => (
-            <TipTapNode
-              key={index}
-              node={child}
-              inlineContent={inlineContent}
-              onContentClick={onContentClick}
-            />
-          ))}
-        </li>
-      );
+      return <li>{renderChildren(node.content || [], nodeKeyPrefix || 'li')}</li>;
 
     case 'blockquote':
-      return (
-        <blockquote className="border-l-4 border-strong pl-4 italic text-muted mb-4">
-          {node.content?.map((child: any, index: number) => (
-            <TipTapNode
-              key={index}
-              node={child}
-              inlineContent={inlineContent}
-              onContentClick={onContentClick}
-            />
-          ))}
-        </blockquote>
-      );
+      return <blockquote className="border-l-4 border-strong pl-4 italic text-muted mb-4">{renderChildren(node.content || [], nodeKeyPrefix || 'bq')}</blockquote>;
 
     case 'codeBlock':
       return (
         <pre className="bg-surface-hover rounded-lg p-4 mb-4 overflow-x-auto">
-          <code className="text-sm font-mono">
-            {node.content?.map((child: any, index: number) => (
-              <TipTapNode
-                key={index}
-                node={child}
-                inlineContent={inlineContent}
-                onContentClick={onContentClick}
-              />
-            ))}
-          </code>
+          <code className="text-sm font-mono">{renderChildren(node.content || [], nodeKeyPrefix || 'cb')}</code>
         </pre>
       );
 
     case 'horizontalRule':
       return <hr className="my-6 border-theme" />;
 
-    case 'text':
+    case 'text': {
       const nodeText = node.text || '';
+      const FORM_TYPES_SET = new Set(['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block']);
+      const MEDIA_TYPES_SET = new Set(['audio', 'video']);
 
-      // Find inline content that matches this text (by anchor_text)
-      const matchingContent = inlineContent.filter(
-        ic => ic.anchor_text && nodeText.includes(ic.anchor_text)
-      );
+      // Look up pre-assigned matches for this exact node key (computed before render, no mutation)
+      const matchingContent = (nodeKeyPrefix && assignmentMap?.get(nodeKeyPrefix)) || [];
 
-      // If there are matching inline contents, render with highlights
-      if (matchingContent.length > 0) {
-        // Sort by position in text and length (longer matches first to avoid partial overlaps)
-        const sortedMatches = matchingContent
-          .map(ic => ({
-            content: ic,
-            index: nodeText.indexOf(ic.anchor_text!),
-            length: ic.anchor_text!.length
-          }))
-          .filter(m => m.index !== -1)
-          .sort((a, b) => a.index - b.index || b.length - a.length);
-
-        // Build segments with highlights
-        const segments: React.ReactNode[] = [];
-        let lastIndex = 0;
-        const usedRanges: { start: number; end: number }[] = [];
-
-        sortedMatches.forEach((match, idx) => {
-          const start = match.index;
-          const end = start + match.length;
-
-          // Skip if this range overlaps with already used range
-          if (usedRanges.some(r => start < r.end && end > r.start)) {
-            return;
-          }
-          usedRanges.push({ start, end });
-
-          // Add text before this match
-          if (start > lastIndex) {
-            segments.push(
-              <TextWithMarks key={`pre-${idx}`} text={nodeText.slice(lastIndex, start)} marks={node.marks} />
-            );
-          }
-
-          // Check if this is an interactive form type
-          const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block'];
-          const isFormType = formTypes.includes(match.content.content_type);
-          const displayMode = match.content.display_mode || 'inline';
-
-          // If display mode is inline and it's a form type, render the form element directly
-          if (isFormType && displayMode === 'inline') {
-            // Render the interactive form element inline
-            segments.push(
-              <InlineFormElement key={`form-${match.content.id}`} content={match.content} />
-            );
-          } else if (isFormType && (displayMode === 'start_of_chapter' || displayMode === 'end_of_chapter')) {
-            // For start/end of chapter display, just show highlighted text with indicator
-            const markerClass = getInlineContentClass(match.content.content_type);
-            const icon = getInlineContentIcon(match.content.content_type);
-            segments.push(
-              <span
-                key={`match-${match.content.id}`}
-                className={`${markerClass} relative group cursor-default`}
-                title={`Form displayed at ${displayMode === 'start_of_chapter' ? 'start' : 'end'} of chapter`}
-              >
-                <TextWithMarks text={nodeText.slice(start, end)} marks={node.marks} />
-                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
-                  {icon}
-                </span>
-              </span>
-            );
-          } else {
-            // Sidebar mode or non-form types: show highlighted text that opens panel on click
-            const markerClass = getInlineContentClass(match.content.content_type);
-            const icon = getInlineContentIcon(match.content.content_type);
-            const isAuthorContent = match.content.is_author_content;
-
-            segments.push(
-              <span
-                key={`match-${match.content.id}`}
-                className={`${markerClass} relative group`}
-                onClick={() => onContentClick(match.content)}
-                title={`Click to view ${match.content.content_type} (${isAuthorContent ? 'Author' : 'Reader'})`}
-              >
-                <TextWithMarks text={nodeText.slice(start, end)} marks={node.marks} />
-                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
-                  {icon}
-                  {/* Author/Reader indicator */}
-                  {isAuthorContent ? (
-                    <Crown className="h-2.5 w-2.5 text-amber-500" />
-                  ) : (
-                    <User className="h-2.5 w-2.5 text-blue-500" />
-                  )}
-                </span>
-              </span>
-            );
-          }
-
-          lastIndex = end;
-        });
-
-        // Add remaining text after all matches
-        if (lastIndex < nodeText.length) {
-          segments.push(
-            <TextWithMarks key="post" text={nodeText.slice(lastIndex)} marks={node.marks} />
-          );
-        }
-
-        return <>{segments}</>;
+      if (matchingContent.length === 0) {
+        return <TextWithMarks text={nodeText} marks={node.marks} />;
       }
 
-      // No matching inline content - render text with marks normally
-      return <TextWithMarks text={nodeText} marks={node.marks} />;
+      const sortedMatches = matchingContent
+        .map(ic => ({ content: ic, index: nodeText.indexOf(ic.anchor_text!), length: ic.anchor_text!.length }))
+        .filter(m => m.index !== -1)
+        .sort((a, b) => a.index - b.index || b.length - a.length);
+
+      const segments: React.ReactNode[] = [];
+      let lastIndex = 0;
+      const usedRanges: { start: number; end: number }[] = [];
+
+      sortedMatches.forEach((match, idx) => {
+        const start = match.index;
+        const end = start + match.length;
+        if (usedRanges.some(r => start < r.end && end > r.start)) return;
+        usedRanges.push({ start, end });
+
+        if (start > lastIndex) {
+          segments.push(<TextWithMarks key={`pre-${idx}`} text={nodeText.slice(lastIndex, start)} marks={node.marks} />);
+        }
+
+        const ic = match.content;
+        const isFormType = FORM_TYPES_SET.has(ic.content_type);
+        const isMediaType = MEDIA_TYPES_SET.has(ic.content_type);
+        const rawPos = ic.position_in_chapter;
+        const position = (!rawPos || rawPos === 'sidebar') ? 'inline' : rawPos;
+        const segText = nodeText.slice(start, end);
+        const markerClass = getInlineContentClass(ic.content_type);
+        const icon = getInlineContentIcon(ic.content_type);
+
+        if (isFormType && position === 'inline') {
+          segments.push(
+            <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
+              {segText && <mark className={`${markerClass} px-0.5 rounded`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+              <InlineFormElement content={ic} />
+            </span>
+          );
+        } else if (isMediaType && position === 'inline') {
+          // Render the media player inline in the text flow
+          segments.push(
+            <span key={`media-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex flex-col gap-1 my-1 w-full">
+              {segText && <mark className={`${markerClass} px-0.5 rounded text-sm`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+              <InlineMediaPlayer content={ic} />
+            </span>
+          );
+        } else if ((isFormType || isMediaType) && (position === 'start_of_chapter' || position === 'end_of_chapter')) {
+          // Anchor text becomes a jump-link to the block at start/end
+          const dest = position === 'start_of_chapter' ? 'start' : 'end';
+          segments.push(
+            <span key={`pos-${ic.id}`} id={`reader-inline-${ic.id}`} className={`${markerClass} cursor-pointer group`}
+              title={`Click to go to ${ic.content_type} at ${dest} of chapter`}
+              onClick={() => { const t = document.getElementById(`reader-block-${ic.id}`); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(t); } }}>
+              <TextWithMarks text={segText} marks={node.marks} />
+              <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100">{icon}</span>
+            </span>
+          );
+        } else {
+          segments.push(
+            <span key={`click-${ic.id}`} id={`reader-inline-${ic.id}`} className={`${markerClass} cursor-pointer group`}
+              onClick={() => onContentClick(ic)} title={`Click to view ${ic.content_type}`}>
+              <TextWithMarks text={segText} marks={node.marks} />
+              <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
+                {icon}
+                {ic.is_author_content ? <Crown className="h-2.5 w-2.5 text-amber-500" /> : <User className="h-2.5 w-2.5 text-blue-500" />}
+              </span>
+            </span>
+          );
+        }
+        lastIndex = end;
+      });
+
+      if (lastIndex < nodeText.length) {
+        segments.push(<TextWithMarks key="post" text={nodeText.slice(lastIndex)} marks={node.marks} />);
+      }
+      return <>{segments}</>;
+    }
+
+    case 'inlineFormWidget': {
+      // Atom node inserted by InlineFormNode TipTap extension.
+      // attrs: { contentId, contentType, anchorText }
+      const contentId = node.attrs?.contentId;
+      const anchorText: string = node.attrs?.anchorText || '';
+      const ic = inlineContent.find(i => i.id === contentId);
+      if (!ic) {
+        // Fallback: render anchor text as plain text if DB item not found
+        return <span>{anchorText}</span>;
+      }
+      const markerClass = getInlineContentClass(ic.content_type);
+      return (
+        <span id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
+          {anchorText && <mark className={`${markerClass} px-0.5 rounded`}>{anchorText}</mark>}
+          <InlineFormElement content={ic} />
+        </span>
+      );
+    }
 
     case 'hardBreak':
       return <br />;
 
     default:
-      // For unknown node types, try to render content if available
-      if (node.content) {
-        return (
-          <>
-            {node.content.map((child: any, index: number) => (
-              <TipTapNode
-                key={index}
-                node={child}
-                inlineContent={inlineContent}
-                onContentClick={onContentClick}
-              />
-            ))}
-          </>
-        );
-      }
+      if (node.content) return <>{renderChildren(node.content, nodeKeyPrefix || 'x')}</>;
       return null;
   }
 }
@@ -1199,7 +1163,17 @@ function StartOfChapterContent({ items, isAuthor, userId }: { items: InlineConte
     <div className="mb-8 pb-6 border-b space-y-4">
       <h3 className="text-lg font-semibold text-theme">Before You Begin</h3>
       {startItems.map((item) => (
-        <InlineContentBlock key={item.id} content={item} isAuthor={isAuthor} userId={userId} />
+        <div key={item.id} id={`reader-block-${item.id}`} className="scroll-mt-6">
+          {item.anchor_text && (
+            <button
+              className="text-xs text-muted underline underline-offset-2 mb-1 hover:text-accent transition-colors"
+              onClick={() => scrollToInline(item.id)}
+            >
+              ↓ Jump to "{item.anchor_text}" in text
+            </button>
+          )}
+          <InlineContentBlock content={item} isAuthor={isAuthor} userId={userId} />
+        </div>
       ))}
     </div>
   );
@@ -1213,7 +1187,17 @@ function EndOfChapterContent({ items, isAuthor, userId }: { items: InlineContent
     <div className="mt-12 pt-8 border-t space-y-6">
       <h2 className="text-xl font-bold">Chapter Review</h2>
       {endItems.map((item) => (
-        <InlineContentBlock key={item.id} content={item} isAuthor={isAuthor} userId={userId} />
+        <div key={item.id} id={`reader-block-${item.id}`} className="scroll-mt-6">
+          {item.anchor_text && (
+            <button
+              className="text-xs text-muted underline underline-offset-2 mb-1 hover:text-accent transition-colors"
+              onClick={() => scrollToInline(item.id)}
+            >
+              ↑ Jump to "{item.anchor_text}" in text
+            </button>
+          )}
+          <InlineContentBlock content={item} isAuthor={isAuthor} userId={userId} />
+        </div>
       ))}
     </div>
   );
@@ -1556,21 +1540,11 @@ function PollBlock({ content }: { content: InlineContent }) {
 
 // Small save status indicator shown in the top-right of form blocks
 function SaveStatusDot({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
-  if (status === 'idle') return null;
-  if (status === 'saving') return (
-    <span className="flex items-center gap-1 text-xs text-muted">
-      <Loader2 className="h-3 w-3 animate-spin" />
-    </span>
-  );
-  if (status === 'saved') return (
-    <span className="flex items-center gap-1 text-xs text-green-600">
-      <Check className="h-3 w-3" />
-      <span>Saved</span>
-    </span>
-  );
   return (
-    <span title="Failed to save" className="flex items-center gap-1 text-xs text-red-500">
-      <AlertCircle className="h-3 w-3" />
+    <span className="flex items-center gap-1 text-xs h-4 min-w-[3rem] transition-opacity duration-300" style={{ opacity: status === 'idle' ? 0 : 1 }}>
+      {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
+      {status === 'saved' && <><Check className="h-3 w-3 text-green-600" /><span className="text-green-600">Saved</span></>}
+      {status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" title="Failed to save" />}
     </span>
   );
 }
@@ -2074,6 +2048,41 @@ function ScriptureBlockDisplay({ content }: { content: InlineContent }) {
   );
 }
 
+// Compact inline media player — rendered directly in the text flow
+function InlineMediaPlayer({ content }: { content: InlineContent }) {
+  const data = content.content_data as MediaData;
+  const isAudio = data.type === 'audio';
+
+  const getEmbedUrl = (url: string): string | null => {
+    const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+    const vm = url.match(/vimeo\.com\/(\d+)/);
+    if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
+    return null;
+  };
+
+  const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
+
+  return (
+    <span className={`inline-flex flex-col gap-1 w-full rounded-lg border p-3 my-1 ${isAudio ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'}`}>
+      {data.title && (
+        <span className={`text-xs font-medium ${isAudio ? 'text-orange-800' : 'text-red-800'}`}>{data.title}</span>
+      )}
+      {isAudio ? (
+        <audio src={data.url} controls className="w-full" preload="metadata" />
+      ) : embedUrl ? (
+        <span className="block w-full aspect-video rounded overflow-hidden bg-black">
+          <iframe src={embedUrl} className="w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen />
+        </span>
+      ) : (
+        <video src={data.url} controls className="w-full rounded" preload="metadata" />
+      )}
+    </span>
+  );
+}
+
 // Inline form element - renders interactive forms directly in the text
 function InlineFormElement({ content }: { content: InlineContent }) {
   const type = content.content_type;
@@ -2456,7 +2465,17 @@ function RightSideToolbar({
             {filteredItems.map((item, index) => (
               <button
                 key={item.id}
-                onClick={() => onContentSelect(item)}
+                onClick={() => {
+                  onContentSelect(item);
+                  // Scroll to inline mark in text, or to the block if start/end of chapter
+                  const pos = item.position_in_chapter;
+                  if (pos === 'start_of_chapter' || pos === 'end_of_chapter') {
+                    const block = document.getElementById(`reader-block-${item.id}`);
+                    if (block) { block.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(block); }
+                  } else {
+                    scrollToInline(item.id);
+                  }
+                }}
                 className="w-full text-left p-3 hover:bg-surface-hover border-b border-theme last:border-b-0 transition-colors"
               >
                 <div className="flex items-center gap-2">

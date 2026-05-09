@@ -12,11 +12,12 @@ import TipTapLink from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import InlineContentMark from '../components/editor/InlineContentMark';
+import { InlineFormNode } from '../components/editor/InlineFormNode';
 import api from '../lib/api';
 import type {
   Chapter, InlineContent, MediaData, QuestionData, PollData, NoteData, LinkData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, CollaboratorRole
+  CodeBlockData, ScriptureBlockData, CollaboratorRole, BookSettings
 } from '../types';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import CommentsSidebar from '../components/comments/CommentsSidebar';
@@ -41,6 +42,8 @@ export default function ChapterEditor() {
   const [showComments, setShowComments] = useState(() => searchParams.get('comments') === '1');
   const [commentSelection, setCommentSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
+  const [bookSettings, setBookSettings] = useState<BookSettings | null>(null);
+  const [markTooltip, setMarkTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -57,6 +60,7 @@ export default function ChapterEditor() {
         placeholder: 'Start writing your chapter...',
       }),
       InlineContentMark,
+      InlineFormNode,
     ],
     content: '',
     editorProps: {
@@ -106,6 +110,10 @@ export default function ChapterEditor() {
         handleSave(editor.getJSON(), editor.getText());
       }, 2000);
     },
+    onPaste: () => {
+      // Re-apply marks after paste since positions shift
+      setTimeout(() => applyInlineContentMarks(inlineContents), 50);
+    },
     onSelectionUpdate: ({ editor }) => {
       const { from, to } = editor.state.selection;
       if (from !== to) {
@@ -128,6 +136,7 @@ export default function ChapterEditor() {
     }
     if (bookId) {
       api.getMyRole(bookId).then(r => setUserRole(r.role)).catch(() => {});
+      api.getBook(bookId).then(b => setBookSettings(b.settings ?? null)).catch(() => {});
     }
     return () => {
       if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
@@ -215,22 +224,38 @@ export default function ChapterEditor() {
   function applyInlineContentMarks(contents: InlineContent[]) {
     if (!editor) return;
 
-    contents.forEach((item) => {
-      if (item.start_offset !== undefined && item.end_offset !== undefined && item.start_offset !== item.end_offset) {
-        try {
-          editor
-            .chain()
-            .setTextSelection({ from: item.start_offset, to: item.end_offset })
-            .setInlineContentMark({ contentType: item.content_type, contentId: item.id })
-            .run();
-        } catch (err) {
-          // Position might be out of range if content changed
-          console.debug('Could not apply mark for item:', item.id, err);
-        }
+    const doc = editor.state.doc;
+    const tr = editor.state.tr;
+    const markType = editor.schema.marks.inlineContentMark;
+    if (!markType) return;
+
+    // First remove all existing inlineContentMark marks
+    doc.descendants((node, pos) => {
+      if (node.isText) {
+        const mark = node.marks.find(m => m.type === markType);
+        if (mark) tr.removeMark(pos, pos + node.nodeSize, markType);
       }
     });
 
-    // Reset selection to start
+    // Re-apply each item by searching for anchor_text in the document
+    contents.forEach((item) => {
+      const anchor = item.anchor_text;
+      if (!anchor) return;
+
+      let found = false;
+      doc.descendants((node, pos) => {
+        if (found || !node.isText) return;
+        const idx = node.text!.indexOf(anchor);
+        if (idx === -1) return;
+        const from = pos + idx;
+        const to = from + anchor.length;
+        const mark = markType.create({ contentType: item.content_type, contentId: item.id });
+        tr.addMark(from, to, mark);
+        found = true;
+      });
+    });
+
+    editor.view.dispatch(tr);
     editor.commands.setTextSelection(0);
   }
 
@@ -255,12 +280,74 @@ export default function ChapterEditor() {
     }
   }, [chapterId, title, editor, saving]);
 
+  // Attach hover tooltip + click-to-scroll to inline content marks in the TipTap editor
+  useEffect(() => {
+    if (!editor) return;
+    const editorEl = editor.view.dom;
+
+    function getLabel(contentId: string) {
+      const item = inlineContents.find(i => i.id === contentId);
+      if (!item) return null;
+      const data = item.content_data as any;
+      const typeLabel = item.content_type.replace(/_/g, ' ');
+      const label = data?.label || data?.question || data?.placeholder || '';
+      return label ? `${typeLabel}: ${label}` : typeLabel;
+    }
+
+    function onMouseOver(e: MouseEvent) {
+      const span = (e.target as Element).closest('[data-inline-content]') as HTMLElement | null;
+      if (!span) return;
+      const contentId = span.getAttribute('data-content-id');
+      if (!contentId) return;
+      const label = getLabel(contentId);
+      if (!label) return;
+      const rect = span.getBoundingClientRect();
+      setMarkTooltip({ label, x: rect.left + rect.width / 2, y: rect.top - 8 });
+    }
+
+    function onMouseOut(e: MouseEvent) {
+      const related = e.relatedTarget as Element | null;
+      if (related?.closest('[data-inline-content]')) return;
+      setMarkTooltip(null);
+    }
+
+    function onClick(e: MouseEvent) {
+      const span = (e.target as Element).closest('[data-inline-content]') as HTMLElement | null;
+      if (!span) return;
+      const contentId = span.getAttribute('data-content-id');
+      if (!contentId) return;
+      // Always scroll to the preview item wherever it lives (top strip, inline strip, or bottom strip)
+      const target = document.getElementById(`preview-${contentId}`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('ring-2', 'ring-accent', 'ring-offset-1', 'rounded');
+        setTimeout(() => target.classList.remove('ring-2', 'ring-accent', 'ring-offset-1', 'rounded'), 1500);
+      }
+    }
+
+    editorEl.addEventListener('mouseover', onMouseOver);
+    editorEl.addEventListener('mouseout', onMouseOut);
+    editorEl.addEventListener('click', onClick);
+    return () => {
+      editorEl.removeEventListener('mouseover', onMouseOver);
+      editorEl.removeEventListener('mouseout', onMouseOut);
+      editorEl.removeEventListener('click', onClick);
+    };
+  }, [editor, inlineContents]);
+
   function handleAddInlineContent(type: InlineContent['content_type']) {
     if (!editor) return;
     const { from, to } = editor.state.selection;
-    const text = editor.state.doc.textBetween(from, to, ' ');
+    const text = editor.state.doc.textBetween(from, to, ' ').trim();
+    const FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox'];
+    if (FORM_TYPES.includes(type) && !text) {
+      alert('Please select some text in the editor first — the selected text will be the anchor for your form item.');
+      return;
+    }
     setShowInlineModal({ type, selection: { from, to, text } });
   }
+
+  const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
@@ -273,14 +360,33 @@ export default function ChapterEditor() {
         anchor_text: showInlineModal.selection?.text,
       });
 
-      // Apply visual mark to the selected text in the editor
       if (editor && showInlineModal.selection && showInlineModal.selection.from !== showInlineModal.selection.to) {
-        editor
-          .chain()
-          .focus()
-          .setTextSelection({ from: showInlineModal.selection.from, to: showInlineModal.selection.to })
-          .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
-          .run();
+        const isFormType = INLINE_FORM_TYPES.includes(showInlineModal.type);
+        const isInline = !created.position_in_chapter || created.position_in_chapter === 'inline';
+
+        if (isFormType && isInline) {
+          // Replace the selected anchor text with an InlineFormNode atom
+          editor
+            .chain()
+            .focus()
+            .setTextSelection({ from: showInlineModal.selection.from, to: showInlineModal.selection.to })
+            .insertInlineFormNode({
+              contentId: created.id,
+              contentType: showInlineModal.type,
+              anchorText: showInlineModal.selection.text,
+              contentData: created.content_data ?? null,
+              position: (created.position_in_chapter as any) ?? 'inline',
+            })
+            .run();
+        } else {
+          // Non-form types (question, poll, note, highlight): apply a Mark
+          editor
+            .chain()
+            .focus()
+            .setTextSelection({ from: showInlineModal.selection.from, to: showInlineModal.selection.to })
+            .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
+            .run();
+        }
       }
 
       setInlineContents(prev => [...prev, created]);
@@ -304,23 +410,42 @@ export default function ChapterEditor() {
 
   async function handleDeleteInlineContent(id: string) {
     try {
-      // Find the item to get its position before deleting
       const item = inlineContents.find(i => i.id === id);
 
       await api.deleteInlineContent(id);
-      setInlineContents(inlineContents.filter(item => item.id !== id));
+      setInlineContents(inlineContents.filter(i => i.id !== id));
 
-      // Remove the visual mark from the editor
-      if (editor && item && item.start_offset !== undefined && item.end_offset !== undefined) {
-        try {
-          editor
-            .chain()
-            .setTextSelection({ from: item.start_offset, to: item.end_offset })
-            .unsetInlineContentMark()
-            .run();
-          editor.commands.setTextSelection(0);
-        } catch {
-          // Ignore if position is invalid
+      if (editor && item) {
+        const isFormType = INLINE_FORM_TYPES.includes(item.content_type);
+        const isInline = !item.position_in_chapter || item.position_in_chapter === 'inline';
+
+        if (isFormType && isInline) {
+          // Find and delete the InlineFormNode atom in the document
+          const { state } = editor;
+          const { tr } = state;
+          let found = false;
+          state.doc.descendants((node, pos) => {
+            if (found) return;
+            if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
+              tr.replaceWith(pos, pos + node.nodeSize, state.schema.text(item.anchor_text || ''));
+              found = true;
+            }
+          });
+          if (found) editor.view.dispatch(tr);
+        } else {
+          // Remove the Mark from anchor text range
+          try {
+            if (item.start_offset !== undefined && item.end_offset !== undefined) {
+              editor
+                .chain()
+                .setTextSelection({ from: item.start_offset, to: item.end_offset })
+                .unsetInlineContentMark()
+                .run();
+              editor.commands.setTextSelection(0);
+            }
+          } catch {
+            // Ignore invalid positions
+          }
         }
       }
     } catch (err) {
@@ -334,6 +459,21 @@ export default function ChapterEditor() {
       setInlineContents(inlineContents.map(item =>
         item.id === id ? { ...item, position_in_chapter: position } : item
       ));
+
+      // Update the node attr in the editor so the pill reflects the new position immediately
+      if (editor) {
+        const { state } = editor;
+        const { tr } = state;
+        let found = false;
+        state.doc.descendants((node, pos) => {
+          if (found) return;
+          if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, position });
+            found = true;
+          }
+        });
+        if (found) editor.view.dispatch(tr);
+      }
     } catch (err) {
       console.error('Failed to update position:', err);
     }
@@ -449,11 +589,9 @@ export default function ChapterEditor() {
               />
             </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-              {lastSaved && (
-                <span className="text-xs text-muted hidden sm:inline">
-                  Saved {lastSaved.toLocaleTimeString()}
-                </span>
-              )}
+              <span className={`text-xs text-muted hidden sm:inline transition-opacity duration-500 ${lastSaved && !saving ? 'opacity-100' : 'opacity-0'}`}>
+                Saved
+              </span>
               <button
                 onClick={() => handleSave()}
                 disabled={saving}
@@ -518,6 +656,28 @@ export default function ChapterEditor() {
       <div className="flex max-w-[1600px] mx-auto px-4 py-6 gap-6 min-w-0">
         {/* Editor */}
         <div className="flex-1 min-w-0">
+          {/* Start of Chapter Preview */}
+          {(bookSettings?.show_inline_form_preview ?? true) && (() => {
+            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block'];
+            const startItems = inlineContents.filter(
+              item => POSITIONED_TYPES.includes(item.content_type) && item.position_in_chapter === 'start_of_chapter'
+            );
+            if (startItems.length === 0) return null;
+            return (
+              <div className="mb-3 bg-surface border border-theme rounded-lg overflow-hidden">
+                <div className="px-4 py-2 border-b border-theme bg-blue-50 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Start of Chapter</span>
+                  <span className="text-xs text-blue-500">({startItems.length} item{startItems.length !== 1 ? 's' : ''})</span>
+                </div>
+                <div className="p-4 flex flex-col gap-4">
+                  {startItems.map(item => (
+                    <InlineFormPreviewItem key={item.id} item={item} />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Toolbar */}
           <div className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap sticky top-12 z-20 shadow-sm">
             <ToolbarButton
@@ -686,6 +846,28 @@ export default function ChapterEditor() {
               className="prose max-w-none p-6 min-h-[500px] focus:outline-none"
             />
           </div>
+
+          {/* End of Chapter Preview */}
+          {(bookSettings?.show_inline_form_preview ?? true) && (() => {
+            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block'];
+            const endItems = inlineContents.filter(
+              item => POSITIONED_TYPES.includes(item.content_type) && item.position_in_chapter === 'end_of_chapter'
+            );
+            if (endItems.length === 0) return null;
+            return (
+              <div className="mt-3 bg-surface border border-theme rounded-lg overflow-hidden">
+                <div className="px-4 py-2 border-b border-theme bg-amber-50 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">End of Chapter</span>
+                  <span className="text-xs text-amber-500">({endItems.length} item{endItems.length !== 1 ? 's' : ''})</span>
+                </div>
+                <div className="p-4 flex flex-col gap-4">
+                  {endItems.map(item => (
+                    <InlineFormPreviewItem key={item.id} item={item} />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Right Panel — tabbed: Comments / Inline Content */}
@@ -787,6 +969,16 @@ export default function ChapterEditor() {
         </div>
       )}
 
+      {/* Mark tooltip */}
+      {markTooltip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1 rounded bg-gray-900 text-white text-xs shadow-lg -translate-x-1/2 -translate-y-full"
+          style={{ left: markTooltip.x, top: markTooltip.y }}
+        >
+          {markTooltip.label}
+        </div>
+      )}
+
       {/* Inline Content Modal */}
       {showInlineModal && (
         <InlineContentModal
@@ -876,11 +1068,15 @@ function InlineContentItem({
       {/* Header Row */}
       <div
         className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-surface-hover ${bgColors[item.content_type]}`}
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          setExpanded(!expanded);
+          const target = document.getElementById(`preview-${item.id}`);
+          if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); target.classList.add('ring-2', 'ring-accent', 'ring-offset-1', 'rounded'); setTimeout(() => target.classList.remove('ring-2', 'ring-accent', 'ring-offset-1', 'rounded'), 1500); }
+        }}
       >
         <GripVertical className="h-4 w-4 text-muted cursor-grab" />
         {icons[item.content_type]}
-        <span className="text-sm font-medium capitalize flex-1">{item.content_type}</span>
+        <span className="text-sm font-medium capitalize flex-1">{item.anchor_text || item.content_type}</span>
         {isHidden && <EyeOff className="h-3 w-3 text-muted" />}
         {expanded ? (
           <ChevronUp className="h-4 w-4 text-muted" />
@@ -930,8 +1126,8 @@ function InlineContentItem({
                 }}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-hover text-muted hover:bg-surface-hover rounded"
               >
-                {item.position_in_chapter === 'inline' ? 'Inline' :
-                 item.position_in_chapter === 'end_of_chapter' ? 'End' : 'Start'}
+                {item.position_in_chapter === 'end_of_chapter' ? 'End' :
+                 item.position_in_chapter === 'start_of_chapter' ? 'Start' : 'Inline'}
                 <ChevronDown className="h-3 w-3" />
               </button>
               {showPositionMenu && (
@@ -945,7 +1141,7 @@ function InlineContentItem({
                         setShowPositionMenu(false);
                       }}
                       className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-hover ${
-                        item.position_in_chapter === pos ? 'bg-primary-50 text-accent' : ''
+                        (pos === 'inline' ? (!item.position_in_chapter || item.position_in_chapter === 'inline') : item.position_in_chapter === pos) ? 'bg-primary-50 text-accent' : ''
                       }`}
                     >
                       {pos === 'inline' ? 'Inline' :
@@ -1202,4 +1398,152 @@ function ContentPreview({ item }: { item: InlineContent }) {
     default:
       return <p className="text-sm text-muted">Preview not available</p>;
   }
+}
+
+// Inline form preview strip item — shows anchor text highlighted beside the actual input control
+function InlineFormPreviewItem({ item }: { item: InlineContent }) {
+  const data = item.content_data as any;
+  const anchorText = item.anchor_text || item.content_type;
+
+  const anchorClass: Record<string, string> = {
+    textbox:     'inline-form inline-textbox',
+    textarea:    'inline-form inline-textarea',
+    select:      'inline-form inline-select',
+    multiselect: 'inline-form inline-multiselect',
+    radio:       'inline-form inline-radio',
+    checkbox:    'inline-form inline-checkbox',
+  };
+  const cls = anchorClass[item.content_type] || 'inline-form';
+
+  function renderInput() {
+    switch (item.content_type) {
+      case 'textbox':
+        return (
+          <input
+            type="text"
+            placeholder={data?.placeholder || ''}
+            className="border border-theme rounded px-2 py-1 text-sm bg-surface text-theme focus:outline-none focus:ring-1 focus:ring-accent"
+            readOnly
+          />
+        );
+      case 'textarea':
+        return (
+          <textarea
+            placeholder={data?.placeholder || ''}
+            rows={2}
+            className="border border-theme rounded px-2 py-1 text-sm bg-surface text-theme focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+            readOnly
+          />
+        );
+      case 'select':
+        return (
+          <select className="border border-theme rounded px-2 py-1 text-sm bg-surface text-theme focus:outline-none focus:ring-1 focus:ring-accent" disabled>
+            <option value="">{data?.placeholder || 'Select...'}</option>
+            {(data?.options || []).map((opt: any, i: number) => (
+              <option key={i} value={opt.id ?? i}>{opt.text ?? opt.label ?? String(opt)}</option>
+            ))}
+          </select>
+        );
+      case 'multiselect':
+        return (
+          <select multiple className="border border-theme rounded px-2 py-1 text-sm bg-surface text-theme focus:outline-none focus:ring-1 focus:ring-accent" disabled>
+            {(data?.options || []).map((opt: any, i: number) => (
+              <option key={i} value={opt.id ?? i}>{opt.text ?? opt.label ?? String(opt)}</option>
+            ))}
+          </select>
+        );
+      case 'radio':
+        return (
+          <div className="flex flex-col gap-1">
+            {(data?.options || []).map((opt: any, i: number) => (
+              <label key={i} className="flex items-center gap-1.5 text-sm text-theme cursor-default">
+                <input type="radio" disabled className="accent-accent" />
+                {opt.text ?? opt.label ?? String(opt)}
+              </label>
+            ))}
+          </div>
+        );
+      case 'checkbox':
+        return (
+          <div className="flex flex-col gap-1">
+            {(data?.options || []).map((opt: any, i: number) => (
+              <label key={i} className="flex items-center gap-1.5 text-sm text-theme cursor-default">
+                <input type="checkbox" disabled className="accent-accent" />
+                {opt.text ?? opt.label ?? String(opt)}
+              </label>
+            ))}
+          </div>
+        );
+      case 'audio': {
+        const m = data as any;
+        return (
+          <div className="flex flex-col gap-1 w-full">
+            {m?.title && <p className="text-xs font-medium text-orange-700">{m.title}</p>}
+            {m?.url
+              ? <audio src={m.url} controls className="w-full h-8" preload="metadata" />
+              : <p className="text-xs text-muted italic">No audio URL set</p>}
+          </div>
+        );
+      }
+      case 'video': {
+        const m = data as any;
+        return (
+          <div className="flex flex-col gap-1 w-full">
+            {m?.title && <p className="text-xs font-medium text-red-700">{m.title}</p>}
+            {m?.url
+              ? <video src={m.url} controls className="w-full rounded" preload="metadata" style={{ maxHeight: 140 }} />
+              : <p className="text-xs text-muted italic">No video URL set</p>}
+          </div>
+        );
+      }
+      case 'code_block': {
+        const cb = data as any;
+        return (
+          <div className="w-full rounded bg-gray-900 text-gray-100 p-2 text-xs font-mono overflow-x-auto max-h-24">
+            {cb?.title && <p className="text-gray-400 mb-1">{cb.title} ({cb.language})</p>}
+            <pre className="whitespace-pre-wrap">{(cb?.code || '').slice(0, 200)}{(cb?.code || '').length > 200 ? '…' : ''}</pre>
+          </div>
+        );
+      }
+      case 'scripture_block': {
+        const sb = data as any;
+        return (
+          <div className="w-full rounded bg-amber-50 border border-amber-200 p-2 text-xs">
+            <p className="font-semibold text-amber-800">{sb?.reference} {sb?.version && `(${sb.version})`}</p>
+            <p className="italic text-amber-900 mt-0.5 line-clamp-2">"{sb?.text}"</p>
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
+  }
+
+  // Audio/video/code/scripture: render full-width without the anchor mark structure
+  const FULL_WIDTH_TYPES = ['audio', 'video', 'code_block', 'scripture_block'];
+  if (FULL_WIDTH_TYPES.includes(item.content_type)) {
+    const typeColors: Record<string, string> = {
+      audio: 'text-orange-600', video: 'text-red-600',
+      code_block: 'text-slate-600', scripture_block: 'text-amber-700',
+    };
+    return (
+      <div id={`preview-${item.id}`} className="w-full scroll-mt-6">
+        {anchorText !== item.content_type && (
+          <p className={`text-xs font-medium mb-1 ${typeColors[item.content_type] ?? 'text-muted'}`}>
+            Anchored to: <span className="italic">"{anchorText}"</span>
+          </p>
+        )}
+        {renderInput()}
+      </div>
+    );
+  }
+
+  return (
+    <div id={`preview-${item.id}`} className="flex items-start gap-3 flex-wrap scroll-mt-6">
+      <mark className={`${cls} px-1 py-0.5 rounded text-sm font-medium self-center`}>
+        {anchorText}
+      </mark>
+      {renderInput()}
+    </div>
+  );
 }

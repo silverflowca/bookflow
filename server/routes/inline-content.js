@@ -77,8 +77,13 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
     content_data,
     visibility,
     position_in_chapter,
+    display_mode,
     response_visibility,
   } = req.body;
+  // display_mode and position_in_chapter are synonymous — client forms use display_mode
+  // 'sidebar' is a client-only display hint, not a DB position — normalize it to 'inline'
+  const rawPosition = display_mode || position_in_chapter || 'inline';
+  const resolvedPosition = rawPosition === 'sidebar' ? 'inline' : rawPosition;
 
   try {
     // Get chapter and book info
@@ -126,7 +131,7 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
         created_by: req.user.id,
         is_author_content: isAuthor,
         visibility: isAuthor ? (visibility || 'all_readers') : (visibility || 'private'),
-        position_in_chapter: position_in_chapter || 'inline',
+        position_in_chapter: resolvedPosition,
         response_visibility: response_visibility || 'private',
       })
       .select(`
@@ -146,7 +151,7 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
 
 // Update inline content
 router.put('/inline-content/:id', authenticate, async (req, res) => {
-  const { content_data, visibility, anchor_text, position_in_chapter, start_offset, end_offset, response_visibility } = req.body;
+  const { content_data, visibility, anchor_text, position_in_chapter, display_mode, start_offset, end_offset, response_visibility } = req.body;
 
   try {
     // Check ownership
@@ -171,7 +176,8 @@ router.put('/inline-content/:id', authenticate, async (req, res) => {
     if (content_data !== undefined) updateData.content_data = content_data;
     if (visibility !== undefined) updateData.visibility = visibility;
     if (anchor_text !== undefined) updateData.anchor_text = anchor_text;
-    if (position_in_chapter !== undefined) updateData.position_in_chapter = position_in_chapter;
+    const rawPos = display_mode ?? position_in_chapter;
+    if (rawPos !== undefined) updateData.position_in_chapter = rawPos === 'sidebar' ? 'inline' : rawPos;
     if (start_offset !== undefined) updateData.start_offset = start_offset;
     if (end_offset !== undefined) updateData.end_offset = end_offset;
     if (response_visibility !== undefined) updateData.response_visibility = response_visibility;

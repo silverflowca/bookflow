@@ -536,6 +536,23 @@ export default function BookSettings() {
             />
           </div>
         </div>
+
+        {/* Editor Options */}
+        <div className="p-6 border-t border-theme">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Editor Options</h2>
+          <p className="text-sm text-muted mb-4">
+            Configure how the chapter editor behaves while writing.
+          </p>
+
+          <div className="space-y-4">
+            <ToggleSetting
+              label="Show inline form preview below editor"
+              description="Displays a live preview strip under the editor showing inline form items (textboxes, selects, etc.) with their highlighted anchor text beside the actual input control."
+              checked={settings.show_inline_form_preview ?? true}
+              onChange={(v) => updateSetting('show_inline_form_preview', v)}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Save Button */}

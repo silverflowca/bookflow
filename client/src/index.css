@@ -240,46 +240,53 @@ body {
 
 /* Interactive form inline styles */
 .inline-form {
-  background-color: rgba(99, 102, 241, 0.15);
+  background-color: rgba(99, 102, 241, 0.18);
   border-bottom: 2px dashed #6366f1;
   cursor: pointer;
   padding: 1px 4px;
   border-radius: 2px;
   transition: background-color 0.2s;
+  outline: 1px solid rgba(99, 102, 241, 0.35);
 }
 
 .inline-form:hover {
-  background-color: rgba(99, 102, 241, 0.3);
+  background-color: rgba(99, 102, 241, 0.32);
 }
 
 .inline-select {
-  background-color: rgba(99, 102, 241, 0.12);
+  background-color: rgba(99, 102, 241, 0.18);
   border-bottom-color: #6366f1;
+  outline-color: rgba(99, 102, 241, 0.35);
 }
 
 .inline-multiselect {
-  background-color: rgba(139, 92, 246, 0.12);
+  background-color: rgba(139, 92, 246, 0.18);
   border-bottom-color: #8b5cf6;
+  outline-color: rgba(139, 92, 246, 0.35);
 }
 
 .inline-textbox {
-  background-color: rgba(107, 114, 128, 0.12);
-  border-bottom-color: #6b7280;
+  background-color: rgba(59, 130, 246, 0.18);
+  border-bottom: 2px dashed #3b82f6;
+  outline: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .inline-textarea {
-  background-color: rgba(107, 114, 128, 0.15);
-  border-bottom-color: #6b7280;
+  background-color: rgba(59, 130, 246, 0.15);
+  border-bottom: 2px dashed #3b82f6;
+  outline: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .inline-radio {
-  background-color: rgba(249, 115, 22, 0.12);
+  background-color: rgba(249, 115, 22, 0.18);
   border-bottom-color: #f97316;
+  outline-color: rgba(249, 115, 22, 0.35);
 }
 
 .inline-checkbox {
-  background-color: rgba(20, 184, 166, 0.12);
+  background-color: rgba(20, 184, 166, 0.18);
   border-bottom-color: #14b8a6;
+  outline-color: rgba(20, 184, 166, 0.35);
 }
 
 /* Code block inline style */

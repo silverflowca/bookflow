@@ -28,13 +28,11 @@ function DisplayModeSelector({
         className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
       >
         <option value="inline">Inline (directly in text)</option>
-        <option value="sidebar">Sidebar (click to view)</option>
         <option value="start_of_chapter">Start of Chapter</option>
         <option value="end_of_chapter">End of Chapter</option>
       </select>
       <p className="text-xs text-gray-500 mt-1">
         {value === 'inline' && 'Form appears directly within the text where readers can interact with it.'}
-        {value === 'sidebar' && 'Text is highlighted and readers click to view the form in a side panel.'}
         {value === 'start_of_chapter' && 'Form appears at the beginning of the chapter.'}
         {value === 'end_of_chapter' && 'Form appears at the end of the chapter.'}
       </p>
