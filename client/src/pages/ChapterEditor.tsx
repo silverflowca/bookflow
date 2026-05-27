@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
@@ -34,6 +34,7 @@ export default function ChapterEditor() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [inlineContents, setInlineContents] = useState<InlineContent[]>([]);
+  const inlineContentsRef = useRef<InlineContent[]>([]);
   const [showInlineModal, setShowInlineModal] = useState<{
     type: InlineContent['content_type'];
     selection?: { from: number; to: number; text: string };
@@ -109,6 +110,30 @@ export default function ChapterEditor() {
       autoSaveTimeout = setTimeout(() => {
         handleSave(editor.getJSON(), editor.getText());
       }, 2000);
+
+      // Detect inlineFormWidget nodes removed from the doc and delete orphaned items
+      const presentIds = new Set<string>();
+      editor.state.doc.descendants(node => {
+        if (node.type.name === 'inlineFormWidget' && node.attrs.contentId) {
+          presentIds.add(node.attrs.contentId);
+        }
+      });
+      const current = inlineContentsRef.current;
+      const FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox'];
+      const orphaned = current.filter(
+        ic => FORM_TYPES.includes(ic.content_type) &&
+          (!ic.position_in_chapter || ic.position_in_chapter === 'inline') &&
+          !presentIds.has(ic.id)
+      );
+      if (orphaned.length > 0) {
+        const names = orphaned.map(ic => `"${ic.anchor_text || ic.content_type}"`).join(', ');
+        if (window.confirm(`Delete ${orphaned.length} removed form item(s) from the sidebar?\n\n${names}`)) {
+          orphaned.forEach(ic => {
+            api.deleteInlineContent(ic.id).catch(console.error);
+          });
+          setInlineContents(prev => prev.filter(ic => !orphaned.some(o => o.id === ic.id)));
+        }
+      }
     },
     onPaste: () => {
       // Re-apply marks after paste since positions shift
@@ -203,6 +228,9 @@ export default function ChapterEditor() {
       setLoading(false);
     }
   }
+
+  // Keep ref in sync so onUpdate closure can access current inlineContents without stale capture
+  useEffect(() => { inlineContentsRef.current = inlineContents; }, [inlineContents]);
 
   async function loadInlineContent() {
     try {
