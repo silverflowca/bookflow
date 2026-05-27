@@ -32,14 +32,14 @@ function makeNodeViewProps(overrides: Partial<{
     selected: overrides.selected ?? false,
     editor: {} as any,
     getPos: () => 0,
-    decorations: [],
-    innerDecorations: [],
+    decorations: [] as any,
+    innerDecorations: {} as any,
     extension: {} as any,
     HTMLAttributes: {},
     updateAttributes: vi.fn(),
     deleteNode: vi.fn(),
     view: {} as any,
-  };
+  } as any;
 }
 
 // ─── InlineFormNode Extension Tests ──────────────────────────────────────────
