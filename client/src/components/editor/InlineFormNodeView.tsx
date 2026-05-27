@@ -21,9 +21,9 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
   switch (contentType) {
     case 'textbox': {
       const d = contentData as TextboxData;
-      const wStyle = WIDTH_STYLE[d.width ?? 'md'];
+      const isFull = (d.width ?? 'md') === 'full';
       return (
-        <span className="inline-flex items-center gap-1 ml-1 align-middle" data-testid="inline-form-preview-textbox">
+        <span className={`${isFull ? 'flex flex-1 min-w-0' : 'inline-flex'} items-center gap-1 ml-1 align-middle`} data-testid="inline-form-preview-textbox">
           <input
             type="text"
             placeholder={d.placeholder || d.label || 'Type here…'}
@@ -32,16 +32,16 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             readOnly
             tabIndex={-1}
             className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none"
-            style={wStyle}
+            style={isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'md']}
           />
         </span>
       );
     }
     case 'textarea': {
       const d = contentData as TextareaData;
-      const wStyle = WIDTH_STYLE[d.width ?? 'full'];
+      const isFull = (d.width ?? 'full') === 'full';
       return (
-        <span className="inline-flex items-start gap-1 ml-1 align-middle" data-testid="inline-form-preview-textarea">
+        <span className={`${isFull ? 'flex flex-1 min-w-0' : 'inline-flex'} items-start gap-1 ml-1 align-middle`} data-testid="inline-form-preview-textarea">
           <textarea
             placeholder={d.placeholder || d.label || 'Type here…'}
             defaultValue={d.default_value || ''}
@@ -49,7 +49,7 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             tabIndex={-1}
             rows={Math.min(d.rows || 2, 2)}
             className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none resize-none"
-            style={wStyle}
+            style={isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'full']}
           />
         </span>
       );
@@ -202,7 +202,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   return (
     <NodeViewWrapper
       as="span"
-      className={`${isFullWidth ? 'inline-flex w-full' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass}`}
+      className={`${isFullWidth ? 'inline-flex w-full min-w-0' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass}`}
       data-content-id={contentId}
       data-content-type={contentType}
       data-testid="inline-form-node"
