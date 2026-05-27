@@ -515,6 +515,10 @@ class ApiClient {
     return this.request(`/books/${bookId}/reviews/${reviewId}`, { method: 'DELETE' });
   }
 
+  async resetReview(bookId: string, reviewId: string): Promise<void> {
+    return this.request(`/books/${bookId}/reviews/${reviewId}/reset`, { method: 'PATCH' });
+  }
+
   // Notifications
   async getNotifications(limit?: number): Promise<UserNotification[]> {
     return this.request(`/notifications${limit ? `?limit=${limit}` : ''}`);

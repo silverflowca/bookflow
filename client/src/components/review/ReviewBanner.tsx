@@ -65,6 +65,20 @@ export default function ReviewBanner({ bookId, reviewStatus, userRole, latestRev
     }
   }
 
+  async function handleReset() {
+    if (!latestReview) return;
+    if (!confirm('Cancel this approval and reset to "not submitted"?')) return;
+    setLoading(true);
+    try {
+      await api.resetReview(bookId, latestReview.id);
+      onStatusChange?.('none');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to reset review');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const STATUS_CONFIG = {
     none: { bg: 'bg-surface border-theme', icon: <Star className="h-4 w-4 text-muted" />, label: 'Not submitted' },
     pending: { bg: 'bg-yellow-50 border-yellow-200', icon: <Star className="h-4 w-4 text-yellow-500" />, label: 'Review pending' },
@@ -120,6 +134,31 @@ export default function ReviewBanner({ bookId, reviewStatus, userRole, latestRev
                 className="text-xs theme-button-primary px-3 py-1.5 rounded-md font-medium"
               >
                 Review
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Approved/Rejected: re-submit (owner/author) or cancel approval (owner/reviewer) */}
+        {['approved', 'rejected'].includes(reviewStatus) && (
+          <>
+            {['owner', 'author'].includes(userRole) && (
+              <button
+                onClick={() => setShowSubmitForm(!showSubmitForm)}
+                disabled={loading}
+                className="text-xs theme-button-primary px-3 py-1.5 rounded-md font-medium flex items-center gap-1"
+              >
+                <Send className="h-3 w-3" />
+                Re-submit
+              </button>
+            )}
+            {['owner', 'reviewer'].includes(userRole) && (
+              <button
+                onClick={handleReset}
+                disabled={loading}
+                className="text-xs text-muted hover:text-red-500 px-3 py-1.5 rounded-md border border-theme transition-colors"
+              >
+                Cancel approval
               </button>
             )}
           </>

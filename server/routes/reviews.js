@@ -173,6 +173,37 @@ router.put('/:reviewId', authenticate, requireRole(['owner', 'reviewer']), async
   }
 });
 
+// PATCH /api/books/:bookId/reviews/:reviewId/reset — cancel approval/rejection (owner or reviewer)
+router.patch('/:reviewId/reset', authenticate, requireRole(['owner', 'reviewer']), async (req, res) => {
+  try {
+    const { data: review } = await supabase
+      .from('review_requests')
+      .select('status')
+      .eq('id', req.params.reviewId)
+      .eq('book_id', req.params.bookId)
+      .single();
+
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    if (!['approved', 'rejected'].includes(review.status)) {
+      return res.status(409).json({ error: 'Only approved or rejected reviews can be reset' });
+    }
+
+    await supabase
+      .from('review_requests')
+      .update({ status: 'cancelled', reviewed_by: null, reviewed_at: null, reviewer_note: null })
+      .eq('id', req.params.reviewId);
+
+    await supabase
+      .from('books')
+      .update({ review_status: 'none' })
+      .eq('id', req.params.bookId);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/books/:bookId/reviews/:reviewId — cancel (submitter only)
 router.delete('/:reviewId', authenticate, async (req, res) => {
   try {
