@@ -1001,14 +1001,12 @@ function TipTapNode({
   onContentClick,
   assignmentMap,
   nodeKeyPrefix,
-  usedIds,
 }: {
   node: any;
   inlineContent: InlineContent[];
   onContentClick: (content: InlineContent) => void;
   assignmentMap?: Map<string, InlineContent[]>;
   nodeKeyPrefix?: string;
-  usedIds?: Set<string>;
 }) {
   if (!node) return null;
 
@@ -1087,7 +1085,7 @@ function TipTapNode({
         const isFormType = FORM_TYPES_SET.has(ic.content_type);
         const isMediaType = MEDIA_TYPES_SET.has(ic.content_type);
         const rawPos = ic.position_in_chapter;
-        const position = (!rawPos || rawPos === 'sidebar') ? 'inline' : rawPos;
+        const position = (!rawPos || (rawPos as string) === 'sidebar') ? 'inline' : rawPos;
         const segText = nodeText.slice(start, end);
         const markerClass = getInlineContentClass(ic.content_type);
         const icon = getInlineContentIcon(ic.content_type);
@@ -1570,7 +1568,7 @@ function SaveStatusDot({ status }: { status: 'idle' | 'saving' | 'saved' | 'erro
     <span className="flex items-center gap-1 text-xs h-4 min-w-[3rem] transition-opacity duration-300" style={{ opacity: status === 'idle' ? 0 : 1 }}>
       {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
       {status === 'saved' && <><Check className="h-3 w-3 text-green-600" /><span className="text-green-600">Saved</span></>}
-      {status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" title="Failed to save" />}
+      {status === 'error' && <span title="Failed to save"><AlertCircle className="h-3 w-3 text-red-500" /></span>}
     </span>
   );
 }

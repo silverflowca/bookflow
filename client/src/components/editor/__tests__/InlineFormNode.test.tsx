@@ -38,6 +38,7 @@ function makeNodeViewProps(overrides: Partial<{
     HTMLAttributes: {},
     updateAttributes: vi.fn(),
     deleteNode: vi.fn(),
+    view: {} as any,
   };
 }
 
