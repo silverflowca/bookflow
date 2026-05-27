@@ -132,6 +132,11 @@ body {
   outline: none;
 }
 
+/* Suppress TipTap's default blue box on selected atom nodes — we handle selection via ring classes */
+.ProseMirror-selectednode {
+  outline: none !important;
+}
+
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
