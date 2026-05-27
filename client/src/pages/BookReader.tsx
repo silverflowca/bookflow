@@ -1093,11 +1093,19 @@ function TipTapNode({
         const icon = getInlineContentIcon(ic.content_type);
 
         if (isFormType && position === 'inline') {
+          const isFullW2 = (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
           segments.push(
-            <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
-              {segText && <mark className={`${markerClass} px-0.5 rounded`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
-              <InlineFormElement content={ic} />
-            </span>
+            isFullW2 ? (
+              <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-2">
+                {segText && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                <InlineFormElement content={ic} />
+              </span>
+            ) : (
+              <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
+                {segText && <mark className={`${markerClass} px-0.5 rounded`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                <InlineFormElement content={ic} />
+              </span>
+            )
           );
         } else if (isMediaType && position === 'inline') {
           // Render the media player inline in the text flow
@@ -1150,7 +1158,13 @@ function TipTapNode({
         return <span>{anchorText}</span>;
       }
       const markerClass = getInlineContentClass(ic.content_type);
-      return (
+      const isFullW = (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
+      return isFullW ? (
+        <span id={`reader-inline-${ic.id}`} className="block my-2">
+          {anchorText && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}>{anchorText}</mark>}
+          <InlineFormElement content={ic} />
+        </span>
+      ) : (
         <span id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
           {anchorText && <mark className={`${markerClass} px-0.5 rounded`}>{anchorText}</mark>}
           <InlineFormElement content={ic} />
