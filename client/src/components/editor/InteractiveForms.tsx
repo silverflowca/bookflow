@@ -314,12 +314,21 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, ini
   );
 }
 
+const WIDTH_OPTIONS = [
+  { value: 'xs',   label: 'XS (80px)' },
+  { value: 'sm',   label: 'SM (120px)' },
+  { value: 'md',   label: 'MD (200px)' },
+  { value: 'lg',   label: 'LG (320px)' },
+  { value: 'full', label: 'Full width' },
+] as const;
+
 export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: TextboxData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
+  const [width, setWidth] = useState<TextboxData['width']>(initialData?.width || 'md');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -330,6 +339,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
       required,
       max_length: maxLength ? parseInt(maxLength) : undefined,
       default_value: defaultValue || undefined,
+      width,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -370,16 +380,28 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Max Length (optional)</label>
-        <input
-          type="number"
-          value={maxLength}
-          onChange={(e) => setMaxLength(e.target.value)}
-          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
-          min="1"
-          placeholder="No limit"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Width</label>
+          <select
+            value={width}
+            onChange={e => setWidth(e.target.value as TextboxData['width'])}
+            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          >
+            {WIDTH_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Max Length (optional)</label>
+          <input
+            type="number"
+            value={maxLength}
+            onChange={(e) => setMaxLength(e.target.value)}
+            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+            min="1"
+            placeholder="No limit"
+          />
+        </div>
       </div>
 
       <label className="flex items-center gap-2">
@@ -405,6 +427,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [rows, setRows] = useState(initialData?.rows?.toString() || '4');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
+  const [width, setWidth] = useState<TextareaData['width']>(initialData?.width || 'full');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -416,6 +439,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
       max_length: maxLength ? parseInt(maxLength) : undefined,
       rows: rows ? parseInt(rows) : 4,
       default_value: defaultValue || undefined,
+      width,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -456,7 +480,17 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-1">Width</label>
+          <select
+            value={width}
+            onChange={e => setWidth(e.target.value as TextareaData['width'])}
+            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          >
+            {WIDTH_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1">Rows</label>
           <input

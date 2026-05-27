@@ -9,10 +9,19 @@ type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
 
+const WIDTH_STYLE: Record<string, React.CSSProperties> = {
+  xs:   { width: 80 },
+  sm:   { width: 120 },
+  md:   { width: 200 },
+  lg:   { width: 320 },
+  full: { width: '100%' },
+};
+
 function FormPreview({ contentType, contentData }: { contentType: FormType; contentData: any }) {
   switch (contentType) {
     case 'textbox': {
       const d = contentData as TextboxData;
+      const wStyle = WIDTH_STYLE[d.width ?? 'md'];
       return (
         <span className="inline-flex items-center gap-1 ml-1 align-middle" data-testid="inline-form-preview-textbox">
           <input
@@ -23,13 +32,14 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             readOnly
             tabIndex={-1}
             className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none"
-            style={{ minWidth: 120, maxWidth: 200 }}
+            style={wStyle}
           />
         </span>
       );
     }
     case 'textarea': {
       const d = contentData as TextareaData;
+      const wStyle = WIDTH_STYLE[d.width ?? 'full'];
       return (
         <span className="inline-flex items-start gap-1 ml-1 align-middle" data-testid="inline-form-preview-textarea">
           <textarea
@@ -39,7 +49,7 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             tabIndex={-1}
             rows={Math.min(d.rows || 2, 2)}
             className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none resize-none"
-            style={{ minWidth: 140, maxWidth: 220 }}
+            style={wStyle}
           />
         </span>
       );

@@ -2172,10 +2172,19 @@ function InlineMultiselect({ content }: { content: InlineContent }) {
   );
 }
 
+const FIELD_WIDTH_STYLE: Record<string, React.CSSProperties> = {
+  xs:   { width: 80 },
+  sm:   { width: 120 },
+  md:   { width: 200 },
+  lg:   { width: 320 },
+  full: { width: '100%' },
+};
+
 // Inline Textbox (single line)
 function InlineTextbox({ content }: { content: InlineContent }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
+  const wStyle = FIELD_WIDTH_STYLE[data.width ?? 'md'];
 
   return (
     <span className="inline-flex items-center gap-1 mx-1">
@@ -2186,7 +2195,7 @@ function InlineTextbox({ content }: { content: InlineContent }) {
         placeholder={data.placeholder || 'Type here...'}
         maxLength={data.max_length}
         className="inline-block px-2 py-0.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
-        style={{ minWidth: '150px', maxWidth: '250px' }}
+        style={wStyle}
       />
       {data.required && <span className="text-red-500 text-xs">*</span>}
     </span>
@@ -2197,16 +2206,17 @@ function InlineTextbox({ content }: { content: InlineContent }) {
 function InlineTextarea({ content }: { content: InlineContent }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
+  const wStyle = FIELD_WIDTH_STYLE[data.width ?? 'full'];
 
   return (
-    <span className="inline-block mx-1 align-middle">
+    <span className="inline-block mx-1 align-middle" style={wStyle}>
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={data.placeholder || 'Enter your response...'}
         rows={data.rows || 2}
         maxLength={data.max_length}
-        className="block w-64 px-2 py-1 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+        className="block w-full px-2 py-1 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
       />
       {data.max_length && (
         <span className="text-xs text-muted">{value.length}/{data.max_length}</span>

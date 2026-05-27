@@ -267,6 +267,7 @@ export interface TextboxData {
   max_length?: number;
   validation_pattern?: string;
   default_value?: string;
+  width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
 }
 
 export interface TextareaData {
@@ -276,6 +277,7 @@ export interface TextareaData {
   max_length?: number;
   rows?: number;
   default_value?: string;
+  width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
 }
 
 export interface RadioData {
