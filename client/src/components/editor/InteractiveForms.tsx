@@ -326,6 +326,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
+  const [showLabel, setShowLabel] = useState(initialData?.show_label ?? true);
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
   const [width, setWidth] = useState<TextboxData['width']>(initialData?.width || 'md');
@@ -340,6 +341,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
       max_length: maxLength ? parseInt(maxLength) : undefined,
       default_value: defaultValue || undefined,
       width,
+      show_label: showLabel,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -404,14 +406,16 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
         </div>
       </div>
 
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={required}
-          onChange={(e) => setRequired(e.target.checked)}
-        />
-        <span className="text-sm">Required</span>
-      </label>
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+          <span className="text-sm">Required</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={showLabel} onChange={(e) => setShowLabel(e.target.checked)} />
+          <span className="text-sm">Show label to reader</span>
+        </label>
+      </div>
 
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
@@ -424,6 +428,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
+  const [showLabel, setShowLabel] = useState(initialData?.show_label ?? true);
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [rows, setRows] = useState(initialData?.rows?.toString() || '4');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
@@ -442,6 +447,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
       default_value: defaultValue || undefined,
       width,
       auto_expand: autoExpand || undefined,
+      show_label: showLabel,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -534,6 +540,14 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
             onChange={(e) => setAutoExpand(e.target.checked)}
           />
           <span className="text-sm">Auto-expand as user types</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={showLabel}
+            onChange={(e) => setShowLabel(e.target.checked)}
+          />
+          <span className="text-sm">Show label to reader</span>
         </label>
       </div>
 

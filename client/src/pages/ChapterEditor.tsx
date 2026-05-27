@@ -367,11 +367,6 @@ export default function ChapterEditor() {
     if (!editor) return;
     const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, ' ').trim();
-    const FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox'];
-    if (FORM_TYPES.includes(type) && !text) {
-      alert('Please select some text in the editor first — the selected text will be the anchor for your form item.');
-      return;
-    }
     setShowInlineModal({ type, selection: { from, to, text } });
   }
 
@@ -380,38 +375,61 @@ export default function ChapterEditor() {
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
     try {
+      const hasSelection = showInlineModal.selection && showInlineModal.selection.from !== showInlineModal.selection.to;
+      // When no text is selected, use the label from content_data as the anchor text
+      const anchorText = hasSelection
+        ? showInlineModal.selection!.text
+        : ((data.content_data as any)?.label || '');
+
       const created = await api.createInlineContent(chapterId, {
         ...data,
         content_type: showInlineModal.type,
         start_offset: showInlineModal.selection?.from || 0,
         end_offset: showInlineModal.selection?.to || 0,
-        anchor_text: showInlineModal.selection?.text,
+        anchor_text: anchorText || undefined,
       });
 
-      if (editor && showInlineModal.selection && showInlineModal.selection.from !== showInlineModal.selection.to) {
+      if (editor) {
         const isFormType = INLINE_FORM_TYPES.includes(showInlineModal.type);
         const isInline = !created.position_in_chapter || created.position_in_chapter === 'inline';
+        const cursorPos = showInlineModal.selection?.from || 0;
 
         if (isFormType && isInline) {
-          // Replace the selected anchor text with an InlineFormNode atom
+          if (hasSelection) {
+            // Replace the selected anchor text with an InlineFormNode atom
+            editor
+              .chain()
+              .focus()
+              .setTextSelection({ from: showInlineModal.selection!.from, to: showInlineModal.selection!.to })
+              .insertInlineFormNode({
+                contentId: created.id,
+                contentType: showInlineModal.type,
+                anchorText,
+                contentData: created.content_data ?? null,
+                position: (created.position_in_chapter as any) ?? 'inline',
+              })
+              .run();
+          } else {
+            // No selection: insert the node at the cursor position
+            editor
+              .chain()
+              .focus()
+              .setTextSelection(cursorPos)
+              .insertInlineFormNode({
+                contentId: created.id,
+                contentType: showInlineModal.type,
+                anchorText,
+                contentData: created.content_data ?? null,
+                position: (created.position_in_chapter as any) ?? 'inline',
+              })
+              .run();
+          }
+        } else if (hasSelection) {
+          // Non-form types (question, poll, note, highlight): apply a Mark — requires selection
           editor
             .chain()
             .focus()
-            .setTextSelection({ from: showInlineModal.selection.from, to: showInlineModal.selection.to })
-            .insertInlineFormNode({
-              contentId: created.id,
-              contentType: showInlineModal.type,
-              anchorText: showInlineModal.selection.text,
-              contentData: created.content_data ?? null,
-              position: (created.position_in_chapter as any) ?? 'inline',
-            })
-            .run();
-        } else {
-          // Non-form types (question, poll, note, highlight): apply a Mark
-          editor
-            .chain()
-            .focus()
-            .setTextSelection({ from: showInlineModal.selection.from, to: showInlineModal.selection.to })
+            .setTextSelection({ from: showInlineModal.selection!.from, to: showInlineModal.selection!.to })
             .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
             .run();
         }

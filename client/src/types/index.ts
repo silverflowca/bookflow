@@ -268,6 +268,7 @@ export interface TextboxData {
   validation_pattern?: string;
   default_value?: string;
   width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
+  show_label?: boolean;
 }
 
 export interface TextareaData {
@@ -279,6 +280,7 @@ export interface TextareaData {
   default_value?: string;
   width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
   auto_expand?: boolean;
+  show_label?: boolean;
 }
 
 export interface RadioData {

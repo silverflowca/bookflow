@@ -1807,7 +1807,7 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
           <SaveStatusDot status={saveStatus} />
         </div>
       </div>
-      <label className="block text-theme mb-2">{data.label}</label>
+      {(data.show_label ?? true) && <label className="block text-theme mb-2">{data.label}</label>}
       <input
         type="text"
         value={value}
@@ -1875,7 +1875,7 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
           <SaveStatusDot status={saveStatus} />
         </div>
       </div>
-      <label className="block text-theme mb-2">{data.label}</label>
+      {(data.show_label ?? true) && <label className="block text-theme mb-2">{data.label}</label>}
       <textarea
         ref={textareaRef}
         value={value}
