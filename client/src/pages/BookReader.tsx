@@ -2236,17 +2236,36 @@ function InlineTextarea({ content }: { content: InlineContent }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
   const isFull = (data.width ?? 'full') === 'full';
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setValue(e.target.value);
+    if (data.auto_expand && e.target) {
+      e.target.style.height = 'auto';
+      e.target.style.height = e.target.scrollHeight + 'px';
+    }
+  }, [data.auto_expand]);
+
+  // Set initial height when auto_expand is on
+  useEffect(() => {
+    if (data.auto_expand && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [data.auto_expand]);
 
   if (isFull) {
     return (
       <span className="block my-2">
         <textarea
+          ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={handleChange}
           placeholder={data.placeholder || 'Enter your response...'}
           rows={data.rows || 2}
           maxLength={data.max_length}
           className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+          style={data.auto_expand ? { overflow: 'hidden' } : undefined}
         />
         {data.max_length && <span className="text-xs text-muted">{value.length}/{data.max_length}</span>}
       </span>
@@ -2256,12 +2275,14 @@ function InlineTextarea({ content }: { content: InlineContent }) {
   return (
     <span className="inline-block mx-1 align-middle" style={FIELD_WIDTH_STYLE[data.width ?? 'lg']}>
       <textarea
+        ref={textareaRef}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleChange}
         placeholder={data.placeholder || 'Enter your response...'}
         rows={data.rows || 2}
         maxLength={data.max_length}
         className="block w-full px-2 py-1 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+        style={data.auto_expand ? { overflow: 'hidden' } : undefined}
       />
       {data.max_length && <span className="text-xs text-muted">{value.length}/{data.max_length}</span>}
     </span>

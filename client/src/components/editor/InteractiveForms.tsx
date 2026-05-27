@@ -428,6 +428,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
   const [rows, setRows] = useState(initialData?.rows?.toString() || '4');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
   const [width, setWidth] = useState<TextareaData['width']>(initialData?.width || 'full');
+  const [autoExpand, setAutoExpand] = useState(initialData?.auto_expand ?? false);
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -440,6 +441,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
       rows: rows ? parseInt(rows) : 4,
       default_value: defaultValue || undefined,
       width,
+      auto_expand: autoExpand || undefined,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -516,14 +518,24 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
         </div>
       </div>
 
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={required}
-          onChange={(e) => setRequired(e.target.checked)}
-        />
-        <span className="text-sm">Required</span>
-      </label>
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={(e) => setRequired(e.target.checked)}
+          />
+          <span className="text-sm">Required</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={autoExpand}
+            onChange={(e) => setAutoExpand(e.target.checked)}
+          />
+          <span className="text-sm">Auto-expand as user types</span>
+        </label>
+      </div>
 
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 

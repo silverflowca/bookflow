@@ -278,6 +278,7 @@ export interface TextareaData {
   rows?: number;
   default_value?: string;
   width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
+  auto_expand?: boolean;
 }
 
 export interface RadioData {
