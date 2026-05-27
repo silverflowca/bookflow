@@ -31,8 +31,8 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             maxLength={d.max_length}
             readOnly
             tabIndex={-1}
-            className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none"
-            style={isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'md']}
+            className="px-2 py-0.5 text-sm border border-gray-300 rounded pointer-events-none"
+            style={{ background: 'rgba(255,255,255,0.45)', ...(isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'md']) }}
           />
         </span>
       );
@@ -48,8 +48,8 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             readOnly
             tabIndex={-1}
             rows={Math.min(d.rows || 2, 2)}
-            className="px-2 py-0.5 text-sm border border-gray-300 rounded bg-white pointer-events-none resize-none"
-            style={isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'full']}
+            className="px-2 py-0.5 text-sm border border-gray-300 rounded pointer-events-none resize-none"
+            style={{ background: 'rgba(255,255,255,0.45)', ...(isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'full']) }}
           />
         </span>
       );
