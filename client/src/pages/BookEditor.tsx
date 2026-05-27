@@ -263,7 +263,7 @@ export default function BookEditor() {
       // Load latest review request
       api.getReviews(bookId!).then(reviews => {
         if (reviews.length > 0) setLatestReview(reviews[0]);
-      }).catch(() => {});
+      }).catch(console.error);
     } catch (err) {
       console.error('Failed to load book:', err);
     } finally {

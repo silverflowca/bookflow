@@ -35,7 +35,10 @@ export default function ReviewBanner({ bookId, reviewStatus, userRole, latestRev
   }
 
   async function handleDecision(status: 'approved' | 'rejected') {
-    if (!latestReview) return;
+    if (!latestReview) {
+      alert('Review request not found. Please refresh the page and try again.');
+      return;
+    }
     setLoading(true);
     try {
       await api.reviewDecision(bookId, latestReview.id, { status, reviewer_note: reviewerNote });
