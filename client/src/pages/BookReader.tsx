@@ -1814,7 +1814,8 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
         onChange={(e) => handleChange(e.target.value)}
         placeholder={data.placeholder || ''}
         maxLength={data.max_length}
-        className="w-full p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500"
+        className="p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500"
+        style={(data.width && data.width !== 'full') ? FIELD_WIDTH_STYLE[data.width] : { width: '100%' }}
       />
       {data.max_length && (
         <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
@@ -1830,6 +1831,7 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -1837,14 +1839,28 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
-  const handleChange = (newValue: string) => {
+  useEffect(() => {
+    if (data.auto_expand && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [data.auto_expand]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
     setValue(newValue);
+    if (data.auto_expand && e.target) {
+      e.target.style.height = 'auto';
+      e.target.style.height = e.target.scrollHeight + 'px';
+    }
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
+
+  const widthStyle = (data.width && data.width !== 'full') ? FIELD_WIDTH_STYLE[data.width] : { width: '100%' };
 
   return (
     <div className="bg-surface-hover border border-theme rounded-lg p-4">
@@ -1861,12 +1877,14 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
       </div>
       <label className="block text-theme mb-2">{data.label}</label>
       <textarea
+        ref={textareaRef}
         value={value}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={handleChange}
         placeholder={data.placeholder || ''}
         rows={data.rows || 4}
         maxLength={data.max_length}
-        className="w-full p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500 resize-none"
+        className="p-2 theme-input rounded-lg focus:ring-2 focus:ring-gray-500 resize-none"
+        style={{ ...widthStyle, ...(data.auto_expand ? { overflow: 'hidden' } : {}) }}
       />
       {data.max_length && (
         <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
