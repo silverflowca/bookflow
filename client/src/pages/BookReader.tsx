@@ -753,6 +753,18 @@ function ChapterContent({
     const assignedIds = new Set<string>();
     const assignmentMap = new Map<string, InlineContent[]>(); // nodeKey → items assigned to it
 
+    // Pre-mark any items already handled by inlineFormWidget atoms in the JSON
+    // so the text-node matching path doesn't also render them (causing duplication)
+    function collectWidgetIds(nodes: any[]) {
+      nodes.forEach((node: any) => {
+        if (node.type === 'inlineFormWidget' && node.attrs?.contentId) {
+          assignedIds.add(node.attrs.contentId);
+        }
+        if (node.content) collectWidgetIds(node.content);
+      });
+    }
+    collectWidgetIds(parsedContent.content);
+
     function collectTextNodes(nodes: any[], prefix: string) {
       nodes.forEach((node: any, i: number) => {
         const key = `${prefix}-${i}`;
