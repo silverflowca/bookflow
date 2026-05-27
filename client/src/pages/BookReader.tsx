@@ -2177,7 +2177,6 @@ const FIELD_WIDTH_STYLE: Record<string, React.CSSProperties> = {
   sm:   { width: 120 },
   md:   { width: 200 },
   lg:   { width: 320 },
-  full: { width: '100%', display: 'block' },
 };
 
 // Inline Textbox (single line)
@@ -2185,10 +2184,25 @@ function InlineTextbox({ content }: { content: InlineContent }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
   const isFull = (data.width ?? 'md') === 'full';
-  const wStyle = FIELD_WIDTH_STYLE[data.width ?? 'md'];
+
+  if (isFull) {
+    return (
+      <span className="block my-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={data.placeholder || 'Type here...'}
+          maxLength={data.max_length}
+          className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
+        />
+        {data.required && <span className="text-red-500 text-xs mt-0.5 block">Required</span>}
+      </span>
+    );
+  }
 
   return (
-    <span className={isFull ? 'block my-1' : 'inline-flex items-center gap-1 mx-1'}>
+    <span className="inline-flex items-center gap-1 mx-1">
       <input
         type="text"
         value={value}
@@ -2196,7 +2210,7 @@ function InlineTextbox({ content }: { content: InlineContent }) {
         placeholder={data.placeholder || 'Type here...'}
         maxLength={data.max_length}
         className="px-2 py-0.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
-        style={wStyle}
+        style={FIELD_WIDTH_STYLE[data.width ?? 'md']}
       />
       {data.required && <span className="text-red-500 text-xs">*</span>}
     </span>
@@ -2208,22 +2222,34 @@ function InlineTextarea({ content }: { content: InlineContent }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
   const isFull = (data.width ?? 'full') === 'full';
-  const wStyle = FIELD_WIDTH_STYLE[data.width ?? 'full'];
+
+  if (isFull) {
+    return (
+      <span className="block my-2">
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={data.placeholder || 'Enter your response...'}
+          rows={data.rows || 2}
+          maxLength={data.max_length}
+          className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+        />
+        {data.max_length && <span className="text-xs text-muted">{value.length}/{data.max_length}</span>}
+      </span>
+    );
+  }
 
   return (
-    <span className={isFull ? 'block my-1' : 'inline-block mx-1 align-middle'} style={isFull ? undefined : wStyle}>
+    <span className="inline-block mx-1 align-middle" style={FIELD_WIDTH_STYLE[data.width ?? 'lg']}>
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={data.placeholder || 'Enter your response...'}
         rows={data.rows || 2}
         maxLength={data.max_length}
-        className="block px-2 py-1 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
-        style={wStyle}
+        className="block w-full px-2 py-1 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
       />
-      {data.max_length && (
-        <span className="text-xs text-muted">{value.length}/{data.max_length}</span>
-      )}
+      {data.max_length && <span className="text-xs text-muted">{value.length}/{data.max_length}</span>}
     </span>
   );
 }

@@ -14,7 +14,7 @@ const WIDTH_STYLE: Record<string, React.CSSProperties> = {
   sm:   { width: 120 },
   md:   { width: 200 },
   lg:   { width: 320 },
-  full: { width: '100%' },
+  full: { flexGrow: 1, minWidth: 200 },
 };
 
 function FormPreview({ contentType, contentData }: { contentType: FormType; contentData: any }) {
@@ -201,8 +201,8 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   const isFullWidth = (contentData as any)?.width === 'full';
   return (
     <NodeViewWrapper
-      as={isFullWidth ? 'div' : 'span'}
-      className={`${isFullWidth ? 'flex' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border ${isFullWidth ? 'my-1' : 'align-baseline'} ${colorClass}${ringClass}`}
+      as="span"
+      className={`${isFullWidth ? 'inline-flex w-full' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass}`}
       data-content-id={contentId}
       data-content-type={contentType}
       data-testid="inline-form-node"
