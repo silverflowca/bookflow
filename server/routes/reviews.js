@@ -10,12 +10,7 @@ router.get('/', authenticate, requireRole(['owner', 'author', 'editor', 'reviewe
   try {
     const { data, error } = await supabase
       .from('review_requests')
-      .select(`
-        id, status, message, submitted_at, reviewed_at, reviewer_note,
-        submitter:profiles!review_requests_submitted_by_fkey(id, display_name, avatar_url),
-        reviewer:profiles!review_requests_reviewed_by_fkey(id, display_name, avatar_url),
-        version:book_versions(id, version_number, label)
-      `)
+      .select('id, status, message, submitted_at, reviewed_at, reviewer_note, submitted_by, reviewed_by, book_id')
       .eq('book_id', req.params.bookId)
       .order('submitted_at', { ascending: false });
 
