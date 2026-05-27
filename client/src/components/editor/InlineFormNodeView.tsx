@@ -198,10 +198,11 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   }
 
   // ── Inline: full anchor + type badge + live widget preview ────────────────
+  const isFullWidth = (contentData as any)?.width === 'full';
   return (
     <NodeViewWrapper
-      as="span"
-      className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass}`}
+      as={isFullWidth ? 'div' : 'span'}
+      className={`${isFullWidth ? 'flex' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border ${isFullWidth ? 'my-1' : 'align-baseline'} ${colorClass}${ringClass}`}
       data-content-id={contentId}
       data-content-type={contentType}
       data-testid="inline-form-node"
