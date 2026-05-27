@@ -520,6 +520,20 @@ export default function ChapterEditor() {
       setInlineContents(inlineContents.map(item =>
         item.id === id ? { ...item, content_data: data.content_data! } : item
       ));
+      // Update the node attrs in the TipTap doc so the editor preview re-renders immediately
+      if (editor && data.content_data) {
+        const { state, view } = editor;
+        const { tr } = state;
+        let found = false;
+        state.doc.descendants((node, pos) => {
+          if (found) return false;
+          if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, contentData: data.content_data });
+            found = true;
+          }
+        });
+        if (found) view.dispatch(tr);
+      }
       setShowInlineModal(null);
     } catch (err) {
       console.error('Failed to update inline content:', err);
