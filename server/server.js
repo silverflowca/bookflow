@@ -102,6 +102,71 @@ app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);
 // My role on a book
 app.get('/api/books/:bookId/my-role', authenticate, getMyRole);
 
+// ── OG preview for social crawlers on /book/:id ─────────────────────────────
+// WhatsApp, Facebook, Twitter etc. send a specific User-Agent — detect them
+// and return a lightweight HTML page with Open Graph meta tags so the link
+// unfurls with cover image + title.  Regular browsers get the SPA as usual.
+const CRAWLER_UA = /whatsapp|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|googlebot|bingbot/i;
+
+app.get('/book/:bookId', async (req, res, next) => {
+  const ua = req.headers['user-agent'] || '';
+  if (!CRAWLER_UA.test(ua)) return next(); // regular browser → serve SPA below
+
+  try {
+    const { data: book, error } = await supabase
+      .from('books')
+      .select('title, subtitle, description, cover_image_url, visibility, author:profiles!books_author_id_fkey(display_name)')
+      .eq('id', req.params.bookId)
+      .single();
+
+    if (error || !book || book.visibility !== 'public') return next();
+
+    const siteUrl = process.env.CLIENT_URL?.split(',')[0]?.trim() || `https://books.silverflow.ca`;
+    const pageUrl = `${siteUrl}/book/${req.params.bookId}`;
+    const title = book.title + (book.subtitle ? ` — ${book.subtitle}` : '');
+    const description = book.description || `A book by ${book.author?.display_name || 'an author'} on BookFlow.`;
+    const image = book.cover_image_url || '';
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escHtml(title)}</title>
+  <meta name="description" content="${escHtml(description)}" />
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="book" />
+  <meta property="og:url"         content="${escHtml(pageUrl)}" />
+  <meta property="og:title"       content="${escHtml(title)}" />
+  <meta property="og:description" content="${escHtml(description)}" />
+  ${image ? `<meta property="og:image" content="${escHtml(image)}" />
+  <meta property="og:image:width"  content="800" />
+  <meta property="og:image:height" content="1200" />` : ''}
+
+  <!-- Twitter card -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="${escHtml(title)}" />
+  <meta name="twitter:description" content="${escHtml(description)}" />
+  ${image ? `<meta name="twitter:image" content="${escHtml(image)}" />` : ''}
+
+  <!-- Redirect browsers that somehow land here -->
+  <meta http-equiv="refresh" content="0;url=${escHtml(pageUrl)}" />
+</head>
+<body>
+  <script>location.replace(${JSON.stringify(pageUrl)});</script>
+</body>
+</html>`);
+  } catch (err) {
+    console.error('[og-preview] error:', err.message);
+    next();
+  }
+});
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   const publicPath = path.join(__dirname, 'public');
