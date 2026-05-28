@@ -2474,6 +2474,8 @@ function RightSideToolbar({
   onFilterChange: (type: string | null) => void;
   onContentSelect: (content: InlineContent) => void;
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   // Count items by type
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -2515,10 +2517,34 @@ function RightSideToolbar({
     { type: 'scripture_block', icon: BookOpen, label: 'Scripture', color: 'text-amber-700', bgColor: 'bg-amber-100', hoverBg: 'hover:bg-amber-50' },
   ];
 
+  // Total content count for the mobile badge
+  const totalCount = useMemo(() => Object.values(counts).reduce((a, b) => a + b, 0), [counts]);
+
   return (
     <>
-      {/* Icon Toolbar - Fixed to right */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-surface rounded-lg shadow-lg p-2 border-theme border">
+      {/* Mobile toggle button — only visible on small screens */}
+      <button
+        className="md:hidden fixed right-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 flex items-center justify-center bg-surface rounded-full shadow-lg border-theme border"
+        onClick={() => { setMobileOpen(v => !v); if (mobileOpen) onFilterChange(null); }}
+        aria-label={mobileOpen ? 'Close content bar' : 'Open content bar'}
+      >
+        {mobileOpen ? (
+          <X className="h-4 w-4 text-theme" />
+        ) : (
+          <span className="relative">
+            <List className="h-4 w-4 text-theme" />
+            {totalCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center text-[10px] font-bold rounded-full bg-primary-600 text-white leading-none">
+                {totalCount > 99 ? '99+' : totalCount}
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+
+      {/* Icon Toolbar - Fixed to right; hidden on mobile until toggled */}
+      <div className={`fixed right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-surface rounded-lg shadow-lg p-2 border-theme border
+        ${mobileOpen ? 'flex' : 'hidden'} md:flex`}>
         {toolbarItems.map(({ type, icon: Icon, label, color, bgColor, hoverBg }) => {
           const count = counts[type];
           const isActive = filterType === type;
