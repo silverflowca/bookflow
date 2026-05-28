@@ -90,10 +90,12 @@ RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_live_shows_updated_at ON bookflow.live_shows;
 CREATE TRIGGER trg_live_shows_updated_at
   BEFORE UPDATE ON bookflow.live_shows
   FOR EACH ROW EXECUTE FUNCTION bookflow.update_live_updated_at();
 
+DROP TRIGGER IF EXISTS trg_live_episodes_updated_at ON bookflow.live_episodes;
 CREATE TRIGGER trg_live_episodes_updated_at
   BEFORE UPDATE ON bookflow.live_episodes
   FOR EACH ROW EXECUTE FUNCTION bookflow.update_live_updated_at();
