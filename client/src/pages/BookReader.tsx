@@ -1198,7 +1198,6 @@ function StartOfChapterContent({ items, isAuthor, userId }: { items: InlineConte
 
   return (
     <div className="mb-8 pb-6 border-b space-y-4">
-      <h3 className="text-lg font-semibold text-theme">Before You Begin</h3>
       {startItems.map((item) => (
         <div key={item.id} id={`reader-block-${item.id}`} className="scroll-mt-6">
           {item.anchor_text && (
@@ -1222,7 +1221,6 @@ function EndOfChapterContent({ items, isAuthor, userId }: { items: InlineContent
 
   return (
     <div className="mt-12 pt-8 border-t space-y-6">
-      <h2 className="text-xl font-bold">Chapter Review</h2>
       {endItems.map((item) => (
         <div key={item.id} id={`reader-block-${item.id}`} className="scroll-mt-6">
           {item.anchor_text && (
