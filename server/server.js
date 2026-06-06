@@ -28,6 +28,7 @@ import clubsRoutes from './routes/clubs.js';
 import clubChatRoutes from './routes/club-chat.js';
 import activityRoutes from './routes/activity.js';
 import formResponsesRoutes from './routes/form-responses.js';
+import progressRoutes from './routes/progress.js';
 import liveRoutes from './routes/live.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { startStatusCron } from './services/chat-status.js';
@@ -94,6 +95,7 @@ app.use('/api/clubs/:clubId/chat', clubChatRoutes);
 app.use('/api/clubs/chat', clubChatRoutes);  // for /unread-all (no clubId)
 app.use('/api/books/:bookId/activity', activityRoutes);
 app.use('/api', formResponsesRoutes);
+app.use('/api/progress', progressRoutes);
 app.use('/api/live', liveRoutes);
 
 // Invite acceptance

@@ -161,6 +161,19 @@ body {
   background: transparent;
 }
 
+/* Progress tracking — completable item borders */
+.progress-item {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+  padding: 4px;
+  margin: 4px 0;
+}
+.progress-item--done {
+  border-color: #22c55e;
+  background-color: color-mix(in srgb, #22c55e 6%, transparent);
+}
+
 /* Inline content markers */
 .inline-question {
   background-color: rgba(59, 130, 246, 0.15);

@@ -4,7 +4,7 @@ import {
   Users, BookOpen, MessageSquare, Settings, Plus, Trash2,
   Crown, Shield, UserMinus, ChevronRight, Loader2, Send,
   Globe, Lock, Star, ArrowLeft,
-  X, Check, Mail, Search, Copy,
+  X, Check, Mail, Search, Copy, CheckCircle,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +48,19 @@ interface ClubSettings {
   show_member_answers: boolean;
   show_member_highlights: boolean;
   show_member_media: boolean;
+  enable_progress_tracking?: boolean;
+}
+
+interface ClubProgressEntry {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  role: string;
+  items_completed: number;
+  items_total: number;
+  chapters_completed: number;
+  chapters_total: number;
+  last_active: string | null;
 }
 
 interface Club {
@@ -524,7 +537,7 @@ function PendingInviteRow({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type PanelTab = 'overview' | 'members' | 'books' | 'discussions' | 'chat' | 'settings';
+type PanelTab = 'overview' | 'members' | 'books' | 'discussions' | 'chat' | 'settings' | 'progress';
 
 export default function ClubDetailPage() {
   const { clubId } = useParams<{ clubId: string }>();
@@ -544,6 +557,8 @@ export default function ClubDetailPage() {
   const [editingSettings, setEditingSettings] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<ClubSettings | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [progressData, setProgressData] = useState<ClubProgressEntry[] | null>(null);
+  const [progressLoading, setProgressLoading] = useState(false);
   const postRef = useRef<HTMLTextAreaElement>(null);
 
   const myRole = club?.my_role ?? null;
@@ -556,7 +571,18 @@ export default function ClubDetailPage() {
 
   useEffect(() => {
     if (tab === 'discussions' && clubId) loadDiscussions();
+    if (tab === 'progress' && clubId && !progressData) loadProgress();
   }, [tab]);
+
+  async function loadProgress() {
+    if (!clubId) return;
+    setProgressLoading(true);
+    try {
+      const data = await api.getClubProgress(clubId);
+      setProgressData(data);
+    } catch { setProgressData([]); }
+    finally { setProgressLoading(false); }
+  }
 
   async function loadClub() {
     try {
@@ -715,6 +741,7 @@ export default function ClubDetailPage() {
       label: chatUnread[clubId!] > 0 ? `Chat (${chatUnread[clubId!]})` : 'Chat',
       icon: <MessageSquare className="h-4 w-4" />,
     },
+    ...(club.settings?.enable_progress_tracking ? [{ key: 'progress' as PanelTab, label: 'Progress', icon: <CheckCircle className="h-4 w-4" /> }] : []),
     ...(isAdmin ? [{ key: 'settings' as PanelTab, label: 'Settings', icon: <Settings className="h-4 w-4" /> }] : []),
   ];
 
@@ -1047,6 +1074,78 @@ export default function ClubDetailPage() {
         </div>
       )}
 
+      {/* ── Progress ── */}
+      {tab === 'progress' && (
+        <div className="theme-section rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <h2 className="font-semibold text-theme">Member Progress</h2>
+            </div>
+            <button onClick={loadProgress} className="text-xs text-muted hover:text-theme underline">Refresh</button>
+          </div>
+
+          {progressLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted" />
+            </div>
+          )}
+
+          {!progressLoading && progressData && progressData.length === 0 && (
+            <p className="text-sm text-muted text-center py-8">No progress data yet.</p>
+          )}
+
+          {!progressLoading && progressData && progressData.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted border-b border-theme">
+                    <th className="pb-2 pr-4 font-medium">Member</th>
+                    <th className="pb-2 pr-4 font-medium text-center">Chapters</th>
+                    <th className="pb-2 pr-4 font-medium text-center">Items</th>
+                    <th className="pb-2 font-medium text-right">Last active</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-theme/30">
+                  {progressData.map(entry => {
+                    const itemPct = entry.items_total > 0 ? Math.round((entry.items_completed / entry.items_total) * 100) : 0;
+                    return (
+                      <tr key={entry.user_id} className="py-2">
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            {entry.avatar_url
+                              ? <img src={entry.avatar_url} className="h-7 w-7 rounded-full object-cover" alt="" />
+                              : <div className="h-7 w-7 rounded-full bg-primary-100 flex items-center justify-center text-xs font-bold text-primary-600">{entry.display_name[0]?.toUpperCase()}</div>
+                            }
+                            <span className="font-medium text-theme">{entry.display_name}</span>
+                            {entry.role === 'owner' && <Crown className="h-3 w-3 text-amber-500" />}
+                            {entry.role === 'admin' && <Shield className="h-3 w-3 text-blue-500" />}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center text-muted">
+                          {entry.chapters_completed}/{entry.chapters_total}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
+                              <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${itemPct}%` }} />
+                            </div>
+                            <span className="text-muted text-xs shrink-0">{itemPct}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3 text-right text-muted text-xs">
+                          {entry.last_active ? timeAgo(entry.last_active) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Settings ── */}
       {tab === 'settings' && isAdmin && (
         <div className="space-y-6">
@@ -1070,7 +1169,7 @@ export default function ClubDetailPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => { setEditingSettings(true); setSettingsDraft(club.settings ?? { show_member_reading_progress: true, show_member_answers: false, show_member_highlights: true, show_member_media: true }); }}
+                  onClick={() => { setEditingSettings(true); setSettingsDraft(club.settings ?? { show_member_reading_progress: true, show_member_answers: false, show_member_highlights: true, show_member_media: true, enable_progress_tracking: false }); }}
                   className="text-sm theme-button-secondary px-3 py-1.5 rounded-lg"
                 >
                   Edit
@@ -1079,7 +1178,8 @@ export default function ClubDetailPage() {
             </div>
 
             {[
-              { key: 'show_member_reading_progress' as const, label: 'Reading Progress', desc: 'Members can see each other\'s reading progress' },
+              { key: 'enable_progress_tracking' as const, label: 'Enable Progress Tracking', desc: 'Track member completion of forms, audio, and video in chapters — shows a Progress tab' },
+              { key: 'show_member_reading_progress' as const, label: 'Show Reading Progress Dashboard', desc: 'Allow all members to see each other\'s progress (admins always see it)' },
               { key: 'show_member_answers' as const, label: 'Q&A Answers', desc: 'Reveal other members\' answers to in-book questions' },
               { key: 'show_member_highlights' as const, label: 'Highlights', desc: 'Members can see each other\'s highlights' },
               { key: 'show_member_media' as const, label: 'Audio / Video', desc: 'Show inline media content from other members' },

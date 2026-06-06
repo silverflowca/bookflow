@@ -58,6 +58,7 @@ export interface BookSettings {
   show_author_notes: boolean;
   show_inline_form_preview?: boolean;
   allow_public_tts?: boolean;
+  enable_progress_tracking?: boolean;
 }
 
 // Chapter types

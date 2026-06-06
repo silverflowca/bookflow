@@ -458,6 +458,23 @@ export default function BookSettings() {
           </div>
         </div>
 
+        {/* Progress Tracking */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Progress Tracking</h2>
+          <p className="text-sm text-muted mb-4">
+            Track reader completion of interactive elements (forms, audio, video) and display a progress indicator in the chapter menu.
+          </p>
+
+          <div className="space-y-4">
+            <ToggleSetting
+              label="Enable progress tracking"
+              description="Readers see a progress button in the chapter sidebar showing how many interactive items they've completed. Each completed item gets a green border."
+              checked={settings.enable_progress_tracking ?? false}
+              onChange={(v) => updateSetting('enable_progress_tracking', v)}
+            />
+          </div>
+        </div>
+
         {/* Author Content Options */}
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-4 text-theme">Author Content Options</h2>

@@ -263,6 +263,26 @@ class ApiClient {
     });
   }
 
+  // Item-level progress tracking
+  async markItemComplete(chapterId: string, itemKey: string, itemType: string): Promise<void> {
+    return this.request('/progress/complete', {
+      method: 'POST',
+      body: JSON.stringify({ chapter_id: chapterId, item_key: itemKey, item_type: itemType }),
+    });
+  }
+
+  async getChapterProgress(chapterId: string): Promise<{ completions: string[]; total: number }> {
+    return this.request(`/progress/chapter/${chapterId}`);
+  }
+
+  async getBookProgress(bookId: string): Promise<{ chapter_id: string; completed: number; total: number }[]> {
+    return this.request(`/progress/book/${bookId}`);
+  }
+
+  async getClubProgress(clubId: string): Promise<{ user_id: string; display_name: string; avatar_url: string | null; role: string; items_completed: number; items_total: number; chapters_completed: number; chapters_total: number; last_active: string | null }[]> {
+    return this.request(`/progress/club/${clubId}`);
+  }
+
   // Files
   async getUploadUrl(fileName: string, fileType: string, bookId?: string): Promise<{ upload_url: string; storage_path: string; token: string; fileflow_folder_id?: string | null; use_supabase?: boolean }> {
     return this.request('/files/upload', {

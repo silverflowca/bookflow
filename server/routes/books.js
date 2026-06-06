@@ -211,6 +211,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     show_author_notes,
     show_inline_form_preview,
     allow_public_tts,
+    enable_progress_tracking,
   } = req.body;
 
   try {
@@ -225,6 +226,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         show_author_notes,
         show_inline_form_preview,
         allow_public_tts,
+        enable_progress_tracking,
       })
       .eq('book_id', req.params.id)
       .select()

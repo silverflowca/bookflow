@@ -1,11 +1,19 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef, createContext, useContext } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
-  Check, AlertCircle, Users, Lock, Globe
+  Check, AlertCircle, Users, Lock, Globe, CheckCircle
 } from 'lucide-react';
+
+// Context for progress tracking — avoids prop-drilling into deeply nested block components
+interface ProgressCtx {
+  completions: Set<string>;
+  markComplete: (itemKey: string, itemType: string) => void;
+  enabled: boolean;
+}
+const ProgressContext = createContext<ProgressCtx>({ completions: new Set(), markComplete: () => {}, enabled: false });
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
@@ -41,6 +49,12 @@ export default function BookReader() {
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [ttsAudio, setTtsAudio] = useState<HTMLAudioElement | null>(null);
+
+  // Progress tracking
+  const [chapterCompletions, setChapterCompletions] = useState<Set<string>>(new Set());
+  const [chapterProgressTotal, setChapterProgressTotal] = useState(0);
+  const [bookChapterStats, setBookChapterStats] = useState<Map<string, { completed: number; total: number }>>(new Map());
+  const [showProgressPanel, setShowProgressPanel] = useState(false);
 
   // Live episode banner
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string; guest_invite_url?: string; live_shows?: { guest_invite_url?: string } } | null>(null);
@@ -298,10 +312,46 @@ export default function BookReader() {
       ]);
       setChapter(chapterData);
       setInlineContent(contentData);
+
+      // Load progress if tracking is enabled and user is logged in
+      const progressEnabled = book?.settings?.enable_progress_tracking;
+      if (user && progressEnabled && chapterId) {
+        try {
+          const [chapProg, bookProg] = await Promise.all([
+            api.getChapterProgress(chapterId),
+            api.getBookProgress(bookId!),
+          ]);
+          setChapterCompletions(new Set(chapProg.completions));
+          setChapterProgressTotal(chapProg.total);
+          const statsMap = new Map<string, { completed: number; total: number }>();
+          bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
+          setBookChapterStats(statsMap);
+        } catch { /* non-fatal — progress silently unavailable */ }
+      } else {
+        setChapterCompletions(new Set());
+        setChapterProgressTotal(0);
+      }
     } catch (err) {
       console.error('Failed to load chapter:', err);
     }
   }
+
+  const progressEnabled = !!(user && book?.settings?.enable_progress_tracking);
+
+  const markComplete = useCallback(async (itemKey: string, itemType: string) => {
+    if (!progressEnabled || !chapterId) return;
+    if (chapterCompletions.has(itemKey)) return; // already done
+    try {
+      await api.markItemComplete(chapterId, itemKey, itemType);
+      setChapterCompletions(prev => new Set([...prev, itemKey]));
+      setBookChapterStats(prev => {
+        const m = new Map(prev);
+        const s = m.get(chapterId) ?? { completed: 0, total: chapterProgressTotal };
+        m.set(chapterId, { ...s, completed: Math.min(s.completed + 1, s.total) });
+        return m;
+      });
+    } catch { /* silent — don't interrupt reading flow */ }
+  }, [progressEnabled, chapterId, chapterCompletions, chapterProgressTotal]);
 
   const currentChapterIndex = useMemo(() => {
     return book?.chapters?.findIndex(c => c.id === chapterId) ?? -1;
@@ -456,24 +506,48 @@ export default function BookReader() {
             <h2 className="font-bold text-lg">{book.title}</h2>
             {book.subtitle && <p className="text-sm text-muted">{book.subtitle}</p>}
             <p className="text-sm text-muted mt-1">by {book.author?.display_name}</p>
+
+            {/* Progress button — shown when tracking is enabled */}
+            {progressEnabled && (() => {
+              const totalDone = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.completed, 0);
+              const totalItems = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.total, 0);
+              return (
+                <button
+                  onClick={() => setShowProgressPanel(true)}
+                  className="mt-3 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme text-sm text-muted hover:bg-surface-hover hover:text-theme transition-colors"
+                >
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                  <span>Progress — {totalDone}/{totalItems}</span>
+                </button>
+              );
+            })()}
           </div>
 
           <div className="flex-1 overflow-y-auto">
             <nav className="px-2">
-              {book.chapters?.map((ch, index) => (
-                <Link
-                  key={ch.id}
-                  to={`/book/${bookId}/chapter/${ch.id}`}
-                  onClick={() => setShowToc(false)}
-                  className={`block px-3 py-2 rounded text-sm ${
-                    ch.id === chapterId
-                      ? 'bg-primary-100 text-primary-700 font-medium'
-                      : 'text-theme hover:bg-surface-hover'
-                  }`}
-                >
-                  {index + 1}. {ch.title}
-                </Link>
-              ))}
+              {book.chapters?.map((ch, index) => {
+                const stat = progressEnabled ? bookChapterStats.get(ch.id) : null;
+                const chDone = stat && stat.total > 0 && stat.completed >= stat.total;
+                return (
+                  <Link
+                    key={ch.id}
+                    to={`/book/${bookId}/chapter/${ch.id}`}
+                    onClick={() => setShowToc(false)}
+                    className={`flex items-center px-3 py-2 rounded text-sm ${
+                      ch.id === chapterId
+                        ? 'bg-primary-100 text-primary-700 font-medium'
+                        : 'text-theme hover:bg-surface-hover'
+                    }`}
+                  >
+                    <span className="flex-1 min-w-0 truncate">{index + 1}. {ch.title}</span>
+                    {stat && stat.total > 0 && (
+                      <span className={`ml-2 shrink-0 text-xs font-medium ${chDone ? 'text-green-500' : 'text-muted'}`}>
+                        {chDone ? '✓' : `${stat.completed}/${stat.total}`}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </nav>
           </div>
         </div>
@@ -579,6 +653,7 @@ export default function BookReader() {
 
         {/* Chapter Content */}
         {chapter ? (
+          <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, enabled: progressEnabled }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
             <h1 className="text-3xl font-bold mb-6">{chapter.title}</h1>
 
@@ -630,12 +705,57 @@ export default function BookReader() {
               )}
             </nav>
           </article>
+          </ProgressContext.Provider>
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-8 text-center text-muted">
             Select a chapter to start reading
           </div>
         )}
       </main>
+
+      {/* Progress Panel slide-over */}
+      {showProgressPanel && (
+        <div className="fixed inset-0 z-30 flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowProgressPanel(false)} />
+          <div className="relative ml-auto w-80 h-full bg-surface shadow-xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-theme">
+              <h3 className="font-semibold text-theme">My Progress</h3>
+              <button onClick={() => setShowProgressPanel(false)} className="text-muted hover:text-theme">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {book.chapters?.map((ch, index) => {
+                const stat = bookChapterStats.get(ch.id);
+                const done = stat ? stat.completed : 0;
+                const total = stat ? stat.total : 0;
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                const isComplete = total > 0 && done >= total;
+                return (
+                  <div key={ch.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className={`flex-1 min-w-0 truncate ${ch.id === chapterId ? 'font-semibold text-accent' : 'text-theme'}`}>
+                        {index + 1}. {ch.title}
+                      </span>
+                      <span className={`ml-2 shrink-0 text-xs font-medium ${isComplete ? 'text-green-500' : 'text-muted'}`}>
+                        {total === 0 ? '—' : isComplete ? '✓ Done' : `${done}/${total}`}
+                      </span>
+                    </div>
+                    {total > 0 && (
+                      <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${isComplete ? 'bg-green-500' : 'bg-accent'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Inline Content Panel */}
       {activeContent && (
@@ -1353,6 +1473,18 @@ function QuestionBlock({ content }: { content: InlineContent }) {
 function MediaBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+  const completedRef = useRef(false);
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement | HTMLVideoElement>) => {
+    if (completedRef.current) return;
+    const el = e.currentTarget;
+    if (el.duration && el.currentTime / el.duration >= 0.8) {
+      completedRef.current = true;
+      markComplete(itemKey, isAudio ? 'audio' : 'video');
+    }
+  };
 
   // Determine if URL is embeddable (YouTube, Vimeo, etc.)
   const getEmbedUrl = (url: string): string | null => {
@@ -1372,6 +1504,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const embedUrl = getEmbedUrl(data.url);
 
   return (
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
     <div className={`${isAudio ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'} border rounded-lg p-4`}>
       <div className="flex items-center gap-2 mb-3">
         {isAudio ? (
@@ -1397,6 +1530,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
             controls
             className="w-full"
             preload="metadata"
+            onTimeUpdate={handleTimeUpdate}
           >
             Your browser does not support the audio element.
           </audio>
@@ -1415,11 +1549,13 @@ function MediaBlock({ content }: { content: InlineContent }) {
             controls
             className="w-full rounded-lg"
             preload="metadata"
+            onTimeUpdate={handleTimeUpdate}
           >
             Your browser does not support the video element.
           </video>
         )}
       </div>
+    </div>
     </div>
   );
 }
@@ -1693,6 +1829,8 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
@@ -1705,35 +1843,37 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
       .catch(() => setSaveStatus('error'));
   };
 
   return (
-    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <ChevronRight className="h-5 w-5 text-accent" />
-          <span className="font-medium text-indigo-800">Select</span>
-          {data.required && <span className="text-red-500 text-sm">*</span>}
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ChevronRight className="h-5 w-5 text-accent" />
+            <span className="font-medium text-indigo-800">Select</span>
+            {data.required && <span className="text-red-500 text-sm">*</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            {isAuthor && <VisibilityToggle content={content} />}
+            <SaveStatusDot status={saveStatus} />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isAuthor && <VisibilityToggle content={content} />}
-          <SaveStatusDot status={saveStatus} />
-        </div>
+        <label className="block text-theme mb-2">{data.label}</label>
+        <select
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          className="w-full p-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-surface"
+        >
+          <option value="">{data.placeholder || 'Select an option...'}</option>
+          {data.options?.map((opt) => (
+            <option key={opt.id} value={opt.id}>{opt.text}</option>
+          ))}
+        </select>
+        {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
       </div>
-      <label className="block text-theme mb-2">{data.label}</label>
-      <select
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        className="w-full p-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-surface"
-      >
-        <option value="">{data.placeholder || 'Select an option...'}</option>
-        {data.options?.map((opt) => (
-          <option key={opt.id} value={opt.id}>{opt.text}</option>
-        ))}
-      </select>
-      {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
   );
 }
@@ -1744,6 +1884,8 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
@@ -1757,11 +1899,12 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newSelected })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
       .catch(() => setSaveStatus('error'));
   };
 
   return (
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
     <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -1797,6 +1940,7 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
       </div>
       {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
+    </div>
   );
 }
 
@@ -1806,6 +1950,8 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
@@ -1818,11 +1964,12 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
       .catch(() => setSaveStatus('error'));
   };
 
   return (
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
     <div className="bg-surface-hover border border-theme rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -1850,6 +1997,7 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
       )}
       {isAuthor && allResponses && <ResponseSummary result={allResponses} type="text" />}
     </div>
+    </div>
   );
 }
 
@@ -1860,6 +2008,8 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
@@ -1884,13 +2034,14 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
       .catch(() => setSaveStatus('error'));
   };
 
   const widthStyle = (data.width && data.width !== 'full') ? FIELD_WIDTH_STYLE[data.width] : { width: '100%' };
 
   return (
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
     <div className="bg-surface-hover border border-theme rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -1919,6 +2070,7 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
       )}
       {isAuthor && allResponses && <ResponseSummary result={allResponses} type="text" />}
     </div>
+    </div>
   );
 }
 
@@ -1928,6 +2080,8 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
   const [selected, setSelected] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
@@ -1940,11 +2094,12 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: optId })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
       .catch(() => setSaveStatus('error'));
   };
 
   return (
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
     <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -1981,6 +2136,7 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
       </div>
       {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
     </div>
+    </div>
   );
 }
 
@@ -1990,6 +2146,8 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
@@ -2003,11 +2161,12 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
     if (!userId) return;
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newSelected })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
       .catch(() => setSaveStatus('error'));
   };
 
   return (
+    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
     <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -2047,6 +2206,7 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
         </p>
       )}
       {isAuthor && allResponses && <ResponseSummary result={allResponses} type="choice" />}
+    </div>
     </div>
   );
 }
