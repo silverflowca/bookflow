@@ -326,7 +326,7 @@ export default function BookReader() {
           const statsMap = new Map<string, { completed: number; total: number }>();
           bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
           setBookChapterStats(statsMap);
-        } catch { /* non-fatal — progress silently unavailable */ }
+        } catch (e) { console.error('[Progress] load failed:', e); }
       } else {
         setChapterCompletions(new Set());
         setChapterProgressTotal(0);
@@ -350,7 +350,7 @@ export default function BookReader() {
         m.set(chapterId, { ...s, completed: Math.min(s.completed + 1, s.total) });
         return m;
       });
-    } catch { /* silent — don't interrupt reading flow */ }
+    } catch (e) { console.error('[Progress] markComplete failed:', e); }
   }, [progressEnabled, chapterId, chapterCompletions, chapterProgressTotal]);
 
   const currentChapterIndex = useMemo(() => {

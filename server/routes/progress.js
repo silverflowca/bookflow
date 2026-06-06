@@ -60,7 +60,6 @@ router.post('/complete', authenticate, async (req, res) => {
         .from('club_members')
         .select('club_id, club:book_clubs(club_books(book_id), settings:club_settings(enable_progress_tracking))')
         .eq('user_id', req.user.id)
-        .eq('invite_accepted_at', null)
         .not('invite_accepted_at', 'is', null);
 
       const clubEnabled = (clubMembership || []).some(m => {
