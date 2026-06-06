@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { optionalAuth } from '../middleware/auth.js';
 import supabase from '../config/supabase.js';
 
 const router = express.Router();
@@ -15,16 +15,17 @@ async function getDeepgramKey(userId) {
 }
 
 // Generate TTS audio from text
-router.post('/generate', authenticate, async (req, res) => {
+router.post('/generate', optionalAuth, async (req, res) => {
   const { text, voice = 'aura-asteria-en' } = req.body;
 
   if (!text || text.trim().length === 0) {
     return res.status(400).json({ error: 'Text is required' });
   }
 
-  const apiKey = await getDeepgramKey(req.user.id);
+  // Use user's own key if logged in, otherwise fall back to global key
+  const apiKey = req.user ? await getDeepgramKey(req.user.id) : (process.env.DEEPGRAM_API_KEY || '');
   if (!apiKey) {
-    return res.status(400).json({ error: 'Deepgram API key not configured. Add it in Settings.' });
+    return res.status(400).json({ error: 'Deepgram API key not configured.' });
   }
 
   // Limit text length to prevent abuse (Deepgram has limits)
@@ -68,7 +69,7 @@ router.post('/generate', authenticate, async (req, res) => {
 });
 
 // Get available voices
-router.get('/voices', authenticate, async (req, res) => {
+router.get('/voices', optionalAuth, async (req, res) => {
   // Deepgram Aura voices
   const voices = [
     { id: 'aura-asteria-en', name: 'Asteria', language: 'English', gender: 'female' },

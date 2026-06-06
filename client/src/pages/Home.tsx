@@ -43,12 +43,12 @@ export default function Home() {
               >
                 Start Writing
               </Link>
-              <Link
-                to="/dashboard"
+              <a
+                href="#books"
                 className="border-2 border-white text-white hover:bg-white/10 px-6 py-3 rounded-lg font-semibold"
               >
                 Browse Books
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function Home() {
       </section>
 
       {/* Published Books Section */}
-      <section className="py-20 bg-surface-hover">
+      <section id="books" className="py-20 bg-surface-hover">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-12">
             Explore Published Books
