@@ -3,7 +3,8 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
-  Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen
+  Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen,
+  LayoutGrid
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -13,6 +14,7 @@ import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import InlineContentMark from '../components/editor/InlineContentMark';
 import { InlineFormNode } from '../components/editor/InlineFormNode';
+import { ColumnLayout, ColumnCell } from '../components/editor/ColumnLayoutNode';
 import api from '../lib/api';
 import type {
   Chapter, InlineContent, MediaData, QuestionData, PollData, NoteData, LinkData, HighlightData,
@@ -45,6 +47,8 @@ export default function ChapterEditor() {
   const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
   const [bookSettings, setBookSettings] = useState<BookSettings | null>(null);
   const [markTooltip, setMarkTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
+  const [showColPicker, setShowColPicker] = useState(false);
+  const colPickerRef = useRef<HTMLDivElement>(null);
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -62,6 +66,8 @@ export default function ChapterEditor() {
       }),
       InlineContentMark,
       InlineFormNode,
+      ColumnLayout,
+      ColumnCell,
     ],
     content: '',
     editorProps: {
@@ -231,6 +237,17 @@ export default function ChapterEditor() {
 
   // Keep ref in sync so onUpdate closure can access current inlineContents without stale capture
   useEffect(() => { inlineContentsRef.current = inlineContents; }, [inlineContents]);
+
+  // Close column picker on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) {
+        setShowColPicker(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   async function loadInlineContent() {
     try {
@@ -897,6 +914,36 @@ export default function ChapterEditor() {
             >
               <BookOpen className="h-4 w-4" />
             </ToolbarButton>
+            <div className="w-px bg-surface-hover mx-1" />
+            {/* Column Layout picker */}
+            <div className="relative" ref={colPickerRef}>
+              <ToolbarButton
+                onClick={() => setShowColPicker(v => !v)}
+                active={showColPicker || editor?.isActive('columnLayout')}
+                title="Insert column layout"
+                className="text-violet-600"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </ToolbarButton>
+              {showColPicker && (
+                <div className="absolute top-full left-0 mt-1 bg-surface border border-theme rounded-lg shadow-lg z-50 py-1 min-w-[130px]">
+                  <p className="px-3 pt-1 pb-1 text-[10px] font-semibold text-muted uppercase tracking-wider">Columns</p>
+                  {[2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => {
+                        editor?.commands.insertColumnLayout(n);
+                        setShowColPicker(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-hover transition-colors text-theme flex items-center gap-2"
+                    >
+                      <span className="text-violet-600 font-mono text-xs">{n}×</span>
+                      {n} columns
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Editor Content */}

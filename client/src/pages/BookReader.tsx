@@ -1183,6 +1183,25 @@ function TipTapNode({
       );
     }
 
+    case 'columnLayout': {
+      const cols = node.attrs?.columns || 2;
+      return (
+        <div
+          className="column-layout-reader my-4"
+          style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '16px' }}
+        >
+          {renderChildren(node.content || [], nodeKeyPrefix || 'col')}
+        </div>
+      );
+    }
+
+    case 'columnCell':
+      return (
+        <div className="column-cell min-w-0">
+          {renderChildren(node.content || [], nodeKeyPrefix || 'cc')}
+        </div>
+      );
+
     case 'hardBreak':
       return <br />;
 

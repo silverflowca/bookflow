@@ -145,6 +145,22 @@ body {
   height: 0;
 }
 
+/* Column layout — editor cells */
+.column-cell {
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-height: 60px;
+  background: var(--color-surface);
+}
+
+/* Column layout — reader (no borders, just the grid gap) */
+.column-layout-reader .column-cell {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
 /* Inline content markers */
 .inline-question {
   background-color: rgba(59, 130, 246, 0.15);
