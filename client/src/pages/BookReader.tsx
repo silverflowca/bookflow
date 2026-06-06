@@ -312,31 +312,31 @@ export default function BookReader() {
       ]);
       setChapter(chapterData);
       setInlineContent(contentData);
-
-      // Load progress if tracking is enabled and user is logged in
-      const progressEnabled = book?.settings?.enable_progress_tracking;
-      if (user && progressEnabled && chapterId) {
-        try {
-          const [chapProg, bookProg] = await Promise.all([
-            api.getChapterProgress(chapterId),
-            api.getBookProgress(bookId!),
-          ]);
-          setChapterCompletions(new Set(chapProg.completions));
-          setChapterProgressTotal(chapProg.total);
-          const statsMap = new Map<string, { completed: number; total: number }>();
-          bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
-          setBookChapterStats(statsMap);
-        } catch (e) { console.error('[Progress] load failed:', e); }
-      } else {
-        setChapterCompletions(new Set());
-        setChapterProgressTotal(0);
-      }
     } catch (err) {
       console.error('Failed to load chapter:', err);
     }
   }
 
   const progressEnabled = !!(user && book?.settings?.enable_progress_tracking);
+
+  // Load progress whenever chapterId or book settings become available
+  useEffect(() => {
+    if (!progressEnabled || !chapterId || !bookId) {
+      setChapterCompletions(new Set());
+      setChapterProgressTotal(0);
+      return;
+    }
+    Promise.all([
+      api.getChapterProgress(chapterId),
+      api.getBookProgress(bookId),
+    ]).then(([chapProg, bookProg]) => {
+      setChapterCompletions(new Set(chapProg.completions));
+      setChapterProgressTotal(chapProg.total);
+      const statsMap = new Map<string, { completed: number; total: number }>();
+      bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
+      setBookChapterStats(statsMap);
+    }).catch(e => console.error('[Progress] load failed:', e));
+  }, [progressEnabled, chapterId, bookId]);
 
   const markComplete = useCallback(async (itemKey: string, itemType: string) => {
     if (!progressEnabled || !chapterId) return;
