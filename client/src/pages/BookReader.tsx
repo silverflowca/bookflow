@@ -526,8 +526,8 @@ export default function BookReader() {
                 Chapter {currentChapterIndex + 1} of {book.chapters?.length}
               </p>
             </div>
-            {/* TTS Button */}
-            <button
+            {/* TTS Button — shown to logged-in users always, or to public readers only if author enabled it */}
+            {(user || settings?.allow_public_tts) && <button
               onClick={handlePlayTTS}
               disabled={ttsLoading || !chapter}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -553,7 +553,7 @@ export default function BookReader() {
                   <span className="hidden sm:inline">Listen</span>
                 </>
               )}
-            </button>
+            </button>}
             {/* Edit button — visible to book author only */}
             {isAuthor && chapterId && (
               <Link

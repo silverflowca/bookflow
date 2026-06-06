@@ -448,6 +448,13 @@ export default function BookSettings() {
               checked={settings.allow_reader_links ?? false}
               onChange={(v) => updateSetting('allow_reader_links', v)}
             />
+
+            <ToggleSetting
+              label="Enable Listen button for public"
+              description="Show the Listen (text-to-speech) button to unauthenticated readers of this public book"
+              checked={settings.allow_public_tts ?? false}
+              onChange={(v) => updateSetting('allow_public_tts', v)}
+            />
           </div>
         </div>
 

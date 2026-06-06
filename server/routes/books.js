@@ -209,7 +209,8 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     allow_reader_polls,
     show_author_highlights,
     show_author_notes,
-    show_inline_form_preview
+    show_inline_form_preview,
+    allow_public_tts,
   } = req.body;
 
   try {
@@ -222,7 +223,8 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         allow_reader_polls,
         show_author_highlights,
         show_author_notes,
-        show_inline_form_preview
+        show_inline_form_preview,
+        allow_public_tts,
       })
       .eq('book_id', req.params.id)
       .select()
