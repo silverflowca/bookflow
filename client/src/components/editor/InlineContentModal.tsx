@@ -1005,7 +1005,7 @@ function ImageForm({ onSubmit, onClose, initialData, isEditing, bookId }: { onSu
     setUploading(true);
     try {
       const result = await api.uploadMedia(file, bookId, file.name);
-      const fileUrl = result.file_url || result.url;
+      const fileUrl = result.file_url;
       setUploadedFile({ url: fileUrl, name: file.name });
       setUrl(fileUrl);
       setMode('url');

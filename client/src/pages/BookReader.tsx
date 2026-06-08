@@ -980,7 +980,8 @@ function ChapterContent({
       checkbox: 'inline-form',
       code_block: 'inline-code',
       scripture_block: 'inline-scripture',
-    }[marker.content_type];
+      image: 'inline-media',
+    }[marker.content_type as string] as string | undefined;
 
     elements.push(
       <span
@@ -1668,14 +1669,9 @@ function MediaBlock({ content }: { content: InlineContent }) {
         )}
 
         {/* Title bar */}
-        {(data.title || data.description) && (
+        {data.title && (
           <div className={`px-4 py-2.5 border-t ${isAudio ? 'border-orange-100' : 'border-slate-800 bg-slate-900'}`}>
-            {data.title && (
-              <p className={`text-sm font-medium ${isAudio ? 'text-orange-900' : 'text-slate-200'}`}>{data.title}</p>
-            )}
-            {data.description && (
-              <p className={`text-xs mt-0.5 ${isAudio ? 'text-orange-600' : 'text-slate-400'}`}>{data.description}</p>
-            )}
+            <p className={`text-sm font-medium ${isAudio ? 'text-orange-900' : 'text-slate-200'}`}>{data.title}</p>
           </div>
         )}
       </div>
