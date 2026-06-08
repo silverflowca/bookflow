@@ -1568,15 +1568,15 @@ function MediaBlock({ content }: { content: InlineContent }) {
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
-              style={{ maxHeight: '480px', objectFit: 'contain', display: 'block' }}
+              style={{ maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }}
             />
             {!playing && (
               <button
                 onClick={togglePlay}
-                className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/30"
+                className="absolute inset-0 flex items-center justify-center transition-colors hover:bg-[var(--color-surface-hover)]/40"
               >
-                <span className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
-                  <Play className="h-6 w-6 text-slate-800 ml-1" />
+                <span className="w-14 h-14 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center shadow-md">
+                  <Play className="h-6 w-6 text-theme ml-1" />
                 </span>
               </button>
             )}
@@ -2435,13 +2435,13 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
 
   if (!isAudio && embedUrl) {
     return (
-      <span className="block w-full rounded-xl overflow-hidden bg-black my-1">
-        <span className="block aspect-video">
+      <span className="block w-full rounded-xl overflow-hidden border border-[var(--color-border)] my-1">
+        <span className="block aspect-video bg-[var(--color-surface-hover)]">
           <iframe src={embedUrl} className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen title={data.title || 'Video'} />
         </span>
-        {data.title && <span className="block px-3 py-2 text-xs font-medium text-slate-300 bg-slate-900">{data.title}</span>}
+        {data.title && <span className="block px-3 py-2 text-xs uppercase tracking-wide font-medium text-muted border-t border-[var(--color-border)]">{data.title}</span>}
       </span>
     );
   }
@@ -2455,7 +2455,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
             src={data.url}
             preload="metadata"
             className="w-full block"
-            style={{ maxHeight: '320px', objectFit: 'contain', display: 'block' }}
+            style={{ maxHeight: '320px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }}
             onTimeUpdate={() => { setCurrentTime(mediaRef.current?.currentTime || 0); }}
             onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
             onPlay={() => setPlaying(true)}
@@ -2463,9 +2463,9 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
             onEnded={() => setPlaying(false)}
           />
           {!playing && (
-            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20 group-hover:bg-black/30 transition-colors">
-              <span className="w-12 h-12 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
-                <Play className="h-5 w-5 text-slate-800 ml-0.5" />
+            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-surface-hover)]/40">
+              <span className="w-12 h-12 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center shadow-md">
+                <Play className="h-5 w-5 text-theme ml-0.5" />
               </span>
             </span>
           )}
