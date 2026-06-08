@@ -393,21 +393,28 @@ export default function ChapterEditor() {
     if (!chapterId || !showInlineModal) return;
     try {
       const hasSelection = showInlineModal.selection && showInlineModal.selection.from !== showInlineModal.selection.to;
+      const isFormType = INLINE_FORM_TYPES.includes(showInlineModal.type);
+
       // When no text is selected, use the label from content_data as the anchor text
       const anchorText = hasSelection
         ? showInlineModal.selection!.text
         : ((data.content_data as any)?.label || '');
 
+      // Non-form types without a text selection must be placed in end_of_chapter
+      // (they need anchor text to be inline; without selection there's nothing to anchor to)
+      const resolvedPosition: InlineContent['position_in_chapter'] =
+        !isFormType && !hasSelection ? 'end_of_chapter' : (data.position_in_chapter ?? 'inline');
+
       const created = await api.createInlineContent(chapterId, {
         ...data,
         content_type: showInlineModal.type,
+        position_in_chapter: resolvedPosition,
         start_offset: showInlineModal.selection?.from || 0,
         end_offset: showInlineModal.selection?.to || 0,
         anchor_text: anchorText || undefined,
       });
 
       if (editor) {
-        const isFormType = INLINE_FORM_TYPES.includes(showInlineModal.type);
         const isInline = !created.position_in_chapter || created.position_in_chapter === 'inline';
         const cursorPos = showInlineModal.selection?.from || 0;
 
@@ -442,7 +449,7 @@ export default function ChapterEditor() {
               .run();
           }
         } else if (hasSelection) {
-          // Non-form types (question, poll, note, highlight): apply a Mark — requires selection
+          // Non-form types with selection: apply a mark on the selected text
           editor
             .chain()
             .focus()
@@ -450,6 +457,7 @@ export default function ChapterEditor() {
             .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
             .run();
         }
+        // Non-form types without selection → placed in end_of_chapter, no editor change needed
       }
 
       setInlineContents(prev => [...prev, created]);
