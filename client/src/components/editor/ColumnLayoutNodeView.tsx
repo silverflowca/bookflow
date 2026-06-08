@@ -8,6 +8,7 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
   const columns: number = node.attrs.columns ?? 2;
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -19,6 +20,17 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  // Force grid layout via DOM ref — works even if TipTap strips style/className from NodeViewContent
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    // Walk up to find the actual NodeViewContent div (may be el itself or its parent)
+    const target = el.querySelector('[data-node-view-content]') as HTMLElement | null ?? el;
+    target.style.display = 'grid';
+    target.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    target.style.gap = '12px';
+  }, [columns]);
 
   function handleSetColumns(n: number) {
     setOpen(false);
@@ -84,11 +96,9 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
         </button>
       </div>
 
-      {/* NodeViewContent IS the grid — styled via CSS targeting [data-node-view-content] */}
-      <NodeViewContent
-        as="div"
-        className="border border-dashed border-theme rounded-lg p-1 bg-surface/50"
-      />
+      <div ref={gridRef} className="border border-dashed border-theme rounded-lg p-1 bg-surface/50">
+        <NodeViewContent as="div" />
+      </div>
     </NodeViewWrapper>
   );
 }
