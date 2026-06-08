@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
+import { TextSelection } from '@tiptap/pm/state';
 import type { NodeView } from '@tiptap/pm/view';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
@@ -64,6 +65,9 @@ class ColumnLayoutView implements NodeView {
 
     // Toolbar row — always in normal flow at the top of the border container
     this.toolbar = this.buildToolbar();
+    // Stop all toolbar mousedown events from reaching ProseMirror so it doesn't
+    // select the node instead of placing the cursor inside a cell
+    this.toolbar.addEventListener('mousedown', (e) => { e.stopPropagation(); });
     border.appendChild(this.toolbar);
 
     // contentDOM = the actual CSS grid — ProseMirror renders children here
@@ -71,6 +75,17 @@ class ColumnLayoutView implements NodeView {
     this.applyGridStyle(node.attrs.columns ?? 2);
     border.appendChild(this.grid);
     this.contentDOM = this.grid;
+
+    // Single-click on the grid: place cursor at clicked position
+    this.grid.addEventListener('mousedown', (e) => {
+      const pos = this.editorView.posAtCoords({ left: e.clientX, top: e.clientY });
+      if (!pos) return;
+      const $pos = this.editorView.state.doc.resolve(pos.pos);
+      const sel = TextSelection.near($pos);
+      const tr = this.editorView.state.tr.setSelection(sel);
+      this.editorView.dispatch(tr);
+      this.editorView.focus();
+    });
 
     this.boundHandleClickOutside = this.handleClickOutside.bind(this);
     document.addEventListener('mousedown', this.boundHandleClickOutside);
@@ -277,12 +292,6 @@ class ColumnLayoutView implements NodeView {
     if (this._updatePickerBtn) this._updatePickerBtn(cols);
     if (this._updateColDeleteBtns) this._updateColDeleteBtns(cols);
     return true;
-  }
-
-  // Let ProseMirror handle all mouse events so a single click places the cursor
-  stopEvent(event: Event) {
-    // Only intercept events from toolbar buttons/dropdowns
-    return this.toolbar.contains(event.target as globalThis.Node);
   }
 
   destroy() {
