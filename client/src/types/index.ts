@@ -177,7 +177,7 @@ export interface ActivityEvent {
 export type InlineContentType =
   | 'question' | 'poll' | 'highlight' | 'note' | 'link' | 'audio' | 'video'
   | 'select' | 'multiselect' | 'textbox' | 'textarea' | 'radio' | 'checkbox'
-  | 'code_block' | 'scripture_block';
+  | 'code_block' | 'scripture_block' | 'image';
 
 // Display mode for interactive content
 export type InlineDisplayMode = 'inline' | 'sidebar' | 'start_of_chapter' | 'end_of_chapter';
@@ -192,12 +192,13 @@ export interface InlineContent {
   anchor_text?: string;
   content_data: QuestionData | PollData | HighlightData | NoteData | LinkData | MediaData
     | SelectData | MultiselectData | TextboxData | TextareaData | RadioData | CheckboxData
-    | CodeBlockData | ScriptureBlockData;
+    | CodeBlockData | ScriptureBlockData | ImageData;
   created_by: string;
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
   response_visibility?: 'private' | 'members_only' | 'all_readers';
   position_in_chapter: 'inline' | 'end_of_chapter' | 'start_of_chapter';
+  order_index?: number;
   display_mode?: InlineDisplayMode; // How the content is displayed to readers
   created_at: string;
   updated_at: string;
@@ -320,6 +321,13 @@ export interface ScriptureBlockData {
   title?: string;
   notes?: string;
   show_reference?: boolean;
+}
+
+export interface ImageData {
+  url: string;
+  alt?: string;
+  caption?: string;
+  width?: 'small' | 'medium' | 'large' | 'full';
 }
 
 // Form response for interactive elements

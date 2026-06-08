@@ -4,7 +4,7 @@ import {
   ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen,
-  LayoutGrid
+  LayoutGrid, Image, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -19,7 +19,7 @@ import api from '../lib/api';
 import type {
   Chapter, InlineContent, MediaData, QuestionData, PollData, NoteData, LinkData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, CollaboratorRole, BookSettings
+  CodeBlockData, ScriptureBlockData, ImageData, CollaboratorRole, BookSettings
 } from '../types';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import CommentsSidebar from '../components/comments/CommentsSidebar';
@@ -542,6 +542,33 @@ export default function ChapterEditor() {
     }
   }
 
+  async function handleReorderItem(id: string, direction: 'up' | 'down') {
+    const item = inlineContents.find(i => i.id === id);
+    if (!item) return;
+    const zone = item.position_in_chapter || 'inline';
+    const zoneItems = [...inlineContents]
+      .filter(i => (i.position_in_chapter || 'inline') === zone)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const idx = zoneItems.findIndex(i => i.id === id);
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === zoneItems.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const swapItem = zoneItems[swapIdx];
+    const newOrder = (item.order_index ?? idx);
+    const swapOrder = (swapItem.order_index ?? swapIdx);
+    try {
+      await api.reorderInlineContent(id, swapOrder);
+      await api.reorderInlineContent(swapItem.id, newOrder);
+      setInlineContents(prev => prev.map(i => {
+        if (i.id === id) return { ...i, order_index: swapOrder };
+        if (i.id === swapItem.id) return { ...i, order_index: newOrder };
+        return i;
+      }));
+    } catch (err) {
+      console.error('Failed to reorder:', err);
+    }
+  }
+
   function handleEditInlineContent(item: InlineContent) {
     setShowInlineModal({
       type: item.content_type,
@@ -914,6 +941,13 @@ export default function ChapterEditor() {
             >
               <BookOpen className="h-4 w-4" />
             </ToolbarButton>
+            <ToolbarButton
+              onClick={() => handleAddInlineContent('image')}
+              title="Add Image"
+              className="text-sky-600"
+            >
+              <Image className="h-4 w-4" />
+            </ToolbarButton>
             <div className="w-px bg-surface-hover mx-1" />
             {/* Column Layout picker */}
             <div className="relative" ref={colPickerRef}>
@@ -1035,15 +1069,18 @@ export default function ChapterEditor() {
                   </div>
                 ) : (
                   <div>
-                    {inlineContents.map((item, index) => (
+                    {[...inlineContents]
+                      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+                      .map((item, index, arr) => (
                       <InlineContentItem
                         key={item.id}
                         item={item}
                         index={index}
-                        totalItems={inlineContents.length}
+                        totalItems={arr.filter(i => (i.position_in_chapter || 'inline') === (item.position_in_chapter || 'inline')).length}
                         onToggleVisibility={handleToggleVisibility}
                         onDelete={handleDeleteInlineContent}
                         onMovePosition={handleMovePosition}
+                        onReorder={handleReorderItem}
                         onEdit={handleEditInlineContent}
                       />
                     ))}
@@ -1133,14 +1170,16 @@ function InlineContentItem({
   onToggleVisibility,
   onDelete,
   onMovePosition,
+  onReorder,
   onEdit,
-  index: _index,
-  totalItems: _totalItems
+  index,
+  totalItems
 }: {
   item: InlineContent;
   onToggleVisibility: (id: string, visibility: InlineContent['visibility']) => void;
   onDelete: (id: string) => void;
   onMovePosition: (id: string, position: InlineContent['position_in_chapter']) => void;
+  onReorder: (id: string, direction: 'up' | 'down') => void;
   onEdit: (item: InlineContent) => void;
   index: number;
   totalItems: number;
@@ -1156,6 +1195,7 @@ function InlineContentItem({
     link: <Link2 className="h-4 w-4 text-cyan-600" />,
     audio: <Play className="h-4 w-4 text-orange-600" />,
     video: <Video className="h-4 w-4 text-red-600" />,
+    image: <Image className="h-4 w-4 text-sky-600" />,
   };
 
   const bgColors: Record<string, string> = {
@@ -1166,6 +1206,7 @@ function InlineContentItem({
     link: 'bg-cyan-50',
     audio: 'bg-orange-50',
     video: 'bg-red-50',
+    image: 'bg-sky-50',
   };
 
   const isHidden = item.visibility === 'author_only';
@@ -1259,6 +1300,24 @@ function InlineContentItem({
               )}
             </div>
 
+            {/* Reorder */}
+            <button
+              onClick={(e) => { e.stopPropagation(); onReorder(item.id, 'up'); }}
+              disabled={index === 0}
+              className="p-1 text-xs text-muted hover:text-theme disabled:opacity-30 rounded"
+              title="Move up"
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onReorder(item.id, 'down'); }}
+              disabled={index === totalItems - 1}
+              className="p-1 text-xs text-muted hover:text-theme disabled:opacity-30 rounded"
+              title="Move down"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
+
             {/* Edit */}
             <button
               onClick={(e) => {
@@ -1332,19 +1391,37 @@ function ContentPreview({ item }: { item: InlineContent }) {
     case 'audio':
     case 'video': {
       const m = data as MediaData;
+      const isAudio = item.content_type === 'audio';
       return (
-        <div className="text-sm">
-          <p className="font-medium text-theme mb-2">{m.title || `${item.content_type} clip`}</p>
-          {item.content_type === 'audio' ? (
+        <div className={`rounded-xl overflow-hidden ${isAudio ? 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-3' : 'bg-black'}`}>
+          {m.title && <p className={`text-xs font-medium mb-2 ${isAudio ? 'text-orange-800' : 'text-slate-300 px-3 pt-2'}`}>{m.title}</p>}
+          {isAudio ? (
             <audio src={m.url} controls className="w-full h-8" preload="metadata" />
           ) : (
-            <video src={m.url} controls className="w-full rounded" preload="metadata" style={{ maxHeight: '150px' }} />
+            <video
+              src={m.url}
+              preload="metadata"
+              className="w-full block rounded-xl"
+              style={{ maxHeight: '140px', objectFit: 'contain', background: 'black' }}
+              controlsList="nodownload"
+              controls
+            />
           )}
           {m.duration && (
-            <p className="text-xs text-muted mt-1">
-              Duration: {Math.floor(m.duration / 60)}:{(m.duration % 60).toString().padStart(2, '0')}
+            <p className={`text-xs mt-1 ${isAudio ? 'text-orange-600' : 'text-slate-400 px-3 pb-2'}`}>
+              {Math.floor(m.duration / 60)}:{(m.duration % 60).toString().padStart(2, '0')}
             </p>
           )}
+        </div>
+      );
+    }
+
+    case 'image': {
+      const img = data as ImageData;
+      return (
+        <div className="text-sm">
+          <img src={img.url} alt={img.alt || 'Image'} className="w-full rounded object-contain max-h-36 bg-gray-50" />
+          {img.caption && <p className="text-xs text-muted mt-1 italic">{img.caption}</p>}
         </div>
       );
     }

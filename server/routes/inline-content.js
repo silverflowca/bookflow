@@ -151,7 +151,7 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
 
 // Update inline content
 router.put('/inline-content/:id', authenticate, async (req, res) => {
-  const { content_data, visibility, anchor_text, position_in_chapter, display_mode, start_offset, end_offset, response_visibility } = req.body;
+  const { content_data, visibility, anchor_text, position_in_chapter, display_mode, start_offset, end_offset, response_visibility, order_index } = req.body;
 
   try {
     // Check ownership
@@ -181,6 +181,7 @@ router.put('/inline-content/:id', authenticate, async (req, res) => {
     if (start_offset !== undefined) updateData.start_offset = start_offset;
     if (end_offset !== undefined) updateData.end_offset = end_offset;
     if (response_visibility !== undefined) updateData.response_visibility = response_visibility;
+    if (order_index !== undefined) updateData.order_index = order_index;
 
     const { data, error } = await supabase
       .from('inline_content')
@@ -197,6 +198,35 @@ router.put('/inline-content/:id', authenticate, async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('Update inline content error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reorder inline content — set a single item's order_index
+router.patch('/inline-content/:id/order', authenticate, async (req, res) => {
+  const { order_index } = req.body;
+  if (order_index === undefined || order_index === null) {
+    return res.status(400).json({ error: 'order_index is required' });
+  }
+  try {
+    const { data: existing, error: existingError } = await supabase
+      .from('inline_content')
+      .select('created_by, book:books!inline_content_book_id_fkey(author_id)')
+      .eq('id', req.params.id)
+      .single();
+    if (existingError) throw existingError;
+    const isAuthor = existing.book?.author_id === req.user.id;
+    const isCreator = existing.created_by === req.user.id;
+    if (!isCreator && !isAuthor) return res.status(403).json({ error: 'Not authorized' });
+
+    const { error } = await supabase
+      .from('inline_content')
+      .update({ order_index })
+      .eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Reorder inline content error:', err);
     res.status(500).json({ error: err.message });
   }
 });

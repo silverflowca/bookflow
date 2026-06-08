@@ -4,7 +4,7 @@ import api from '../../lib/api';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData
+  CodeBlockData, ScriptureBlockData, ImageData
 } from '../../types';
 import {
   SelectForm, MultiselectForm, TextboxForm, TextareaForm,
@@ -38,6 +38,7 @@ export default function InlineContentModal({ type, selectedText, bookId, onClose
     link: isEditing ? 'Edit Link' : 'Add Link',
     audio: isEditing ? 'Edit Audio' : 'Add Audio',
     video: isEditing ? 'Edit Video' : 'Add Video',
+    image: isEditing ? 'Edit Image' : 'Add Image',
     select: isEditing ? 'Edit Select' : 'Add Select Dropdown',
     multiselect: isEditing ? 'Edit Multi-Select' : 'Add Multi-Select',
     textbox: isEditing ? 'Edit Text Input' : 'Add Text Input',
@@ -109,6 +110,7 @@ export default function InlineContentModal({ type, selectedText, bookId, onClose
           {type === 'link' && <LinkForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as LinkData} isEditing={isEditing} />}
           {type === 'audio' && <MediaForm type="audio" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
           {type === 'video' && <MediaForm type="video" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
+          {type === 'image' && <ImageForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ImageData} isEditing={isEditing} bookId={bookId} />}
           
           {type === 'select' && <SelectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SelectData} isEditing={isEditing} />}
           {type === 'multiselect' && <MultiselectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MultiselectData} isEditing={isEditing} />}
@@ -984,5 +986,153 @@ function FormButtons({
         )}
       </button>
     </div>
+  );
+}
+
+function ImageForm({ onSubmit, onClose, initialData, isEditing, bookId }: { onSubmit: (data: Partial<InlineContent>) => void; onClose: () => void; initialData?: ImageData; isEditing?: boolean; bookId?: string }) {
+  const [mode, setMode] = useState<'url' | 'upload'>(initialData?.url ? 'url' : 'url');
+  const [url, setUrl] = useState(initialData?.url || '');
+  const [alt, setAlt] = useState(initialData?.alt || '');
+  const [caption, setCaption] = useState(initialData?.caption || '');
+  const [width, setWidth] = useState<ImageData['width']>(initialData?.width || 'full');
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await api.uploadMedia(file, bookId, file.name);
+      const fileUrl = result.file_url || result.url;
+      setUploadedFile({ url: fileUrl, name: file.name });
+      setUrl(fileUrl);
+      setMode('url');
+    } catch (err) {
+      alert('Upload failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalUrl = url.trim();
+    if (!finalUrl) return;
+    const contentData: ImageData = { url: finalUrl, alt: alt.trim() || undefined, caption: caption.trim() || undefined, width };
+    onSubmit({ content_data: contentData, visibility: 'all_readers', position_in_chapter: 'end_of_chapter' });
+  };
+
+  const previewUrl = url.trim();
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Source mode toggle */}
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        {(['url', 'upload'] as const).map(m => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
+              mode === m ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500' : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            {m === 'url' ? <><LinkIcon className="h-3.5 w-3.5" /> URL</> : <><Upload className="h-3.5 w-3.5" /> Upload</>}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'url' ? (
+        <div>
+          <label className="block text-sm font-medium mb-1">Image URL</label>
+          <input
+            type="url"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+            required
+          />
+          {uploadedFile && <p className="text-xs text-green-600 mt-1">Uploaded: {uploadedFile.name}</p>}
+        </div>
+      ) : (
+        <div>
+          <label className="block text-sm font-medium mb-1">Upload Image</label>
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? (
+              <div className="flex items-center justify-center gap-2 text-blue-600">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+                Uploading...
+              </div>
+            ) : (
+              <>
+                <Upload className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-sm text-gray-500">Click to select an image</p>
+                <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF, WebP</p>
+              </>
+            )}
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+        </div>
+      )}
+
+      {/* Preview */}
+      {previewUrl && (
+        <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+          <img src={previewUrl} alt={alt || 'Preview'} className="w-full object-contain max-h-48" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Alt text <span className="text-gray-400 font-normal">(for accessibility)</span></label>
+        <input
+          type="text"
+          value={alt}
+          onChange={e => setAlt(e.target.value)}
+          placeholder="Describe the image..."
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Caption <span className="text-gray-400 font-normal">(optional)</span></label>
+        <input
+          type="text"
+          value={caption}
+          onChange={e => setCaption(e.target.value)}
+          placeholder="Caption shown below image..."
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Width</label>
+        <div className="flex gap-2">
+          {(['small', 'medium', 'large', 'full'] as const).map(w => (
+            <button
+              key={w}
+              type="button"
+              onClick={() => setWidth(w)}
+              className={`flex-1 py-1.5 text-xs rounded border font-medium transition-colors ${
+                width === w ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-400'
+              }`}
+            >
+              {w.charAt(0).toUpperCase() + w.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <FormButtons
+        onClose={onClose}
+        disabled={!url.trim() || uploading}
+        submitText={isEditing ? 'Save Image' : 'Add Image'}
+      />
+    </form>
   );
 }

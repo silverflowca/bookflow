@@ -215,6 +215,13 @@ class ApiClient {
     return this.request(`/inline-content/${id}`, { method: 'DELETE' });
   }
 
+  async reorderInlineContent(id: string, order_index: number): Promise<void> {
+    return this.request(`/inline-content/${id}/order`, {
+      method: 'PATCH',
+      body: JSON.stringify({ order_index }),
+    });
+  }
+
   // Polls
   async votePoll(pollId: string, selectedOption: string): Promise<{ vote: any; results: Record<string, number>; total_votes: number }> {
     return this.request(`/polls/${pollId}/vote`, {

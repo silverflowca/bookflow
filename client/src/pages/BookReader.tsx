@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef, createContext
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
-  Highlighter, StickyNote, Link2, Play, Video, Volume2, Square, Loader2,
+  Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle
 } from 'lucide-react';
@@ -19,7 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import type {
   Book, Chapter, InlineContent, InlineContentType, QuestionData, PollData, MediaData, LinkData, NoteData, HighlightData,
-  SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData,
+  SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData,
   AllFormResponsesResult,
 } from '../types';
 
@@ -1420,6 +1420,9 @@ function InlineContentBlock({ content, isAuthor = false, userId }: { content: In
   if (content.content_type === 'scripture_block') {
     return <ScriptureBlockDisplay content={content} />;
   }
+  if (content.content_type === 'image') {
+    return <ImageBlock content={content} />;
+  }
   return null;
 }
 
@@ -1476,86 +1479,206 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
-  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement | HTMLVideoElement>) => {
+  const handleTimeUpdate = () => {
+    const el = mediaRef.current;
+    if (!el) return;
+    setCurrentTime(el.currentTime);
     if (completedRef.current) return;
-    const el = e.currentTarget;
     if (el.duration && el.currentTime / el.duration >= 0.8) {
       completedRef.current = true;
       markComplete(itemKey, isAudio ? 'audio' : 'video');
     }
   };
 
-  // Determine if URL is embeddable (YouTube, Vimeo, etc.)
+  const togglePlay = () => {
+    const el = mediaRef.current;
+    if (!el) return;
+    if (el.paused) { el.play(); setPlaying(true); }
+    else { el.pause(); setPlaying(false); }
+  };
+
+  const toggleMute = () => {
+    const el = mediaRef.current;
+    if (!el) return;
+    el.muted = !el.muted;
+    setMuted(el.muted);
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = mediaRef.current;
+    if (!el) return;
+    el.currentTime = Number(e.target.value);
+    setCurrentTime(el.currentTime);
+  };
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
   const getEmbedUrl = (url: string): string | null => {
-    // YouTube
-    const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (ytMatch) {
-      return `https://www.youtube.com/embed/${ytMatch[1]}`;
-    }
-    // Vimeo
-    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
-    if (vimeoMatch) {
-      return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-    }
+    const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`;
+    const vm = url.match(/vimeo\.com\/(\d+)/);
+    if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1`;
     return null;
   };
 
-  const embedUrl = getEmbedUrl(data.url);
+  const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
+  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
-    <div className={`${isAudio ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'} border rounded-lg p-4`}>
-      <div className="flex items-center gap-2 mb-3">
-        {isAudio ? (
-          <Play className="h-5 w-5 text-orange-600" />
-        ) : (
-          <Video className="h-5 w-5 text-red-600" />
-        )}
-        <span className={`font-medium ${isAudio ? 'text-orange-800' : 'text-red-800'}`}>
-          {data.title || (isAudio ? 'Audio Clip' : 'Video Clip')}
-        </span>
-        {data.duration && (
-          <span className="text-xs text-muted">
-            ({Math.floor(data.duration / 60)}:{(data.duration % 60).toString().padStart(2, '0')})
-          </span>
-        )}
-      </div>
+      <div className={`rounded-2xl overflow-hidden shadow-sm border ${isAudio ? 'border-orange-100 bg-gradient-to-br from-orange-50 to-amber-50' : 'border-slate-200 bg-black'}`}>
 
-      {/* Media Player */}
-      <div className="mt-2">
-        {isAudio ? (
-          <audio
-            src={data.url}
-            controls
-            className="w-full"
-            preload="metadata"
-            onTimeUpdate={handleTimeUpdate}
-          >
-            Your browser does not support the audio element.
-          </audio>
-        ) : embedUrl ? (
-          <div className="aspect-video rounded-lg overflow-hidden bg-black">
+        {/* Embed (YouTube/Vimeo) */}
+        {!isAudio && embedUrl && (
+          <div className="aspect-video w-full">
             <iframe
               src={embedUrl}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
+              title={data.title || 'Video'}
             />
           </div>
-        ) : (
-          <video
-            src={data.url}
-            controls
-            className="w-full rounded-lg"
-            preload="metadata"
-            onTimeUpdate={handleTimeUpdate}
-          >
-            Your browser does not support the video element.
-          </video>
+        )}
+
+        {/* Native video with custom controls */}
+        {!isAudio && !embedUrl && (
+          <div className="relative group">
+            <video
+              ref={mediaRef as React.RefObject<HTMLVideoElement>}
+              src={data.url}
+              className="w-full rounded-t-2xl block bg-black"
+              preload="metadata"
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+              style={{ maxHeight: '480px', objectFit: 'contain' }}
+            />
+            {/* Big play button overlay when paused */}
+            {!playing && (
+              <button
+                onClick={togglePlay}
+                className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity group-hover:bg-black/30"
+              >
+                <span className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-xl">
+                  <Play className="h-7 w-7 text-slate-800 ml-1" />
+                </span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Audio — waveform-style bar */}
+        {isAudio && (
+          <div className="p-4 pb-0">
+            <audio
+              ref={mediaRef as React.RefObject<HTMLAudioElement>}
+              src={data.url}
+              preload="metadata"
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+            />
+            {/* Waveform placeholder */}
+            <div className="flex items-center gap-1 mb-3 h-8">
+              {Array.from({ length: 40 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`flex-1 rounded-full transition-colors ${
+                    (i / 40) * 100 <= progressPct ? 'bg-orange-500' : 'bg-orange-200'
+                  }`}
+                  style={{ height: `${20 + Math.sin(i * 0.7) * 10 + Math.sin(i * 1.3) * 6}px` }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Controls bar — shown for native video + audio */}
+        {(isAudio || (!isAudio && !embedUrl)) && (
+          <div className={`flex items-center gap-3 px-4 py-3 ${isAudio ? '' : 'bg-slate-900'}`}>
+            {/* Play/Pause */}
+            <button
+              onClick={togglePlay}
+              disabled={!loaded && isAudio}
+              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                isAudio
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              {playing
+                ? <span className="flex gap-0.5"><span className="w-1 h-4 bg-current rounded-full" /><span className="w-1 h-4 bg-current rounded-full" /></span>
+                : <Play className="h-4 w-4 ml-0.5" />
+              }
+            </button>
+
+            {/* Time / seek */}
+            <div className="flex-1 flex items-center gap-2">
+              <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-300'}`}>
+                {formatTime(currentTime)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                value={currentTime}
+                onChange={handleSeek}
+                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, ${isAudio ? '#f97316' : '#6366f1'} ${progressPct}%, ${isAudio ? '#fed7aa' : '#334155'} ${progressPct}%)`
+                }}
+              />
+              <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-300'}`}>
+                {formatTime(duration)}
+              </span>
+            </div>
+
+            {/* Mute */}
+            <button
+              onClick={toggleMute}
+              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                isAudio
+                  ? 'text-orange-600 hover:bg-orange-100'
+                  : 'text-slate-400 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {muted
+                ? <VolumeX className="h-4 w-4" />
+                : <Volume2 className="h-4 w-4" />
+              }
+            </button>
+          </div>
+        )}
+
+        {/* Title bar */}
+        {(data.title || data.description) && (
+          <div className={`px-4 py-2.5 border-t ${isAudio ? 'border-orange-100' : 'border-slate-800 bg-slate-900'}`}>
+            {data.title && (
+              <p className={`text-sm font-medium ${isAudio ? 'text-orange-900' : 'text-slate-200'}`}>{data.title}</p>
+            )}
+            {data.description && (
+              <p className={`text-xs mt-0.5 ${isAudio ? 'text-orange-600' : 'text-slate-400'}`}>{data.description}</p>
+            )}
+          </div>
         )}
       </div>
-    </div>
     </div>
   );
 }
@@ -2280,36 +2403,141 @@ function ScriptureBlockDisplay({ content }: { content: InlineContent }) {
   );
 }
 
+// Image block
+function ImageBlock({ content }: { content: InlineContent }) {
+  const data = content.content_data as ImageData;
+  const widthClass = {
+    small: 'max-w-xs',
+    medium: 'max-w-md',
+    large: 'max-w-2xl',
+    full: 'w-full',
+  }[data.width || 'full'];
+
+  return (
+    <figure className={`${widthClass} mx-auto my-2`}>
+      <img
+        src={data.url}
+        alt={data.alt || ''}
+        className="w-full rounded-lg object-contain bg-surface-hover"
+      />
+      {data.caption && (
+        <figcaption className="text-center text-xs text-muted mt-1.5 italic">{data.caption}</figcaption>
+      )}
+    </figure>
+  );
+}
+
 // Compact inline media player — rendered directly in the text flow
 function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const getEmbedUrl = (url: string): string | null => {
     const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+    if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`;
     const vm = url.match(/vimeo\.com\/(\d+)/);
-    if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
+    if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1`;
     return null;
   };
 
   const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
+  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  return (
-    <span className={`inline-flex flex-col gap-1 w-full rounded-lg border p-3 my-1 ${isAudio ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'}`}>
-      {data.title && (
-        <span className={`text-xs font-medium ${isAudio ? 'text-orange-800' : 'text-red-800'}`}>{data.title}</span>
-      )}
-      {isAudio ? (
-        <audio src={data.url} controls className="w-full" preload="metadata" />
-      ) : embedUrl ? (
-        <span className="block w-full aspect-video rounded overflow-hidden bg-black">
+  const togglePlay = () => {
+    const el = mediaRef.current;
+    if (!el) return;
+    if (el.paused) { el.play(); setPlaying(true); } else { el.pause(); setPlaying(false); }
+  };
+  const toggleMute = () => {
+    const el = mediaRef.current;
+    if (!el) return;
+    el.muted = !el.muted;
+    setMuted(el.muted);
+  };
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+
+  if (!isAudio && embedUrl) {
+    return (
+      <span className="block w-full rounded-xl overflow-hidden bg-black my-1">
+        <span className="block aspect-video">
           <iframe src={embedUrl} className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen />
+            allowFullScreen title={data.title || 'Video'} />
         </span>
-      ) : (
-        <video src={data.url} controls className="w-full rounded" preload="metadata" />
+        {data.title && <span className="block px-3 py-2 text-xs font-medium text-slate-300 bg-slate-900">{data.title}</span>}
+      </span>
+    );
+  }
+
+  return (
+    <span className={`block w-full rounded-xl overflow-hidden my-1 ${isAudio ? 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100' : 'bg-black'}`}>
+      {!isAudio && (
+        <span className="block relative group">
+          <video
+            ref={mediaRef as React.RefObject<HTMLVideoElement>}
+            src={data.url}
+            preload="metadata"
+            className="w-full block"
+            style={{ maxHeight: '320px', objectFit: 'contain', background: 'black' }}
+            onTimeUpdate={() => { setCurrentTime(mediaRef.current?.currentTime || 0); }}
+            onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+          />
+          {!playing && (
+            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20 group-hover:bg-black/30 transition-colors">
+              <span className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                <Play className="h-5 w-5 text-slate-800 ml-0.5" />
+              </span>
+            </span>
+          )}
+        </span>
+      )}
+      {isAudio && (
+        <span className="block px-4 pt-4 pb-0">
+          <audio
+            ref={mediaRef as React.RefObject<HTMLAudioElement>}
+            src={data.url}
+            preload="metadata"
+            onTimeUpdate={() => setCurrentTime(mediaRef.current?.currentTime || 0)}
+            onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+          />
+          <span className="flex items-center gap-0.5 h-6 mb-2">
+            {Array.from({ length: 32 }).map((_, i) => (
+              <span key={i} className={`flex-1 rounded-full ${(i / 32) * 100 <= progressPct ? 'bg-orange-500' : 'bg-orange-200'}`}
+                style={{ height: `${14 + Math.sin(i * 0.8) * 7 + Math.sin(i * 1.5) * 4}px`, display: 'block' }} />
+            ))}
+          </span>
+        </span>
+      )}
+      {/* Controls */}
+      <span className={`flex items-center gap-2 px-3 py-2 ${isAudio ? '' : 'bg-slate-900'}`}>
+        <button onClick={togglePlay} className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isAudio ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+          {playing
+            ? <span className="flex gap-0.5"><span className="w-0.5 h-3.5 bg-current rounded-full" /><span className="w-0.5 h-3.5 bg-current rounded-full" /></span>
+            : <Play className="h-3.5 w-3.5 ml-0.5" />}
+        </button>
+        <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-400'}`}>{formatTime(currentTime)}</span>
+        <input type="range" min={0} max={duration || 100} step={0.1} value={currentTime}
+          onChange={e => { const el = mediaRef.current; if (el) { el.currentTime = Number(e.target.value); setCurrentTime(el.currentTime); } }}
+          className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+          style={{ background: `linear-gradient(to right, ${isAudio ? '#f97316' : '#6366f1'} ${progressPct}%, ${isAudio ? '#fed7aa' : '#334155'} ${progressPct}%)` }} />
+        <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-400'}`}>{formatTime(duration)}</span>
+        <button onClick={toggleMute} className={`w-7 h-7 rounded-full flex items-center justify-center ${isAudio ? 'text-orange-600 hover:bg-orange-100' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
+          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+        </button>
+      </span>
+      {data.title && (
+        <span className={`block px-3 pb-2 text-xs font-medium ${isAudio ? 'text-orange-900' : 'text-slate-300 bg-slate-900'}`}>{data.title}</span>
       )}
     </span>
   );
@@ -2336,6 +2564,8 @@ function InlineFormElement({ content }: { content: InlineContent }) {
       return <InlineCodeBlock content={content} />;
     case 'scripture_block':
       return <InlineScripture content={content} />;
+    case 'image':
+      return <ImageBlock content={content} />;
     default:
       return null;
   }
