@@ -85,36 +85,16 @@ class ColumnLayoutView implements NodeView {
   private buildToolbar(): HTMLElement {
     const bar = document.createElement('div');
     bar.contentEditable = 'false';
-    // Sits in normal flow — collapses when not hovered so grid starts right below
+    // Always visible — no show/hide toggling that could interfere with media controls
     bar.style.cssText = [
       'display: flex',
       'align-items: center',
       'gap: 4px',
-      'overflow: hidden',
-      'max-height: 0',
-      'opacity: 0',
-      'pointer-events: none',
-      'transition: max-height 0.15s ease, opacity 0.15s ease',
-      'margin-bottom: 0',
+      'padding-bottom: 4px',
+      'margin-bottom: 4px',
+      'border-bottom: 1px solid var(--color-border)',
+      'flex-wrap: wrap',
     ].join(';');
-
-    const showBar = () => {
-      bar.style.maxHeight = '32px';
-      bar.style.opacity = '1';
-      bar.style.pointerEvents = 'auto';
-      bar.style.marginBottom = '4px';
-    };
-    const hideBar = () => {
-      if (!this.menuOpen) {
-        bar.style.maxHeight = '0';
-        bar.style.opacity = '0';
-        bar.style.pointerEvents = 'none';
-        bar.style.marginBottom = '0';
-      }
-    };
-
-    this.dom.addEventListener('mouseenter', showBar);
-    this.dom.addEventListener('mouseleave', hideBar);
 
     // Column picker button
     const pickerWrap = document.createElement('div');
@@ -253,12 +233,6 @@ class ColumnLayoutView implements NodeView {
       this.menuOpen = false;
       const dropdown = this.toolbar.querySelector('div[style]') as HTMLElement | null;
       if (dropdown) dropdown.style.display = 'none';
-      if (!this.dom.contains(target)) {
-        this.toolbar.style.maxHeight = '0';
-        this.toolbar.style.opacity = '0';
-        this.toolbar.style.pointerEvents = 'none';
-        this.toolbar.style.marginBottom = '0';
-      }
     }
   }
 
