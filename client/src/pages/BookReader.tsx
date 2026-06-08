@@ -1538,7 +1538,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
   return (
     <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
-      <div className={`rounded-2xl overflow-hidden shadow-sm border ${isAudio ? 'border-orange-100 bg-gradient-to-br from-orange-50 to-amber-50' : 'border-slate-200 bg-black'}`}>
+      <div className={`rounded-lg overflow-hidden border ${isAudio ? 'border-[var(--color-border)] bg-[var(--color-surface)]' : 'border-slate-200 bg-black'}`}>
 
         {/* Embed (YouTube/Vimeo) */}
         {!isAudio && embedUrl && (
@@ -1559,7 +1559,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
             <video
               ref={mediaRef as React.RefObject<HTMLVideoElement>}
               src={data.url}
-              className="w-full rounded-t-2xl block bg-black"
+              className="w-full block bg-black"
               preload="metadata"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
@@ -1568,70 +1568,55 @@ function MediaBlock({ content }: { content: InlineContent }) {
               onEnded={() => setPlaying(false)}
               style={{ maxHeight: '480px', objectFit: 'contain' }}
             />
-            {/* Big play button overlay when paused */}
             {!playing && (
               <button
                 onClick={togglePlay}
-                className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity group-hover:bg-black/30"
+                className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors group-hover:bg-black/35"
               >
-                <span className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-xl">
-                  <Play className="h-7 w-7 text-slate-800 ml-1" />
+                <span className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+                  <Play className="h-6 w-6 text-slate-800 ml-1" />
                 </span>
               </button>
             )}
           </div>
         )}
 
-        {/* Audio — waveform-style bar */}
+        {/* Audio element */}
         {isAudio && (
-          <div className="p-4 pb-0">
-            <audio
-              ref={mediaRef as React.RefObject<HTMLAudioElement>}
-              src={data.url}
-              preload="metadata"
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onEnded={() => setPlaying(false)}
-            />
-            {/* Waveform placeholder */}
-            <div className="flex items-center gap-1 mb-3 h-8">
-              {Array.from({ length: 40 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={`flex-1 rounded-full transition-colors ${
-                    (i / 40) * 100 <= progressPct ? 'bg-orange-500' : 'bg-orange-200'
-                  }`}
-                  style={{ height: `${20 + Math.sin(i * 0.7) * 10 + Math.sin(i * 1.3) * 6}px` }}
-                />
-              ))}
-            </div>
-          </div>
+          <audio
+            ref={mediaRef as React.RefObject<HTMLAudioElement>}
+            src={data.url}
+            preload="metadata"
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+          />
         )}
 
-        {/* Controls bar — shown for native video + audio */}
+        {/* Controls bar */}
         {(isAudio || (!isAudio && !embedUrl)) && (
-          <div className={`flex items-center gap-3 px-4 py-3 ${isAudio ? '' : 'bg-slate-900'}`}>
+          <div className={`flex items-center gap-3 px-4 py-3 ${isAudio ? '' : 'bg-slate-900 border-t border-slate-800'}`}>
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
               disabled={!loaded && isAudio}
-              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+              className={`flex-shrink-0 w-8 h-8 rounded flex items-center justify-center transition-colors ${
                 isAudio
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
+                  ? 'bg-[var(--color-accent)] text-white hover:opacity-90'
+                  : 'bg-white/15 hover:bg-white/25 text-white'
               }`}
             >
               {playing
-                ? <span className="flex gap-0.5"><span className="w-1 h-4 bg-current rounded-full" /><span className="w-1 h-4 bg-current rounded-full" /></span>
-                : <Play className="h-4 w-4 ml-0.5" />
+                ? <span className="flex gap-[3px]"><span className="w-[3px] h-3.5 bg-current" /><span className="w-[3px] h-3.5 bg-current" /></span>
+                : <Play className="h-3.5 w-3.5 ml-0.5" />
               }
             </button>
 
             {/* Time / seek */}
             <div className="flex-1 flex items-center gap-2">
-              <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-300'}`}>
+              <span className={`text-xs tabular-nums w-9 shrink-0 ${isAudio ? 'text-muted' : 'text-slate-400'}`}>
                 {formatTime(currentTime)}
               </span>
               <input
@@ -1641,12 +1626,12 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 step={0.1}
                 value={currentTime}
                 onChange={handleSeek}
-                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                className="flex-1 h-1 appearance-none cursor-pointer rounded-none"
                 style={{
-                  background: `linear-gradient(to right, ${isAudio ? '#f97316' : '#6366f1'} ${progressPct}%, ${isAudio ? '#fed7aa' : '#334155'} ${progressPct}%)`
+                  background: `linear-gradient(to right, var(--color-accent) ${progressPct}%, ${isAudio ? 'var(--color-border)' : '#334155'} ${progressPct}%)`
                 }}
               />
-              <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-300'}`}>
+              <span className={`text-xs tabular-nums w-9 shrink-0 text-right ${isAudio ? 'text-muted' : 'text-slate-400'}`}>
                 {formatTime(duration)}
               </span>
             </div>
@@ -1654,24 +1639,21 @@ function MediaBlock({ content }: { content: InlineContent }) {
             {/* Mute */}
             <button
               onClick={toggleMute}
-              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+              className={`flex-shrink-0 w-7 h-7 flex items-center justify-center transition-colors rounded ${
                 isAudio
-                  ? 'text-orange-600 hover:bg-orange-100'
+                  ? 'text-muted hover:text-theme hover:bg-[var(--color-surface-hover)]'
                   : 'text-slate-400 hover:bg-white/10 hover:text-white'
               }`}
             >
-              {muted
-                ? <VolumeX className="h-4 w-4" />
-                : <Volume2 className="h-4 w-4" />
-              }
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
           </div>
         )}
 
-        {/* Title bar */}
+        {/* Title */}
         {data.title && (
-          <div className={`px-4 py-2.5 border-t ${isAudio ? 'border-orange-100' : 'border-slate-800 bg-slate-900'}`}>
-            <p className={`text-sm font-medium ${isAudio ? 'text-orange-900' : 'text-slate-200'}`}>{data.title}</p>
+          <div className={`px-4 py-2 border-t ${isAudio ? 'border-[var(--color-border)]' : 'border-slate-800 bg-slate-900'}`}>
+            <p className={`text-xs font-medium tracking-wide uppercase ${isAudio ? 'text-muted' : 'text-slate-400'}`}>{data.title}</p>
           </div>
         )}
       </div>
@@ -2471,7 +2453,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   }
 
   return (
-    <span className={`block w-full rounded-xl overflow-hidden my-1 ${isAudio ? 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100' : 'bg-black'}`}>
+    <span className={`block w-full rounded-lg overflow-hidden my-1 border ${isAudio ? 'border-[var(--color-border)] bg-[var(--color-surface)]' : 'bg-black border-slate-700'}`}>
       {!isAudio && (
         <span className="block relative group">
           <video
@@ -2487,8 +2469,8 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
             onEnded={() => setPlaying(false)}
           />
           {!playing && (
-            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20 group-hover:bg-black/30 transition-colors">
-              <span className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/25 group-hover:bg-black/35 transition-colors">
+              <span className="w-12 h-12 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
                 <Play className="h-5 w-5 text-slate-800 ml-0.5" />
               </span>
             </span>
@@ -2496,44 +2478,36 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
         </span>
       )}
       {isAudio && (
-        <span className="block px-4 pt-4 pb-0">
-          <audio
-            ref={mediaRef as React.RefObject<HTMLAudioElement>}
-            src={data.url}
-            preload="metadata"
-            onTimeUpdate={() => setCurrentTime(mediaRef.current?.currentTime || 0)}
-            onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-          />
-          <span className="flex items-center gap-0.5 h-6 mb-2">
-            {Array.from({ length: 32 }).map((_, i) => (
-              <span key={i} className={`flex-1 rounded-full ${(i / 32) * 100 <= progressPct ? 'bg-orange-500' : 'bg-orange-200'}`}
-                style={{ height: `${14 + Math.sin(i * 0.8) * 7 + Math.sin(i * 1.5) * 4}px`, display: 'block' }} />
-            ))}
-          </span>
-        </span>
+        <audio
+          ref={mediaRef as React.RefObject<HTMLAudioElement>}
+          src={data.url}
+          preload="metadata"
+          onTimeUpdate={() => setCurrentTime(mediaRef.current?.currentTime || 0)}
+          onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+        />
       )}
       {/* Controls */}
-      <span className={`flex items-center gap-2 px-3 py-2 ${isAudio ? '' : 'bg-slate-900'}`}>
-        <button onClick={togglePlay} className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isAudio ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+      <span className={`flex items-center gap-2 px-3 py-2 ${isAudio ? '' : 'bg-slate-900 border-t border-slate-800'}`}>
+        <button onClick={togglePlay} className={`w-7 h-7 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isAudio ? 'bg-[var(--color-accent)] text-white hover:opacity-90' : 'bg-white/15 hover:bg-white/25 text-white'}`}>
           {playing
-            ? <span className="flex gap-0.5"><span className="w-0.5 h-3.5 bg-current rounded-full" /><span className="w-0.5 h-3.5 bg-current rounded-full" /></span>
-            : <Play className="h-3.5 w-3.5 ml-0.5" />}
+            ? <span className="flex gap-[3px]"><span className="w-[3px] h-3 bg-current" /><span className="w-[3px] h-3 bg-current" /></span>
+            : <Play className="h-3 w-3 ml-0.5" />}
         </button>
-        <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-400'}`}>{formatTime(currentTime)}</span>
+        <span className={`text-xs tabular-nums w-8 shrink-0 ${isAudio ? 'text-muted' : 'text-slate-400'}`}>{formatTime(currentTime)}</span>
         <input type="range" min={0} max={duration || 100} step={0.1} value={currentTime}
           onChange={e => { const el = mediaRef.current; if (el) { el.currentTime = Number(e.target.value); setCurrentTime(el.currentTime); } }}
-          className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-          style={{ background: `linear-gradient(to right, ${isAudio ? '#f97316' : '#6366f1'} ${progressPct}%, ${isAudio ? '#fed7aa' : '#334155'} ${progressPct}%)` }} />
-        <span className={`text-xs tabular-nums ${isAudio ? 'text-orange-700' : 'text-slate-400'}`}>{formatTime(duration)}</span>
-        <button onClick={toggleMute} className={`w-7 h-7 rounded-full flex items-center justify-center ${isAudio ? 'text-orange-600 hover:bg-orange-100' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
+          className="flex-1 h-1 appearance-none cursor-pointer rounded-none"
+          style={{ background: `linear-gradient(to right, var(--color-accent) ${progressPct}%, ${isAudio ? 'var(--color-border)' : '#334155'} ${progressPct}%)` }} />
+        <span className={`text-xs tabular-nums w-8 shrink-0 text-right ${isAudio ? 'text-muted' : 'text-slate-400'}`}>{formatTime(duration)}</span>
+        <button onClick={toggleMute} className={`w-6 h-6 rounded flex items-center justify-center ${isAudio ? 'text-muted hover:text-theme' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
           {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         </button>
       </span>
       {data.title && (
-        <span className={`block px-3 pb-2 text-xs font-medium ${isAudio ? 'text-orange-900' : 'text-slate-300 bg-slate-900'}`}>{data.title}</span>
+        <span className={`block px-3 pb-2 text-xs uppercase tracking-wide font-medium ${isAudio ? 'text-muted' : 'text-slate-400 bg-slate-900'}`}>{data.title}</span>
       )}
     </span>
   );
