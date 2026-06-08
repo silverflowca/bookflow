@@ -90,10 +90,12 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
         </button>
       </div>
 
-      {/* Column grid — NodeViewContent renders child columnCell nodes */}
-      <div style={gridStyle} className="border border-dashed border-theme rounded-lg p-1 bg-surface/50">
-        <NodeViewContent as="div" className="contents" />
-      </div>
+      {/* Column grid — NodeViewContent IS the grid container so cells are direct children */}
+      <NodeViewContent
+        as="div"
+        className="border border-dashed border-theme rounded-lg p-1 bg-surface/50"
+        style={gridStyle}
+      />
     </NodeViewWrapper>
   );
 }
