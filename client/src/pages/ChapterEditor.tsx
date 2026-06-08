@@ -388,53 +388,87 @@ export default function ChapterEditor() {
   }
 
   const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox'];
+  // Types that can be inserted as an atom node at the cursor (no text selection needed)
+  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'question', 'poll', 'highlight', 'note', 'link', 'code_block', 'scripture_block'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
     try {
       const hasSelection = showInlineModal.selection && showInlineModal.selection.from !== showInlineModal.selection.to;
       const isFormType = INLINE_FORM_TYPES.includes(showInlineModal.type);
+      const isCursorInsertable = CURSOR_INSERTABLE_TYPES.includes(showInlineModal.type);
+      // hasCursor: user clicked a position in the editor (even without selecting text)
+      const cursorPos = showInlineModal.selection?.from ?? 0;
+      const hasCursor = cursorPos > 0;
 
       // When no text is selected, use the label from content_data as the anchor text
       const anchorText = hasSelection
         ? showInlineModal.selection!.text
-        : ((data.content_data as any)?.label || '');
+        : ((data.content_data as any)?.label || (data.content_data as any)?.title || '');
 
-      // Non-form types without a text selection must be placed in end_of_chapter
-      // (they need anchor text to be inline; without selection there's nothing to anchor to)
+      // Determine insertion position:
+      // - Has selection → inline (form/mark)
+      // - Form type, no selection → inline at cursor
+      // - Media/image/other with cursor → inline at cursor
+      // - Media/image/other, no cursor → end_of_chapter
       const resolvedPosition: InlineContent['position_in_chapter'] =
-        !isFormType && !hasSelection ? 'end_of_chapter' : (data.position_in_chapter ?? 'inline');
+        hasSelection || isFormType || (isCursorInsertable && hasCursor)
+          ? (data.position_in_chapter ?? 'inline')
+          : 'end_of_chapter';
 
       const created = await api.createInlineContent(chapterId, {
         ...data,
         content_type: showInlineModal.type,
         position_in_chapter: resolvedPosition,
-        start_offset: showInlineModal.selection?.from || 0,
-        end_offset: showInlineModal.selection?.to || 0,
+        start_offset: cursorPos,
+        end_offset: showInlineModal.selection?.to || cursorPos,
         anchor_text: anchorText || undefined,
       });
 
       if (editor) {
         const isInline = !created.position_in_chapter || created.position_in_chapter === 'inline';
-        const cursorPos = showInlineModal.selection?.from || 0;
 
-        if (isFormType && isInline) {
-          if (hasSelection) {
-            // Replace the selected anchor text with an InlineFormNode atom
+        if (isInline) {
+          if (isFormType) {
+            if (hasSelection) {
+              // Replace the selected anchor text with an InlineFormNode atom
+              editor
+                .chain()
+                .focus()
+                .setTextSelection({ from: showInlineModal.selection!.from, to: showInlineModal.selection!.to })
+                .insertInlineFormNode({
+                  contentId: created.id,
+                  contentType: showInlineModal.type,
+                  anchorText,
+                  contentData: created.content_data ?? null,
+                  position: (created.position_in_chapter as any) ?? 'inline',
+                })
+                .run();
+            } else {
+              // No selection: insert the form node at cursor
+              editor
+                .chain()
+                .focus()
+                .setTextSelection(cursorPos)
+                .insertInlineFormNode({
+                  contentId: created.id,
+                  contentType: showInlineModal.type,
+                  anchorText,
+                  contentData: created.content_data ?? null,
+                  position: (created.position_in_chapter as any) ?? 'inline',
+                })
+                .run();
+            }
+          } else if (hasSelection) {
+            // Non-form with selection: apply a mark on the selected text
             editor
               .chain()
               .focus()
               .setTextSelection({ from: showInlineModal.selection!.from, to: showInlineModal.selection!.to })
-              .insertInlineFormNode({
-                contentId: created.id,
-                contentType: showInlineModal.type,
-                anchorText,
-                contentData: created.content_data ?? null,
-                position: (created.position_in_chapter as any) ?? 'inline',
-              })
+              .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
               .run();
-          } else {
-            // No selection: insert the node at the cursor position
+          } else if (isCursorInsertable && hasCursor) {
+            // Media/image with cursor but no selection: insert atom node at cursor position
             editor
               .chain()
               .focus()
@@ -444,20 +478,12 @@ export default function ChapterEditor() {
                 contentType: showInlineModal.type,
                 anchorText,
                 contentData: created.content_data ?? null,
-                position: (created.position_in_chapter as any) ?? 'inline',
+                position: 'inline',
               })
               .run();
           }
-        } else if (hasSelection) {
-          // Non-form types with selection: apply a mark on the selected text
-          editor
-            .chain()
-            .focus()
-            .setTextSelection({ from: showInlineModal.selection!.from, to: showInlineModal.selection!.to })
-            .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
-            .run();
         }
-        // Non-form types without selection → placed in end_of_chapter, no editor change needed
+        // Non-inline → placed in panel, no editor change needed
       }
 
       setInlineContents(prev => [...prev, created]);
@@ -1136,6 +1162,7 @@ export default function ChapterEditor() {
         <InlineContentModal
           type={showInlineModal.type}
           selectedText={showInlineModal.selection?.text}
+          hasCursor={!!(showInlineModal.selection?.from && showInlineModal.selection.from > 0)}
           bookId={bookId}
           onClose={() => setShowInlineModal(null)}
           onCreate={handleCreateInlineContent}

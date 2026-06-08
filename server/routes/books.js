@@ -332,4 +332,136 @@ router.put('/:id/progress', authenticate, async (req, res) => {
   }
 });
 
+// GET /books/:id/stats — author dashboard statistics
+router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
+  const bookId = req.params.id;
+  try {
+    // Fetch all data in parallel
+    const [
+      chaptersRes,
+      readersRes,
+      completedRes,
+      inlineRes,
+      formResponsesRes,
+      commentsRes,
+      completionsRes,
+    ] = await Promise.all([
+      // Chapters with word count
+      supabase.from('chapters').select('id, title, order_index, status, word_count, estimated_read_time_minutes').eq('book_id', bookId).order('order_index'),
+      // Unique readers (reading_progress rows)
+      supabase.from('reading_progress').select('user_id, percent_complete, last_read_at, completed_at').eq('book_id', bookId),
+      // Completed readers
+      supabase.from('reading_progress').select('user_id', { count: 'exact' }).eq('book_id', bookId).not('completed_at', 'is', null),
+      // Inline content breakdown by type
+      supabase.from('inline_content').select('id, content_type, chapter_id').eq('book_id', bookId).eq('is_author_content', true),
+      // Form responses total
+      supabase.from('form_responses').select('id, inline_content_id, created_at').in('inline_content_id',
+        (await supabase.from('inline_content').select('id').eq('book_id', bookId).eq('is_author_content', true)).data?.map(r => r.id) || []
+      ),
+      // Comments total
+      supabase.from('book_comments').select('id, status, created_at').eq('book_id', bookId),
+      // Chapter item completions (for progress stats)
+      supabase.from('chapter_item_completions').select('user_id, chapter_id, item_type, completed_at').in('chapter_id',
+        (await supabase.from('chapters').select('id').eq('book_id', bookId)).data?.map(c => c.id) || []
+      ),
+    ]);
+
+    const chapters = chaptersRes.data || [];
+    const readers = readersRes.data || [];
+    const inlineContent = inlineRes.data || [];
+    const formResponses = formResponsesRes.data || [];
+    const comments = commentsRes.data || [];
+    const completions = completionsRes.data || [];
+
+    // Total word count
+    const totalWords = chapters.reduce((sum, c) => sum + (c.word_count || 0), 0);
+    const publishedChapters = chapters.filter(c => c.status === 'published');
+
+    // Reader stats
+    const totalReaders = readers.length;
+    const completedReaders = completedRes.count || 0;
+    const avgProgress = readers.length
+      ? Math.round(readers.reduce((sum, r) => sum + (r.percent_complete || 0), 0) / readers.length)
+      : 0;
+
+    // Active readers (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const activeReaders = readers.filter(r => r.last_read_at > thirtyDaysAgo).length;
+
+    // Content breakdown
+    const contentByType = inlineContent.reduce((acc, ic) => {
+      acc[ic.content_type] = (acc[ic.content_type] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Form response counts per chapter
+    const inlineByChapter = {};
+    for (const ic of inlineContent) {
+      if (!inlineByChapter[ic.chapter_id]) inlineByChapter[ic.chapter_id] = [];
+      inlineByChapter[ic.chapter_id].push(ic.id);
+    }
+    const responsesByChapter = {};
+    for (const fr of formResponses) {
+      const ch = inlineContent.find(ic => ic.id === fr.inline_content_id)?.chapter_id;
+      if (ch) responsesByChapter[ch] = (responsesByChapter[ch] || 0) + 1;
+    }
+
+    // Completion stats per chapter
+    const completionsByChapter = {};
+    const uniqueReadersByChapter = {};
+    for (const c of completions) {
+      if (!completionsByChapter[c.chapter_id]) completionsByChapter[c.chapter_id] = 0;
+      completionsByChapter[c.chapter_id]++;
+      if (!uniqueReadersByChapter[c.chapter_id]) uniqueReadersByChapter[c.chapter_id] = new Set();
+      uniqueReadersByChapter[c.chapter_id].add(c.user_id);
+    }
+
+    // Per-chapter stats
+    const chapterStats = chapters.map(ch => ({
+      id: ch.id,
+      title: ch.title,
+      order_index: ch.order_index,
+      status: ch.status,
+      word_count: ch.word_count || 0,
+      read_time: ch.estimated_read_time_minutes || 0,
+      components: inlineByChapter[ch.id]?.length || 0,
+      form_responses: responsesByChapter[ch.id] || 0,
+      completions: completionsByChapter[ch.id] || 0,
+      unique_readers: uniqueReadersByChapter[ch.id]?.size || 0,
+    }));
+
+    // Recent activity (last 10 completions)
+    const recentCompletions = [...completions]
+      .sort((a, b) => b.completed_at?.localeCompare(a.completed_at))
+      .slice(0, 10);
+
+    // Comments breakdown
+    const openComments = comments.filter(c => c.status === 'open').length;
+    const resolvedComments = comments.filter(c => c.status === 'resolved').length;
+
+    res.json({
+      overview: {
+        total_chapters: chapters.length,
+        published_chapters: publishedChapters.length,
+        total_words: totalWords,
+        total_readers: totalReaders,
+        active_readers: activeReaders,
+        completed_readers: completedReaders,
+        avg_progress: avgProgress,
+        total_components: inlineContent.length,
+        total_form_responses: formResponses.length,
+        total_comments: comments.length,
+        open_comments: openComments,
+        resolved_comments: resolvedComments,
+      },
+      content_by_type: contentByType,
+      chapter_stats: chapterStats,
+      recent_completions: recentCompletions,
+    });
+  } catch (err) {
+    console.error('Book stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

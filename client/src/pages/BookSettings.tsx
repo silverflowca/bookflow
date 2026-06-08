@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity } from 'lucide-react';
+import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2 } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
 
@@ -196,6 +196,13 @@ export default function BookSettings() {
         >
           <Activity className="h-4 w-4" />
           Activity
+        </Link>
+        <Link
+          to={`/edit/book/${bookId}/dashboard`}
+          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
+        >
+          <BarChart2 className="h-4 w-4" />
+          Dashboard
         </Link>
         {book.slug && (
           <a

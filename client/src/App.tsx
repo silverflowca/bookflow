@@ -16,6 +16,7 @@ import AcceptInvitePage from './pages/AcceptInvitePage';
 import BookCollaboratorsPage from './pages/BookCollaboratorsPage';
 import BookVersionsPage from './pages/BookVersionsPage';
 import BookActivityPage from './pages/BookActivityPage';
+import BookDashboardPage from './pages/BookDashboardPage';
 import PublicBookPage from './pages/PublicBookPage';
 import PublishSubmitPage from './pages/PublishSubmitPage';
 import ClubsPage from './pages/ClubsPage';
@@ -106,6 +107,12 @@ function AppRoutes() {
         <Route path="edit/book/:bookId/activity" element={
           <ProtectedRoute>
             <BookActivityPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="edit/book/:bookId/dashboard" element={
+          <ProtectedRoute>
+            <BookDashboardPage />
           </ProtectedRoute>
         } />
 

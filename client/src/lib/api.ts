@@ -290,6 +290,24 @@ class ApiClient {
     return this.request(`/progress/club/${clubId}`);
   }
 
+  async getBookStats(bookId: string): Promise<{
+    overview: {
+      total_chapters: number; published_chapters: number; total_words: number;
+      total_readers: number; active_readers: number; completed_readers: number;
+      avg_progress: number; total_components: number; total_form_responses: number;
+      total_comments: number; open_comments: number; resolved_comments: number;
+    };
+    content_by_type: Record<string, number>;
+    chapter_stats: {
+      id: string; title: string; order_index: number; status: string;
+      word_count: number; read_time: number; components: number;
+      form_responses: number; completions: number; unique_readers: number;
+    }[];
+    recent_completions: any[];
+  }> {
+    return this.request(`/books/${bookId}/stats`);
+  }
+
   // Files
   async getUploadUrl(fileName: string, fileType: string, bookId?: string): Promise<{ upload_url: string; storage_path: string; token: string; fileflow_folder_id?: string | null; use_supabase?: boolean }> {
     return this.request('/files/upload', {

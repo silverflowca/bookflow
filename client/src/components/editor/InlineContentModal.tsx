@@ -14,6 +14,7 @@ import {
 interface Props {
   type: InlineContent['content_type'];
   selectedText?: string;
+  hasCursor?: boolean;
   bookId?: string;
   onClose: () => void;
   onCreate: (data: Partial<InlineContent>) => void;
@@ -23,7 +24,7 @@ interface Props {
 
 const FORM_TYPES = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox'];
 
-export default function InlineContentModal({ type, selectedText, bookId, onClose, onCreate, editingItem, onUpdate }: Props) {
+export default function InlineContentModal({ type, selectedText, hasCursor, bookId, onClose, onCreate, editingItem, onUpdate }: Props) {
   const isEditing = !!editingItem;
   const isFormType = FORM_TYPES.includes(type);
   const [responseVisibility, setResponseVisibility] = useState<'private' | 'members_only' | 'all_readers'>(
@@ -76,9 +77,15 @@ export default function InlineContentModal({ type, selectedText, bookId, onClose
         )}
         {!selectedText && !isEditing && !isFormType && (
           <div className="px-4 pt-4">
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              No text selected — this will be added to the <strong>End of Chapter</strong> panel. You can move it later.
-            </p>
+            {hasCursor ? (
+              <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                Will be inserted <strong>inline at your cursor position</strong> in the chapter.
+              </p>
+            ) : (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                No cursor position — this will be added to the <strong>End of Chapter</strong> panel. Click in the chapter text first to insert it inline.
+              </p>
+            )}
           </div>
         )}
 
