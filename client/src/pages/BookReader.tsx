@@ -1281,27 +1281,39 @@ function TipTapNode({
 
     case 'inlineFormWidget': {
       // Atom node inserted by InlineFormNode TipTap extension.
-      // attrs: { contentId, contentType, anchorText }
+      // attrs: { contentId, contentType, anchorText, contentData }
       const contentId = node.attrs?.contentId;
       const anchorText: string = node.attrs?.anchorText || '';
+      const attrContentType: string = node.attrs?.contentType || '';
+      const attrContentData = node.attrs?.contentData;
       const ic = inlineContent.find(i => i.id === contentId);
-      if (!ic) {
+
+      // Build a synthetic InlineContent from node attrs as fallback when DB record isn't loaded
+      const effectiveIc = ic ?? (attrContentType && attrContentData ? {
+        id: contentId || '',
+        content_type: attrContentType,
+        content_data: attrContentData,
+        anchor_text: anchorText,
+        position_in_chapter: 'inline',
+      } as any : null);
+
+      if (!effectiveIc) {
         return <span>{anchorText}</span>;
       }
       // Block-level types must render as block, not inline-flex
       const BLOCK_TYPES = new Set(['image', 'audio', 'video', 'code_block', 'scripture_block']);
-      const isBlock = BLOCK_TYPES.has(ic.content_type);
-      const isFullW = isBlock || (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
-      const markerClass = getInlineContentClass(ic.content_type);
+      const isBlock = BLOCK_TYPES.has(effectiveIc.content_type);
+      const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
+      const markerClass = getInlineContentClass(effectiveIc.content_type);
       return isFullW ? (
-        <span id={`reader-inline-${ic.id}`} className="block my-3">
+        <span id={`reader-inline-${effectiveIc.id}`} className="block my-3">
           {anchorText && !isBlock && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}>{anchorText}</mark>}
-          <InlineFormElement content={ic} />
+          <InlineFormElement content={effectiveIc} />
         </span>
       ) : (
-        <span id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
+        <span id={`reader-inline-${effectiveIc.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
           {anchorText && <mark className={`${markerClass} px-0.5 rounded`}>{anchorText}</mark>}
-          <InlineFormElement content={ic} />
+          <InlineFormElement content={effectiveIc} />
         </span>
       );
     }
