@@ -146,12 +146,17 @@ body {
 }
 
 /* Column layout — editor cells */
-/* Column layout grid — editor */
-.col-grid { display: grid; gap: 12px; }
-.col-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.col-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.col-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.col-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Column layout grid — editor
+   TipTap renders NodeViewContent as [data-node-view-content].
+   We target it from the wrapper's data-columns attribute. */
+.column-layout-wrapper [data-node-view-content] {
+  display: grid;
+  gap: 12px;
+}
+.column-layout-wrapper[data-columns="2"] [data-node-view-content] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.column-layout-wrapper[data-columns="3"] [data-node-view-content] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.column-layout-wrapper[data-columns="4"] [data-node-view-content] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.column-layout-wrapper[data-columns="5"] [data-node-view-content] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 .column-cell {
   border: 1px dashed var(--color-border);

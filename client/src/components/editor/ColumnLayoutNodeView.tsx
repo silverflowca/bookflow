@@ -84,13 +84,11 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
         </button>
       </div>
 
-      {/* Column grid — inline style on a wrapper div, NodeViewContent renders cells inside */}
-      <div
-        style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: '12px' }}
+      {/* NodeViewContent IS the grid — styled via CSS targeting [data-node-view-content] */}
+      <NodeViewContent
+        as="div"
         className="border border-dashed border-theme rounded-lg p-1 bg-surface/50"
-      >
-        <NodeViewContent as="div" className="contents" />
-      </div>
+      />
     </NodeViewWrapper>
   );
 }
