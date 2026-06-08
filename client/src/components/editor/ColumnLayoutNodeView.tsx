@@ -35,12 +35,6 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
       .run();
   }
 
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-    gap: '12px',
-  };
-
   return (
     <NodeViewWrapper
       className="column-layout-wrapper my-4 relative group"
@@ -90,11 +84,10 @@ export function ColumnLayoutNodeView({ node, editor, getPos }: NodeViewProps) {
         </button>
       </div>
 
-      {/* Column grid — NodeViewContent IS the grid container so cells are direct children */}
+      {/* Column grid — grid applied via col-grid-N class */}
       <NodeViewContent
         as="div"
-        className="border border-dashed border-theme rounded-lg p-1 bg-surface/50"
-        style={gridStyle}
+        className={`col-grid col-grid-${columns} border border-dashed border-theme rounded-lg p-1 bg-surface/50`}
       />
     </NodeViewWrapper>
   );
