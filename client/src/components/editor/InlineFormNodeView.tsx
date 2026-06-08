@@ -4,7 +4,7 @@ import type {
   TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData,
 } from '../../types/index';
 
-type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox';
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
@@ -118,6 +118,52 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         </span>
       );
     }
+    case 'audio': {
+      const src = (contentData as any)?.url || (contentData as any)?.src;
+      if (!src) return <span className="text-xs opacity-60 ml-1">[no audio]</span>;
+      return (
+        <span className="block w-full mt-1" contentEditable={false}>
+          <audio
+            src={src}
+            controls
+            preload="metadata"
+            className="w-full rounded"
+            style={{ height: 36 }}
+          />
+        </span>
+      );
+    }
+    case 'video': {
+      const src = (contentData as any)?.url || (contentData as any)?.src;
+      if (!src) return <span className="text-xs opacity-60 ml-1">[no video]</span>;
+      return (
+        <span className="block w-full mt-1" contentEditable={false}>
+          <video
+            src={src}
+            controls
+            preload="metadata"
+            className="w-full rounded-lg"
+            style={{ maxHeight: 240, background: 'var(--color-surface-hover)' }}
+          />
+        </span>
+      );
+    }
+    case 'image': {
+      const src = (contentData as any)?.url || (contentData as any)?.src;
+      const alt = (contentData as any)?.alt || (contentData as any)?.caption || '';
+      if (!src) return <span className="text-xs opacity-60 ml-1">[no image]</span>;
+      return (
+        <span className="block w-full mt-1" contentEditable={false}>
+          <img
+            src={src}
+            alt={alt}
+            className="w-full rounded-lg object-cover"
+            style={{ maxHeight: 300 }}
+          />
+          {alt && <span className="block text-xs text-center opacity-60 mt-0.5">{alt}</span>}
+        </span>
+      );
+    }
     default:
       return null;
   }
@@ -132,7 +178,12 @@ const TYPE_LABEL: Record<FormType, string> = {
   multiselect: 'Multi-Select',
   radio: 'Radio',
   checkbox: 'Checkbox',
+  audio: 'Audio',
+  video: 'Video',
+  image: 'Image',
 };
+
+const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image']);
 
 // Per-type colour tokens used for the inline pill
 const TYPE_COLOR: Record<FormType, string> = {
@@ -142,6 +193,9 @@ const TYPE_COLOR: Record<FormType, string> = {
   multiselect: 'bg-violet-50 border-violet-200 text-violet-700',
   radio:       'bg-orange-50 border-orange-200 text-orange-700',
   checkbox:    'bg-teal-50   border-teal-200   text-teal-700',
+  audio:       'bg-yellow-50 border-yellow-200 text-yellow-700',
+  video:       'bg-red-50    border-red-200    text-red-700',
+  image:       'bg-pink-50   border-pink-200   text-pink-700',
 };
 
 // Location badge styles for non-inline placements
@@ -198,7 +252,29 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   }
 
   // ── Inline: full anchor + type badge + live widget preview ────────────────
-  const isFullWidth = (contentData as any)?.width === 'full';
+  const isMedia = BLOCK_MEDIA_TYPES.has(contentType);
+  const isFullWidth = isMedia || (contentData as any)?.width === 'full';
+
+  if (isMedia) {
+    return (
+      <NodeViewWrapper
+        as="span"
+        className={`block my-2 px-1.5 py-1.5 rounded border ${colorClass}${ringClass}`}
+        data-content-id={contentId}
+        data-content-type={contentType}
+        data-testid="inline-form-node"
+      >
+        <span className="flex items-center gap-1.5 mb-1 text-xs font-medium opacity-70" contentEditable={false}>
+          <span>{label}</span>
+          {anchorText && <span className="underline decoration-dotted underline-offset-2">{anchorText}</span>}
+        </span>
+        {contentData && (
+          <FormPreview contentType={contentType} contentData={contentData} />
+        )}
+      </NodeViewWrapper>
+    );
+  }
+
   return (
     <NodeViewWrapper
       as="span"
