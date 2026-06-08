@@ -234,6 +234,12 @@ class ColumnLayoutView implements NodeView {
     return true;
   }
 
+  // Let ProseMirror handle all mouse events so a single click places the cursor
+  stopEvent(event: Event) {
+    // Only intercept events from toolbar buttons/dropdowns
+    return this.toolbar.contains(event.target as globalThis.Node);
+  }
+
   destroy() {
     document.removeEventListener('mousedown', this.boundHandleClickOutside);
   }
