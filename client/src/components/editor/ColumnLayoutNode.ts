@@ -44,6 +44,7 @@ class ColumnLayoutView implements NodeView {
   private menuOpen = false;
   private boundHandleClickOutside: (e: MouseEvent) => void;
   private _updatePickerBtn: ((cols: number) => void) | null = null;
+  private _updateColDeleteBtns: ((cols: number) => void) | null = null;
 
   constructor(node: PmNode, view: EditorView, getPos: () => number | undefined) {
     this.pmNode = node;
@@ -190,9 +191,44 @@ class ColumnLayoutView implements NodeView {
     pickerWrap.appendChild(dropdown);
     bar.appendChild(pickerWrap);
 
-    // Delete button
+    // Separator
+    const sep = document.createElement('span');
+    sep.style.cssText = 'width:1px;height:16px;background:var(--color-border);margin:0 2px;flex-shrink:0';
+    bar.appendChild(sep);
+
+    // Per-column delete buttons container
+    const colBtnsWrap = document.createElement('div');
+    colBtnsWrap.style.cssText = 'display:flex;align-items:center;gap:3px';
+    bar.appendChild(colBtnsWrap);
+
+    const buildColDeleteBtns = (cols: number) => {
+      colBtnsWrap.innerHTML = '';
+      for (let i = 0; i < cols; i++) {
+        const btn = document.createElement('button');
+        btn.title = `Delete column ${i + 1}`;
+        btn.style.cssText = 'display:flex;align-items:center;gap:2px;padding:1px 6px;font-size:11px;cursor:pointer;border-radius:4px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text-muted,#888)';
+        btn.innerHTML = `<span style="font-size:10px;opacity:0.7">col${i + 1}</span><span style="color:#dc2626;font-weight:bold">✕</span>`;
+        btn.addEventListener('mouseenter', () => { btn.style.borderColor = '#fca5a5'; btn.style.background = '#fff1f2'; });
+        btn.addEventListener('mouseleave', () => { btn.style.borderColor = 'var(--color-border)'; btn.style.background = 'var(--color-surface)'; });
+        const colIndex = i;
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          this.deleteColumn(colIndex);
+        });
+        colBtnsWrap.appendChild(btn);
+      }
+    };
+    buildColDeleteBtns(this.pmNode.attrs.columns ?? 2);
+    this._updateColDeleteBtns = buildColDeleteBtns;
+
+    // Separator
+    const sep2 = document.createElement('span');
+    sep2.style.cssText = 'width:1px;height:16px;background:var(--color-border);margin:0 2px;flex-shrink:0';
+    bar.appendChild(sep2);
+
+    // Delete whole layout button
     const delBtn = document.createElement('button');
-    delBtn.textContent = '✕';
+    delBtn.textContent = '✕ layout';
     delBtn.style.cssText = 'padding:1px 8px;font-size:12px;cursor:pointer;border-radius:4px;border:1px solid #fca5a5;background:#fff1f2;color:#dc2626';
     delBtn.title = 'Remove column layout';
     delBtn.addEventListener('mousedown', (e) => {
@@ -234,6 +270,30 @@ class ColumnLayoutView implements NodeView {
     return `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px">${rects}</svg>`;
   }
 
+  private deleteColumn(colIndex: number) {
+    const pos = this.getPos();
+    if (pos == null) return;
+    const { state, dispatch } = this.editorView;
+    const node = state.doc.nodeAt(pos);
+    if (!node) return;
+    const currentCells = node.childCount;
+    if (currentCells <= 1) {
+      // Last column — delete the whole layout
+      dispatch(state.tr.deleteRange(pos, pos + node.nodeSize));
+      this.editorView.focus();
+      return;
+    }
+    const newCells = Array.from({ length: currentCells }, (_, i) => node.child(i))
+      .filter((_, i) => i !== colIndex);
+    const newNode = state.schema.nodes.columnLayout.create(
+      { columns: newCells.length },
+      newCells,
+    );
+    const tr = state.tr.replaceWith(pos, pos + node.nodeSize, newNode);
+    dispatch(tr);
+    this.editorView.focus();
+  }
+
   update(node: PmNode) {
     if (node.type !== this.pmNode.type) return false;
     this.pmNode = node;
@@ -241,6 +301,7 @@ class ColumnLayoutView implements NodeView {
     this.dom.setAttribute('data-columns', String(cols));
     this.applyGridStyle(cols);
     if (this._updatePickerBtn) this._updatePickerBtn(cols);
+    if (this._updateColDeleteBtns) this._updateColDeleteBtns(cols);
     return true;
   }
 
