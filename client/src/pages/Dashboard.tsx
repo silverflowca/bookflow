@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Eye, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 
@@ -184,6 +184,18 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
   const [togglingVisibility, setTogglingVisibility] = useState(false);
   const [copied, setCopied] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   const bookUrl = `${window.location.origin}/book/${book.id}`;
 
@@ -286,7 +298,7 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
           </Link>
 
           {/* Three-dots menu */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0" ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors"
@@ -295,22 +307,6 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
             </button>
             {showMenu && (
               <div className="absolute right-0 mt-1 w-48 theme-modal rounded-xl shadow-lg z-10 overflow-hidden py-1">
-                <Link
-                  to={`/edit/book/${book.id}`}
-                  onClick={() => setShowMenu(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                  Edit
-                </Link>
-                <Link
-                  to={`/book/${book.id}`}
-                  onClick={() => setShowMenu(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  Preview
-                </Link>
                 <Link
                   to={`/edit/book/${book.id}/settings`}
                   onClick={() => setShowMenu(false)}
@@ -342,7 +338,7 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
         </div>
 
         {/* Meta row */}
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between mt-2 mb-3">
           <span className="text-xs text-muted">
             {book.chapters?.length || 0} {book.chapters?.length === 1 ? 'chapter' : 'chapters'}
           </span>
@@ -362,6 +358,22 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
             )}
             {book.visibility === 'public' ? 'Public' : 'Private'}
           </button>
+        </div>
+
+        {/* Edit / View buttons */}
+        <div className="flex gap-2">
+          <Link
+            to={`/edit/book/${book.id}`}
+            className="flex-1 text-center py-1.5 theme-button-primary rounded-lg font-medium text-sm"
+          >
+            Edit
+          </Link>
+          <Link
+            to={`/book/${book.id}`}
+            className="flex-1 text-center py-1.5 theme-button-secondary rounded-lg font-medium text-sm"
+          >
+            View
+          </Link>
         </div>
       </div>
     </div>
