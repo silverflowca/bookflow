@@ -50,20 +50,20 @@ class ColumnLayoutView implements NodeView {
     this.editorView = view;
     this.getPos = getPos;
 
-    // Outer wrapper (NodeViewWrapper equivalent)
+    // Outer wrapper
     this.dom = document.createElement('div');
-    this.dom.className = 'column-layout-wrapper my-4 relative group';
+    this.dom.className = 'column-layout-wrapper my-4';
+    this.dom.style.position = 'relative';
     this.dom.setAttribute('data-columns', String(node.attrs.columns ?? 2));
 
-    // Toolbar
-    this.toolbar = this.buildToolbar();
-    this.dom.appendChild(this.toolbar);
-
-    // Grid border container
+    // Grid border container — toolbar sits inside here at the top, above the grid
     const border = document.createElement('div');
-    border.className = 'border border-dashed border-[var(--color-border)] rounded-lg p-1';
-    border.style.background = 'var(--color-surface)';
+    border.style.cssText = 'border: 1px dashed var(--color-border); border-radius: 8px; padding: 4px; background: var(--color-surface);';
     this.dom.appendChild(border);
+
+    // Toolbar row — always in normal flow at the top of the border container
+    this.toolbar = this.buildToolbar();
+    border.appendChild(this.toolbar);
 
     // contentDOM = the actual CSS grid — ProseMirror renders children here
     this.grid = document.createElement('div');
@@ -84,28 +84,36 @@ class ColumnLayoutView implements NodeView {
   private buildToolbar(): HTMLElement {
     const bar = document.createElement('div');
     bar.contentEditable = 'false';
-    bar.style.position = 'absolute';
-    bar.style.top = '-28px';
-    bar.style.left = '0';
-    bar.style.display = 'flex';
-    bar.style.alignItems = 'center';
-    bar.style.gap = '4px';
-    bar.style.opacity = '0';
-    bar.style.pointerEvents = 'none';
-    bar.style.zIndex = '10';
-    bar.style.transition = 'opacity 0.15s';
+    // Sits in normal flow — collapses when not hovered so grid starts right below
+    bar.style.cssText = [
+      'display: flex',
+      'align-items: center',
+      'gap: 4px',
+      'overflow: hidden',
+      'max-height: 0',
+      'opacity: 0',
+      'pointer-events: none',
+      'transition: max-height 0.15s ease, opacity 0.15s ease',
+      'margin-bottom: 0',
+    ].join(';');
 
-    // Show on hover
-    this.dom.addEventListener('mouseenter', () => {
+    const showBar = () => {
+      bar.style.maxHeight = '32px';
       bar.style.opacity = '1';
       bar.style.pointerEvents = 'auto';
-    });
-    this.dom.addEventListener('mouseleave', () => {
+      bar.style.marginBottom = '4px';
+    };
+    const hideBar = () => {
       if (!this.menuOpen) {
+        bar.style.maxHeight = '0';
         bar.style.opacity = '0';
         bar.style.pointerEvents = 'none';
+        bar.style.marginBottom = '0';
       }
-    });
+    };
+
+    this.dom.addEventListener('mouseenter', showBar);
+    this.dom.addEventListener('mouseleave', hideBar);
 
     // Column picker button
     const pickerWrap = document.createElement('div');
@@ -207,11 +215,13 @@ class ColumnLayoutView implements NodeView {
     const target = e.target as globalThis.Node;
     if (this.menuOpen && !this.toolbar.contains(target)) {
       this.menuOpen = false;
-      const dropdown = this.toolbar.querySelector('div') as HTMLElement | null;
+      const dropdown = this.toolbar.querySelector('div[style]') as HTMLElement | null;
       if (dropdown) dropdown.style.display = 'none';
       if (!this.dom.contains(target)) {
+        this.toolbar.style.maxHeight = '0';
         this.toolbar.style.opacity = '0';
         this.toolbar.style.pointerEvents = 'none';
+        this.toolbar.style.marginBottom = '0';
       }
     }
   }
