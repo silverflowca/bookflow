@@ -1557,11 +1557,11 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
         {/* Native video with custom controls */}
         {!isAudio && !embedUrl && (
-          <div className="relative group bg-[var(--color-surface-hover)]">
+          <div className="relative group bg-[var(--color-surface-hover)] p-2">
             <video
               ref={mediaRef as React.RefObject<HTMLVideoElement>}
               src={data.url}
-              className="w-full block"
+              className="w-full block rounded-lg"
               preload="metadata"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
@@ -2449,12 +2449,12 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   return (
     <span className="block w-full rounded-xl overflow-hidden my-1 border border-[var(--color-border)] bg-[var(--color-surface)]">
       {!isAudio && (
-        <span className="block relative group bg-[var(--color-surface-hover)]">
+        <span className="block relative group bg-[var(--color-surface-hover)] p-2">
           <video
             ref={mediaRef as React.RefObject<HTMLVideoElement>}
             src={data.url}
             preload="metadata"
-            className="w-full block"
+            className="w-full block rounded-lg"
             style={{ maxHeight: '320px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }}
             onTimeUpdate={() => { setCurrentTime(mediaRef.current?.currentTime || 0); }}
             onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
