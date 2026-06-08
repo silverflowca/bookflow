@@ -137,15 +137,14 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
       const src = (contentData as any)?.url || (contentData as any)?.src;
       if (!src) return <span className="text-xs opacity-60 ml-1">[no video]</span>;
       return (
-        <span className="block w-full mt-1" contentEditable={false}>
+        <div style={{ display: 'block', width: '100%' }} contentEditable={false}>
           <video
             src={src}
             controls
             preload="metadata"
-            className="w-full rounded-lg"
-            style={{ maxHeight: 240, background: 'var(--color-surface-hover)' }}
+            style={{ display: 'block', width: '100%', borderRadius: 8, background: 'var(--color-surface-hover)' }}
           />
-        </span>
+        </div>
       );
     }
     case 'image': {
@@ -258,8 +257,9 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   if (isMedia) {
     return (
       <NodeViewWrapper
-        as="span"
-        className={`block my-2 px-1.5 py-1.5 rounded border ${colorClass}${ringClass}`}
+        as="div"
+        className={`my-2 px-1.5 py-1.5 rounded border w-full ${colorClass}${ringClass}`}
+        style={{ display: 'block', boxSizing: 'border-box' }}
         data-content-id={contentId}
         data-content-type={contentType}
         data-testid="inline-form-node"

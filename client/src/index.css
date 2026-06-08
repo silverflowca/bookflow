@@ -173,6 +173,20 @@ body {
   background: transparent;
 }
 
+/* Force media widget spans to fill their column cell width */
+.column-cell [data-inline-form-widget],
+.column-cell [data-node-view-wrapper] {
+  display: block !important;
+  width: 100%;
+}
+.column-cell [data-inline-form-widget] video,
+.column-cell [data-inline-form-widget] audio,
+.column-cell [data-inline-form-widget] img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 /* Progress tracking — completable item borders */
 .progress-item {
   border: 2px solid transparent;
