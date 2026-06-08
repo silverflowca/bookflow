@@ -1286,14 +1286,16 @@ function TipTapNode({
       const anchorText: string = node.attrs?.anchorText || '';
       const ic = inlineContent.find(i => i.id === contentId);
       if (!ic) {
-        // Fallback: render anchor text as plain text if DB item not found
         return <span>{anchorText}</span>;
       }
+      // Block-level types must render as block, not inline-flex
+      const BLOCK_TYPES = new Set(['image', 'audio', 'video', 'code_block', 'scripture_block']);
+      const isBlock = BLOCK_TYPES.has(ic.content_type);
+      const isFullW = isBlock || (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
       const markerClass = getInlineContentClass(ic.content_type);
-      const isFullW = (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
       return isFullW ? (
-        <span id={`reader-inline-${ic.id}`} className="block my-2">
-          {anchorText && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}>{anchorText}</mark>}
+        <span id={`reader-inline-${ic.id}`} className="block my-3">
+          {anchorText && !isBlock && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}>{anchorText}</mark>}
           <InlineFormElement content={ic} />
         </span>
       ) : (
