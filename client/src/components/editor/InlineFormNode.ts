@@ -75,7 +75,17 @@ export const InlineFormNode = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(InlineFormNodeView);
+    return ReactNodeViewRenderer(InlineFormNodeView, {
+      stopEvent: ({ event }) => {
+        // Let media control events (click, mousedown, pointerdown, input) pass through
+        // so audio/video play buttons work inside the editor
+        const target = event.target as HTMLElement | null;
+        if (!target) return false;
+        const isMedia = !!target.closest('audio, video');
+        if (isMedia) return false;
+        return true;
+      },
+    });
   },
 
   addCommands() {
