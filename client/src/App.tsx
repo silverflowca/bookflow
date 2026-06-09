@@ -28,6 +28,7 @@ import LiveEpisode from './pages/live/LiveEpisode';
 import LiveDashboard from './pages/live/LiveDashboard';
 import LiveBible from './pages/live/LiveBible';
 import LiveQueue from './pages/live/LiveQueue';
+import ProfilePage from './pages/ProfilePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -183,6 +184,14 @@ function AppRoutes() {
             <LiveQueue />
           </ProtectedRoute>
         } />
+
+        {/* Profile */}
+        <Route path="profile" element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        } />
+        <Route path="profile/:userId" element={<ProfilePage />} />
       </Route>
     </Routes>
   );

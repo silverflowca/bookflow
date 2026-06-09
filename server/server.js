@@ -30,6 +30,7 @@ import activityRoutes from './routes/activity.js';
 import formResponsesRoutes from './routes/form-responses.js';
 import progressRoutes from './routes/progress.js';
 import liveRoutes from './routes/live.js';
+import profileRoutes from './routes/profile.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { startStatusCron } from './services/chat-status.js';
 
@@ -97,6 +98,7 @@ app.use('/api/books/:bookId/activity', activityRoutes);
 app.use('/api', formResponsesRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/live', liveRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);

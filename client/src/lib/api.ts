@@ -953,6 +953,25 @@ class ApiClient {
     return this.request('/live/freeshow/action', { method: 'POST', body: JSON.stringify({ action, data }) });
   }
 
+  // ── Profile ─────────────────────────────────────────────────────────────────
+
+  async getMyProfile(): Promise<any> {
+    return this.request('/profile/me');
+  }
+
+  async updateMyProfile(data: {
+    display_name?: string; bio?: string; avatar_url?: string; is_author?: boolean;
+    website_url?: string; location?: string;
+    profile_public?: boolean; show_reading_progress?: boolean;
+    show_clubs?: boolean; show_books_authored?: boolean;
+  }): Promise<any> {
+    return this.request('/profile/me', { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async getPublicProfile(userId: string): Promise<any> {
+    return this.request(`/profile/${userId}`);
+  }
+
   // Activity / Audit Trail
   async getBookActivity(
     bookId: string,

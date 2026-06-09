@@ -107,12 +107,14 @@ export default function Layout() {
                   </Link>
                   <div className="flex items-center gap-3 ml-4 pl-4 border-l-2 border-strong">
                     <NotificationBell />
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme">
-                        <User className="h-4 w-4 text-accent" />
+                    <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                      <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden">
+                        {profile?.avatar_url
+                          ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                          : <User className="h-4 w-4 text-accent" />}
                       </div>
                       <span className="text-sm font-medium text-theme">{profile?.display_name || user.email}</span>
-                    </div>
+                    </Link>
                     <div className="relative" ref={dropdownRef}>
                       <button onClick={() => setShowThemeDropdown(!showThemeDropdown)} className="text-muted hover:text-theme p-2 rounded-md transition-colors hover:bg-surface-hover" title="Theme Settings">
                         <Settings className="h-5 w-5" />
@@ -154,12 +156,14 @@ export default function Layout() {
           <div className="md:hidden border-t-2 border-theme bg-surface px-4 py-4 space-y-3">
             {user ? (
               <>
-                <div className="flex items-center gap-3 pb-3 border-b border-theme">
-                  <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme">
-                    <User className="h-4 w-4 text-accent" />
+                <Link to="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 pb-3 border-b border-theme">
+                  <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden">
+                    {profile?.avatar_url
+                      ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      : <User className="h-4 w-4 text-accent" />}
                   </div>
                   <span className="text-sm font-medium text-theme">{profile?.display_name || user.email}</span>
-                </div>
+                </Link>
                 <Link to="/dashboard" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
                   <BookOpen className="h-4 w-4 text-accent" /> My Books
                 </Link>
@@ -168,6 +172,9 @@ export default function Layout() {
                 </Link>
                 <Link to="/live" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
                   <Radio className="h-4 w-4 text-accent" /> Live Shows
+                </Link>
+                <Link to="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
+                  <User className="h-4 w-4 text-accent" /> My Profile
                 </Link>
                 <Link to="/dashboard" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium theme-button-primary px-3 rounded-md">
                   <Plus className="h-4 w-4" /> New Book
