@@ -557,6 +557,8 @@ export default function ClubDetailPage() {
   const [editingSettings, setEditingSettings] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<ClubSettings | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [visibilityDraft, setVisibilityDraft] = useState<'private' | 'public' | null>(null);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [progressData, setProgressData] = useState<ClubProgressEntry[] | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
   const postRef = useRef<HTMLTextAreaElement>(null);
@@ -697,6 +699,20 @@ export default function ClubDetailPage() {
       alert(err.message);
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function handleSaveVisibility() {
+    if (!visibilityDraft) return;
+    setSavingVisibility(true);
+    try {
+      await api.updateClub(clubId!, { visibility: visibilityDraft });
+      setClub(prev => prev ? { ...prev, visibility: visibilityDraft } : prev);
+      setVisibilityDraft(null);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSavingVisibility(false);
     }
   }
 
@@ -1149,7 +1165,68 @@ export default function ClubDetailPage() {
       {/* ── Settings ── */}
       {tab === 'settings' && isAdmin && (
         <div className="space-y-6">
-          {/* Visibility toggles */}
+
+          {/* Club Visibility */}
+          <div className="theme-section rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-theme">Club Visibility</h3>
+                <p className="text-xs text-muted mt-0.5">Control who can discover and see this club</p>
+              </div>
+              {visibilityDraft !== null ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveVisibility}
+                    disabled={savingVisibility}
+                    className="flex items-center gap-1 text-sm theme-button-primary px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  >
+                    {savingVisibility ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    Save
+                  </button>
+                  <button onClick={() => setVisibilityDraft(null)} className="text-sm theme-button-secondary px-3 py-1.5 rounded-lg">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setVisibilityDraft(club.visibility)}
+                  className="text-sm theme-button-secondary px-3 py-1.5 rounded-lg"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { value: 'private' as const, icon: <Lock className="h-5 w-5" />, label: 'Members only', desc: 'Only invited members can see this club' },
+                { value: 'public' as const, icon: <Globe className="h-5 w-5" />, label: 'Public', desc: 'Discoverable by any logged-in user' },
+              ] as const).map(opt => {
+                const current = visibilityDraft !== null ? visibilityDraft : club.visibility;
+                const isSelected = current === opt.value;
+                const isEditing = visibilityDraft !== null;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={!isEditing}
+                    onClick={() => isEditing && setVisibilityDraft(opt.value)}
+                    className={`flex flex-col items-start gap-1.5 p-4 rounded-xl border-2 text-left transition-colors ${
+                      isSelected
+                        ? 'border-accent bg-accent/10 text-theme'
+                        : 'border-[var(--color-border)] text-muted'
+                    } ${isEditing ? 'cursor-pointer hover:border-accent/50' : 'cursor-default'}`}
+                  >
+                    <span className={isSelected ? 'text-accent' : ''}>{opt.icon}</span>
+                    <span className="text-sm font-semibold">{opt.label}</span>
+                    <span className="text-xs leading-snug">{opt.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Member Visibility toggles */}
           <div className="theme-section rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-theme">Member Visibility</h3>
