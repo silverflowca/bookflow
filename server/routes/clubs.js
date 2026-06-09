@@ -214,7 +214,26 @@ router.get('/:clubId', authenticate, async (req, res) => {
       .eq('club_id', req.params.clubId)
       .order('added_at', { ascending: false });
 
-    res.json({ ...club, my_role: role, members: members || [], member_count: (members || []).length, pending_invites: pendingInvites, books: clubBooks || [] });
+    // Normalize FK joins — Supabase returns them as arrays even for to-one relations
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+
+    const normalizedMembers = (members || []).map(m => ({ ...m, profile: norm(m.profile) }));
+    const normalizedBooks = (clubBooks || []).map(cb => ({
+      ...cb,
+      book: cb.book ? { ...norm(cb.book), author: norm(norm(cb.book)?.author) } : null,
+      added_by_user: norm(cb.added_by_user),
+    }));
+
+    res.json({
+      ...club,
+      creator: norm(club.creator),
+      settings: norm(club.settings),
+      my_role: role,
+      members: normalizedMembers,
+      member_count: normalizedMembers.length,
+      pending_invites: pendingInvites,
+      books: normalizedBooks,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
