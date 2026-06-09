@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type {
   InlineContent, InlineDisplayMode, SelectData, MultiselectData, TextboxData, TextareaData,
-  RadioData, CheckboxData, CodeBlockData, ScriptureBlockData
+  RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, LabelPosition
 } from '../../types';
 
 interface FormProps {
@@ -36,6 +36,37 @@ function DisplayModeSelector({
         {value === 'start_of_chapter' && 'Form appears at the beginning of the chapter.'}
         {value === 'end_of_chapter' && 'Form appears at the end of the chapter.'}
       </p>
+    </div>
+  );
+}
+
+const LABEL_POSITIONS: { value: LabelPosition; label: string }[] = [
+  { value: 'above', label: 'Above' },
+  { value: 'below', label: 'Below' },
+  { value: 'left',  label: 'Left'  },
+  { value: 'right', label: 'Right' },
+];
+
+function LabelPositionSelector({ value, onChange }: { value: LabelPosition; onChange: (p: LabelPosition) => void }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1">Label Position</label>
+      <div className="flex gap-2">
+        {LABEL_POSITIONS.map(p => (
+          <button
+            key={p.value}
+            type="button"
+            onClick={() => onChange(p.value)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded border transition-colors ${
+              value === p.value
+                ? 'bg-primary-50 border-primary-400 text-primary-700'
+                : 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -88,6 +119,7 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialD
     initialData?.options || [{ id: 'opt_1', text: '' }]
   );
   const [required, setRequired] = useState(initialData?.required || false);
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(initialData?.label_position || 'above');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
@@ -101,6 +133,7 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialD
       placeholder: placeholder || undefined,
       options: options.filter(o => o.text.trim()),
       required,
+      label_position: labelPosition,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -176,6 +209,7 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialD
         <span className="text-sm">Required</span>
       </label>
 
+      <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
@@ -192,6 +226,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, ini
   const [required, setRequired] = useState(initialData?.required || false);
   const [minSelections, setMinSelections] = useState(initialData?.min_selections?.toString() || '');
   const [maxSelections, setMaxSelections] = useState(initialData?.max_selections?.toString() || '');
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(initialData?.label_position || 'above');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
@@ -207,6 +242,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, ini
       required,
       min_selections: minSelections ? parseInt(minSelections) : undefined,
       max_selections: maxSelections ? parseInt(maxSelections) : undefined,
+      label_position: labelPosition,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -307,6 +343,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, ini
         <span className="text-sm">Required</span>
       </label>
 
+      <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
@@ -330,6 +367,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
   const [maxLength, setMaxLength] = useState(initialData?.max_length?.toString() || '');
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
   const [width, setWidth] = useState<TextboxData['width']>(initialData?.width || 'md');
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(initialData?.label_position || 'above');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -342,6 +380,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
       default_value: defaultValue || undefined,
       width,
       show_label: showLabel,
+      label_position: labelPosition,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -417,6 +456,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
         </label>
       </div>
 
+      {showLabel && <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />}
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
@@ -434,6 +474,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
   const [defaultValue, setDefaultValue] = useState(initialData?.default_value || '');
   const [width, setWidth] = useState<TextareaData['width']>(initialData?.width || 'full');
   const [autoExpand, setAutoExpand] = useState(initialData?.auto_expand ?? false);
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(initialData?.label_position || 'above');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -448,6 +489,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
       width,
       auto_expand: autoExpand || undefined,
       show_label: showLabel,
+      label_position: labelPosition,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -551,6 +593,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
         </label>
       </div>
 
+      {showLabel && <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />}
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
@@ -565,6 +608,7 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDi
   );
   const [required, setRequired] = useState(initialData?.required || false);
   const [layout, setLayout] = useState<'vertical' | 'horizontal'>(initialData?.layout || 'vertical');
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(initialData?.label_position || 'above');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
@@ -578,6 +622,7 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDi
       options: options.filter(o => o.text.trim()),
       required,
       layout,
+      label_position: labelPosition,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -667,6 +712,7 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDi
         <span className="text-sm">Required</span>
       </label>
 
+      <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
@@ -683,6 +729,7 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initia
   const [minSelections, setMinSelections] = useState(initialData?.min_selections?.toString() || '');
   const [maxSelections, setMaxSelections] = useState(initialData?.max_selections?.toString() || '');
   const [layout, setLayout] = useState<'vertical' | 'horizontal'>(initialData?.layout || 'vertical');
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(initialData?.label_position || 'above');
   const [displayMode, setDisplayMode] = useState<InlineDisplayMode>(initialDisplayMode || 'inline');
 
   const addOption = () => {
@@ -698,6 +745,7 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initia
       min_selections: minSelections ? parseInt(minSelections) : undefined,
       max_selections: maxSelections ? parseInt(maxSelections) : undefined,
       layout,
+      label_position: labelPosition,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: displayMode });
   };
@@ -812,6 +860,7 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initia
         <span className="text-sm">Required</span>
       </label>
 
+      <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />

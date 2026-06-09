@@ -245,12 +245,15 @@ export interface MediaData {
 }
 
 // Interactive form element types
+export type LabelPosition = 'above' | 'below' | 'left' | 'right';
+
 export interface SelectData {
   label: string;
   placeholder?: string;
   options: { id: string; text: string }[];
   required?: boolean;
   default_value?: string;
+  label_position?: LabelPosition;
 }
 
 export interface MultiselectData {
@@ -261,6 +264,7 @@ export interface MultiselectData {
   min_selections?: number;
   max_selections?: number;
   default_values?: string[];
+  label_position?: LabelPosition;
 }
 
 export interface TextboxData {
@@ -272,6 +276,7 @@ export interface TextboxData {
   default_value?: string;
   width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
   show_label?: boolean;
+  label_position?: LabelPosition;
 }
 
 export interface TextareaData {
@@ -284,6 +289,7 @@ export interface TextareaData {
   width?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
   auto_expand?: boolean;
   show_label?: boolean;
+  label_position?: LabelPosition;
 }
 
 export interface RadioData {
@@ -292,6 +298,7 @@ export interface RadioData {
   required?: boolean;
   default_value?: string;
   layout?: 'vertical' | 'horizontal';
+  label_position?: LabelPosition;
 }
 
 export interface CheckboxData {
@@ -302,6 +309,7 @@ export interface CheckboxData {
   max_selections?: number;
   default_values?: string[];
   layout?: 'vertical' | 'horizontal';
+  label_position?: LabelPosition;
 }
 
 export interface CodeBlockData {
