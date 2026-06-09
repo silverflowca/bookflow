@@ -256,7 +256,7 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
     const membersQuery = supabase
       .schema('bookflow')
       .from('club_members')
-      .select('user_id, role, profile:profiles(display_name, avatar_url)')
+      .select('user_id, role, profile:profiles!club_members_user_id_fkey(display_name, avatar_url)')
       .eq('club_id', clubId)
       .not('invite_accepted_at', 'is', null);
 

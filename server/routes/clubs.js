@@ -178,19 +178,16 @@ router.get('/:clubId', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'You are not a member of this club' });
     }
 
-    // Members (accepted)
-    const { data: members, error: membersErr } = await supabase
+    // Members (accepted) — FK hint needed: club_members has two FKs to profiles (user_id + invited_by)
+    const { data: members } = await supabase
       .from('club_members')
       .select(`
         id, user_id, role, joined_at, invite_accepted_at,
-        profile:profiles(id, display_name, avatar_url, email)
+        profile:profiles!club_members_user_id_fkey(id, display_name, avatar_url, email)
       `)
       .eq('club_id', req.params.clubId)
       .not('invite_accepted_at', 'is', null)
       .order('joined_at', { ascending: true, nullsFirst: false });
-
-    if (membersErr) console.error('[club detail] members query error:', membersErr);
-    console.log('[club detail] clubId:', req.params.clubId, 'members count:', members?.length, 'error:', membersErr?.message);
 
     // Pending invites (only visible to admins)
     let pendingInvites = [];
