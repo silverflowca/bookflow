@@ -557,6 +557,14 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
     };
   }, [mediaStream, recordedUrl]);
 
+  // Wire stream to video preview whenever either becomes available
+  useEffect(() => {
+    if (mediaStream && videoPreviewRef.current && type === 'video') {
+      videoPreviewRef.current.srcObject = mediaStream;
+      videoPreviewRef.current.play().catch(() => {});
+    }
+  }, [mediaStream, type]);
+
   const startRecording = useCallback(async () => {
     try {
       const constraints = type === 'audio'
@@ -565,12 +573,6 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setMediaStream(stream);
-
-      // Show preview for video
-      if (type === 'video' && videoPreviewRef.current) {
-        videoPreviewRef.current.srcObject = stream;
-        videoPreviewRef.current.play();
-      }
 
       const mimeType = type === 'audio' ? 'audio/webm' : 'video/webm';
       const recorder = new MediaRecorder(stream, { mimeType });
@@ -820,11 +822,11 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
 
           {/* Video preview for video recording */}
           {type === 'video' && (isRecording || recordedUrl) && (
-            <div className="mb-4 rounded-lg overflow-hidden bg-black">
+            <div className="mb-4 rounded-lg overflow-hidden bg-black aspect-video">
               {isRecording && !recordedUrl && (
                 <video
                   ref={videoPreviewRef}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-full object-contain"
                   muted
                   playsInline
                 />
@@ -832,7 +834,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
               {recordedUrl && (
                 <video
                   src={recordedUrl}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-full object-contain"
                   controls
                 />
               )}

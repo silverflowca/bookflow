@@ -49,9 +49,49 @@ router.get('/chapters/:id', optionalAuth, async (req, res) => {
 
     if (error) throw error;
 
-    // Check access
+    // Check access: public books or author always allowed
     if (chapter.book.visibility !== 'public' && chapter.book.author_id !== req.user?.id) {
-      return res.status(403).json({ error: 'Not authorized' });
+      if (!req.user?.id) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+
+      // Allow collaborators
+      const { data: collab } = await supabase
+        .schema('bookflow')
+        .from('book_collaborators')
+        .select('id')
+        .eq('book_id', chapter.book.id)
+        .eq('user_id', req.user.id)
+        .not('invite_accepted_at', 'is', null)
+        .maybeSingle();
+
+      if (!collab) {
+        // Allow club members whose club has this book
+        const { data: clubBooks } = await supabase
+          .schema('bookflow')
+          .from('club_books')
+          .select('club_id')
+          .eq('book_id', chapter.book.id);
+
+        const clubIds = (clubBooks || []).map(cb => cb.club_id);
+
+        if (clubIds.length > 0) {
+          const { data: clubMember } = await supabase
+            .schema('bookflow')
+            .from('club_members')
+            .select('id')
+            .eq('user_id', req.user.id)
+            .in('club_id', clubIds)
+            .not('invite_accepted_at', 'is', null)
+            .maybeSingle();
+
+          if (!clubMember) {
+            return res.status(403).json({ error: 'Not authorized' });
+          }
+        } else {
+          return res.status(403).json({ error: 'Not authorized' });
+        }
+      }
     }
 
     res.json(chapter);

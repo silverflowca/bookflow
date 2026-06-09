@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
-  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp
+  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2
 } from 'lucide-react';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
@@ -14,6 +14,21 @@ interface ProgressCtx {
   enabled: boolean;
 }
 const ProgressContext = createContext<ProgressCtx>({ completions: new Set(), markComplete: () => {}, enabled: false });
+
+// Context for coordinating media playback — enforces one playing + one PiP at a time
+interface MediaCtx {
+  playingId: string | null;
+  pipId: string | null;
+  requestPlay: (id: string, pause: () => void) => void;
+  requestPip: (id: string, close: () => void) => void;
+  clearPlay: (id: string) => void;
+  clearPip: (id: string) => void;
+}
+const MediaContext = createContext<MediaCtx>({
+  playingId: null, pipId: null,
+  requestPlay: () => {}, requestPip: () => {},
+  clearPlay: () => {}, clearPip: () => {},
+});
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
@@ -59,6 +74,32 @@ export default function BookReader() {
   // Live episode banner
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string; guest_invite_url?: string; live_shows?: { guest_invite_url?: string } } | null>(null);
   const [liveBannerDismissed, setLiveBannerDismissed] = useState(false);
+
+  // Media coordination — one playing + one PiP at a time
+  const [mediaPlayingId, setMediaPlayingId] = useState<string | null>(null);
+  const [mediaPipId, setMediaPipId] = useState<string | null>(null);
+  const mediaPauseCallbacks = useRef<Map<string, () => void>>(new Map());
+  const mediaPipCloseCallbacks = useRef<Map<string, () => void>>(new Map());
+  const mediaCtx = useMemo<MediaCtx>(() => ({
+    playingId: mediaPlayingId,
+    pipId: mediaPipId,
+    requestPlay: (id, pause) => {
+      mediaPauseCallbacks.current.set(id, pause);
+      setMediaPlayingId(prev => {
+        if (prev && prev !== id) mediaPauseCallbacks.current.get(prev)?.();
+        return id;
+      });
+    },
+    requestPip: (id, close) => {
+      mediaPipCloseCallbacks.current.set(id, close);
+      setMediaPipId(prev => {
+        if (prev && prev !== id) mediaPipCloseCallbacks.current.get(prev)?.();
+        return id;
+      });
+    },
+    clearPlay: (id) => setMediaPlayingId(prev => prev === id ? null : prev),
+    clearPip: (id) => setMediaPipId(prev => prev === id ? null : prev),
+  }), [mediaPlayingId, mediaPipId]);
 
   // Check if current user is the author
   const isAuthor = book?.author_id === user?.id;
@@ -653,6 +694,7 @@ export default function BookReader() {
 
         {/* Chapter Content */}
         {chapter ? (
+          <MediaContext.Provider value={mediaCtx}>
           <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, enabled: progressEnabled }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
             <h1 className="text-3xl font-bold mb-6">{chapter.title}</h1>
@@ -706,6 +748,7 @@ export default function BookReader() {
             </nav>
           </article>
           </ProgressContext.Provider>
+          </MediaContext.Provider>
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-8 text-center text-muted">
             Select a chapter to start reading
@@ -1496,6 +1539,8 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { requestPlay, requestPip, clearPlay, clearPip } = useContext(MediaContext);
+  const mediaId = `media:${content.id}`;
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
@@ -1511,38 +1556,59 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const hasPlayedRef = useRef(false);
   useEffect(() => { if (playing) hasPlayedRef.current = true; }, [playing]);
 
+  const closePip = useCallback(() => {
+    setSticky(false);
+    hasPlayedRef.current = false;
+  }, []);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (hasPlayedRef.current) {
-          if (entry.isIntersecting) setSticky(false);
-          else setSticky(true);
+          if (entry.isIntersecting) {
+            setSticky(false);
+            clearPip(mediaId);
+          } else {
+            setSticky(true);
+            requestPip(mediaId, closePip);
+          }
         }
       },
       { threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [mediaId, requestPip, clearPip, closePip]);
 
-  const handleTimeUpdate = () => {
-    const el = mediaRef.current;
-    if (!el) return;
+  const handleTimeUpdate = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement>) => {
+    const el = e.target as HTMLVideoElement | HTMLAudioElement;
     setCurrentTime(el.currentTime);
     if (completedRef.current) return;
     if (el.duration && el.currentTime / el.duration >= 0.8) {
       completedRef.current = true;
       markComplete(itemKey, isAudio ? 'audio' : 'video');
     }
-  };
+  }, [isAudio, itemKey, markComplete]);
+
+  const pauseSelf = useCallback(() => {
+    const el = mediaRef.current;
+    if (el && !el.paused) { el.pause(); setPlaying(false); }
+  }, []);
 
   const togglePlay = () => {
     const el = mediaRef.current;
     if (!el) return;
-    if (el.paused) { el.play(); setPlaying(true); }
-    else { el.pause(); setPlaying(false); }
+    if (el.paused) {
+      requestPlay(mediaId, pauseSelf);
+      el.play();
+      setPlaying(true);
+    } else {
+      el.pause();
+      setPlaying(false);
+      clearPlay(mediaId);
+    }
   };
 
   const toggleMute = () => {
@@ -1560,6 +1626,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   };
 
   const formatTime = (s: number) => {
+    if (!s || !isFinite(s)) return '0:00';
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
@@ -1595,45 +1662,84 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
         {/* Native video with custom controls */}
         {!isAudio && !embedUrl && (
-          <div
-            className="relative group bg-[var(--color-surface-hover)] p-2"
-            style={sticky ? { minHeight: '160px' } : undefined}
-          >
-            <video
-              ref={mediaRef as React.RefObject<HTMLVideoElement>}
-              src={data.url}
-              className="block rounded-lg"
-              preload="metadata"
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onEnded={() => setPlaying(false)}
-              style={sticky
-                ? { position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', height: 'auto', maxHeight: '200px', objectFit: 'contain', zIndex: 51, borderRadius: '8px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }
-                : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }
-              }
-            />
-            {/* PiP controls overlay */}
+          <>
+            {/* Inline placeholder — keeps layout space while video is in PiP */}
+            <div
+              className="relative group bg-[var(--color-surface-hover)] p-2"
+              style={sticky ? { minHeight: '160px' } : undefined}
+            >
+              {/* Always-mounted video — moves to PiP via fixed positioning, never unmounts */}
+              <video
+                ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                src={data.url}
+                preload="metadata"
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={(e) => { setDuration((e.target as HTMLVideoElement).duration || 0); setLoaded(true); }}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
+                style={sticky
+                  ? { position: 'fixed', bottom: '40px', right: '1rem', width: '280px', maxHeight: '200px', objectFit: 'contain', zIndex: 52, display: 'block', background: '#000', borderRadius: '8px 8px 0 0' }
+                  : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)', borderRadius: '8px' }}
+              />
+
+              {/* Fullscreen button — inline only */}
+              {!sticky && (
+                <button
+                  onClick={() => (mediaRef.current as HTMLVideoElement)?.requestFullscreen?.()}
+                  className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors"
+                  title="Fullscreen"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {!playing && !sticky && (
+                <button
+                  onClick={togglePlay}
+                  className="absolute inset-0 flex items-center justify-center transition-colors hover:bg-[var(--color-surface-hover)]/40"
+                >
+                  <span className="w-14 h-14 rounded-full bg-black/30 border border-white/30 flex items-center justify-center shadow-md backdrop-blur-sm">
+                    <Play className="h-6 w-6 text-white ml-1" />
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {/* PiP overlay controls — shown fixed when sticky, video element itself is already fixed above */}
             {sticky && (
-              <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', zIndex: 52, borderRadius: '8px', overflow: 'hidden' }}>
-                {/* Top: scroll-back + close */}
-                <div className="flex items-center bg-black/50">
+              <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', zIndex: 53, borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', pointerEvents: 'none' }}>
+                {/* Spacer matching video height */}
+                <div style={{ height: '160px', pointerEvents: 'none' }} />
+
+                {/* X — top right */}
+                <button
+                  onClick={() => { closePip(); clearPip(mediaId); }}
+                  style={{ position: 'absolute', top: '6px', right: '6px', pointerEvents: 'all' }}
+                  className="w-6 h-6 rounded-full bg-black/70 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/90 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+
+                {/* ↑ and ⛶ buttons */}
+                <div style={{ position: 'absolute', bottom: '40px', right: '6px', pointerEvents: 'all' }} className="flex flex-col gap-1">
                   <button
                     onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                    className="flex-1 flex items-center justify-center py-1.5 text-white/80 hover:text-white hover:bg-black/30 transition-colors"
+                    className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-colors"
+                    title="Scroll back to video"
                   >
                     <ArrowUp className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => { setSticky(false); hasPlayedRef.current = false; }}
-                    className="flex items-center justify-center px-3 py-1.5 text-white/60 hover:text-white hover:bg-black/30 transition-colors"
+                    onClick={() => (mediaRef.current as HTMLVideoElement)?.requestFullscreen?.()}
+                    className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-colors"
+                    title="Fullscreen"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <Maximize2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                {/* Bottom controls bar */}
-                <div className="flex items-center gap-2 px-2 py-1.5 bg-black/70">
+
+                {/* Controls bar */}
+                <div className="flex items-center gap-2 px-2 py-1.5 bg-black/70" style={{ pointerEvents: 'all' }}>
                   <button onClick={togglePlay} className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-white/20 hover:bg-white/30 text-white transition-colors">
                     {playing
                       ? <span className="flex gap-[3px]"><span className="w-[2px] h-3 bg-current" /><span className="w-[2px] h-3 bg-current" /></span>
@@ -1657,17 +1763,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 </div>
               </div>
             )}
-            {!playing && !sticky && (
-              <button
-                onClick={togglePlay}
-                className="absolute inset-0 flex items-center justify-center transition-colors hover:bg-[var(--color-surface-hover)]/40"
-              >
-                <span className="w-14 h-14 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center shadow-md">
-                  <Play className="h-6 w-6 text-theme ml-1" />
-                </span>
-              </button>
-            )}
-          </div>
+          </>
         )}
 
         {/* Audio element */}
@@ -1677,70 +1773,69 @@ function MediaBlock({ content }: { content: InlineContent }) {
             src={data.url}
             preload="metadata"
             onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
+            onLoadedMetadata={(e) => { setDuration((e.target as HTMLAudioElement).duration || 0); setLoaded(true); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onEnded={() => setPlaying(false)}
           />
         )}
 
-        {/* Controls bar */}
+        {/* Controls bar — single compact row */}
         {(isAudio || (!isAudio && !embedUrl)) && (
-          <div className="flex items-center gap-3 px-4 py-3 border-t border-[var(--color-border)]">
+          <div className="flex items-center gap-2 px-3 py-2 border-t border-[var(--color-border)]">
+            {/* Type icon */}
+            <div className="flex-shrink-0 text-[var(--color-accent)]">
+              {isAudio ? <Volume2 className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
+            </div>
+
+            {/* Title (truncated) */}
+            {data.title && (
+              <span className="text-xs text-muted truncate max-w-[120px] flex-shrink-0">{data.title}</span>
+            )}
+
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
               disabled={!loaded && isAudio}
-              className="flex-shrink-0 w-8 h-8 rounded flex items-center justify-center transition-opacity bg-[var(--color-accent)] text-white hover:opacity-80"
+              className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-opacity bg-[var(--color-accent)] text-white hover:opacity-80"
             >
               {playing
-                ? <span className="flex gap-[3px]"><span className="w-[3px] h-3.5 bg-current" /><span className="w-[3px] h-3.5 bg-current" /></span>
-                : <Play className="h-3.5 w-3.5 ml-0.5" />
+                ? <span className="flex gap-[2px]"><span className="w-[2px] h-3 bg-current" /><span className="w-[2px] h-3 bg-current" /></span>
+                : <Play className="h-3 w-3 ml-0.5" />
               }
             </button>
 
-            {/* Time / seek */}
-            <div className="flex-1 flex items-center">
-              <span className="text-xs tabular-nums w-9 shrink-0 text-muted">
-                {formatTime(currentTime)}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                step={0.1}
-                value={currentTime}
-                onChange={handleSeek}
-                className="media-seek flex-1"
-                style={{
-                  background: `linear-gradient(to right, var(--color-accent) ${progressPct}%, var(--color-border) ${progressPct}%)`
-                }}
-              />
-              <span className="text-xs tabular-nums w-9 shrink-0 text-right text-muted">
-                {formatTime(duration)}
-              </span>
-            </div>
+            {/* Current time */}
+            <span className="text-xs tabular-nums shrink-0 text-muted">{formatTime(currentTime)}</span>
+
+            {/* Seek */}
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeek}
+              className="media-seek flex-1 min-w-0"
+              style={{ background: `linear-gradient(to right, var(--color-accent) ${progressPct}%, var(--color-border) ${progressPct}%)` }}
+            />
+
+            {/* Duration */}
+            <span className="text-xs tabular-nums shrink-0 text-muted">{formatTime(duration)}</span>
 
             {/* Mute */}
             <button
               onClick={toggleMute}
-              className="flex-shrink-0 w-7 h-7 flex items-center justify-center transition-colors rounded text-muted hover:text-theme hover:bg-[var(--color-surface-hover)]"
+              className="flex-shrink-0 w-6 h-6 flex items-center justify-center transition-colors rounded text-muted hover:text-theme hover:bg-[var(--color-surface-hover)]"
             >
-              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </button>
-          </div>
-        )}
-
-        {/* Title */}
-        {data.title && (
-          <div className="px-4 pb-2 pt-1">
-            <p className="text-xs font-medium tracking-wide uppercase text-muted">{data.title}</p>
           </div>
         )}
       </div>
 
-      {/* Sticky mini-player — floats at top when playing and scrolled away */}
-      {sticky && (
+      {/* Sticky mini-player — audio only; video uses the PiP widget instead */}
+      {sticky && isAudio && (
         <div className="fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4 py-2.5 bg-[var(--color-surface)] border-b-2 border-[var(--color-accent)] shadow-lg">
           {/* Icon */}
           <div className={`flex-shrink-0 ${isAudio ? 'w-8 h-8 rounded-full bg-accent/10' : 'w-8 h-8 rounded bg-accent/10'} flex items-center justify-center`}>
@@ -2549,6 +2644,8 @@ function ImageBlock({ content }: { content: InlineContent }) {
 function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
+  const { requestPlay, clearPlay } = useContext(MediaContext);
+  const mediaId = `inline:${content.id}`;
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -2566,10 +2663,23 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  const pauseSelf = useCallback(() => {
+    const el = mediaRef.current;
+    if (el && !el.paused) { el.pause(); setPlaying(false); }
+  }, []);
+
   const togglePlay = () => {
     const el = mediaRef.current;
     if (!el) return;
-    if (el.paused) { el.play(); setPlaying(true); } else { el.pause(); setPlaying(false); }
+    if (el.paused) {
+      requestPlay(mediaId, pauseSelf);
+      el.play();
+      setPlaying(true);
+    } else {
+      el.pause();
+      setPlaying(false);
+      clearPlay(mediaId);
+    }
   };
   const toggleMute = () => {
     const el = mediaRef.current;
