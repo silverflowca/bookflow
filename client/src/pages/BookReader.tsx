@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
-  Check, AlertCircle, Users, Lock, Globe, CheckCircle
+  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp
 } from 'lucide-react';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
@@ -1605,11 +1605,45 @@ function MediaBlock({ content }: { content: InlineContent }) {
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
               style={sticky
-                ? { position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', height: 'auto', maxHeight: '160px', objectFit: 'contain', zIndex: 51, borderRadius: '8px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', cursor: 'pointer' }
+                ? { position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', height: 'auto', maxHeight: '200px', objectFit: 'contain', zIndex: 51, borderRadius: '8px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }
                 : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }
               }
-              onClick={sticky ? () => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : undefined}
             />
+            {/* PiP controls overlay */}
+            {sticky && (
+              <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', zIndex: 52, borderRadius: '8px', overflow: 'hidden' }}>
+                {/* Top: jump back hint */}
+                <button
+                  onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  className="w-full flex items-center justify-center gap-1 py-1 text-xs text-white bg-black/50 hover:bg-black/70 transition-colors"
+                >
+                  <ArrowUp className="h-3 w-3" /> Jump to player
+                </button>
+                {/* Bottom controls bar */}
+                <div className="flex items-center gap-2 px-2 py-1.5 bg-black/70">
+                  <button onClick={togglePlay} className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-white/20 hover:bg-white/30 text-white transition-colors">
+                    {playing
+                      ? <span className="flex gap-[3px]"><span className="w-[2px] h-3 bg-current" /><span className="w-[2px] h-3 bg-current" /></span>
+                      : <Play className="h-3 w-3 ml-0.5" />
+                    }
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    step={0.1}
+                    value={currentTime}
+                    onChange={handleSeek}
+                    className="media-seek flex-1"
+                    style={{ background: `linear-gradient(to right, #fff ${progressPct}%, rgba(255,255,255,0.3) ${progressPct}%)` }}
+                  />
+                  <span className="text-xs text-white/70 tabular-nums flex-shrink-0">{formatTime(currentTime)}</span>
+                  <button onClick={toggleMute} className="flex-shrink-0 text-white/70 hover:text-white transition-colors">
+                    {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+            )}
             {!playing && !sticky && (
               <button
                 onClick={togglePlay}
