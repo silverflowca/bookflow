@@ -149,9 +149,6 @@ export default function ClubReadPage() {
   const totalChapters = stats[0]?.chapters_total ?? 0;
   const totalItems = stats[0]?.items_total ?? 0;
 
-  // Group: ahead / on track / not started
-  const myStats = stats.find(s => s.user_id === currentUserId);
-
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back */}
