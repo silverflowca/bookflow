@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 
@@ -360,7 +360,7 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
           </button>
         </div>
 
-        {/* Edit / View buttons */}
+        {/* Edit / View / Dashboard buttons */}
         <div className="flex gap-2">
           <Link
             to={`/edit/book/${book.id}`}
@@ -373,6 +373,13 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
             className="flex-1 text-center py-1.5 theme-button-secondary rounded-lg font-medium text-sm"
           >
             View
+          </Link>
+          <Link
+            to={`/edit/book/${book.id}/dashboard`}
+            className="flex items-center justify-center px-2.5 py-1.5 theme-button-secondary rounded-lg"
+            title="Dashboard"
+          >
+            <LayoutDashboard className="h-4 w-4" />
           </Link>
         </div>
       </div>
