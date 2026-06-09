@@ -395,6 +395,47 @@ router.post('/:clubId/members/:memberId/resend-invite', authenticate, async (req
   }
 });
 
+// ── GET /api/clubs/invite/:token — public peek at an invite (no auth required) ─
+router.get('/invite/:token', async (req, res) => {
+  try {
+    const { data: member, error } = await supabase
+      .from('club_members')
+      .select(`
+        id, invited_email, invite_accepted_at, user_id,
+        club:book_clubs(
+          id, name,
+          club_books(is_current, book:books(title))
+        )
+      `)
+      .eq('invite_token', req.params.token)
+      .maybeSingle();
+
+    if (error || !member) return res.status(404).json({ error: 'Invalid or expired invite link' });
+    if (member.invite_accepted_at) return res.status(409).json({ error: 'This invite has already been accepted' });
+
+    const club = Array.isArray(member.club) ? member.club[0] : member.club;
+    const currentBook = (club?.club_books || []).find(cb => cb.is_current);
+    const bookTitle = (Array.isArray(currentBook?.book) ? currentBook.book[0] : currentBook?.book)?.title || null;
+
+    // Check if the invited email already has a BookFlow account
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', member.invited_email)
+      .maybeSingle();
+
+    res.json({
+      club_id: club?.id,
+      club_name: club?.name || '',
+      book_title: bookTitle,
+      invited_email: member.invited_email,
+      has_account: !!profile,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/clubs/accept/:token — accept a club invite ─────────────────────
 router.post('/accept/:token', authenticate, async (req, res) => {
   try {

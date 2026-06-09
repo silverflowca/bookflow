@@ -760,6 +760,10 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/invite`, { method: 'POST', body: JSON.stringify({ email }) });
   }
 
+  async getClubInvitePreview(token: string): Promise<{ club_id: string; club_name: string; book_title: string | null; invited_email: string; has_account: boolean }> {
+    return this.request(`/clubs/invite/${token}`);
+  }
+
   async acceptClubInvite(token: string): Promise<any> {
     return this.request(`/clubs/accept/${token}`, { method: 'POST' });
   }
