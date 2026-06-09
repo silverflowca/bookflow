@@ -182,8 +182,8 @@ router.get('/:clubId', authenticate, async (req, res) => {
     const { data: members } = await supabase
       .from('club_members')
       .select(`
-        id, role, joined_at, invite_accepted_at,
-        user:profiles(id, display_name, avatar_url, email)
+        id, user_id, role, joined_at, invite_accepted_at,
+        profile:profiles(id, display_name, avatar_url, email)
       `)
       .eq('club_id', req.params.clubId)
       .not('invite_accepted_at', 'is', null)
