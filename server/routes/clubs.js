@@ -268,7 +268,7 @@ router.put('/:clubId/settings', authenticate, async (req, res) => {
     return res.status(403).json({ error: 'Only owners/admins can change settings' });
   }
 
-  const { show_member_reading_progress, show_member_answers, show_member_highlights, show_member_media } = req.body;
+  const { show_member_reading_progress, show_member_answers, show_member_highlights, show_member_media, enable_progress_tracking } = req.body;
   try {
     const { data, error } = await supabase
       .from('club_settings')
@@ -278,6 +278,7 @@ router.put('/:clubId/settings', authenticate, async (req, res) => {
         show_member_answers,
         show_member_highlights,
         show_member_media,
+        enable_progress_tracking,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'club_id' })
       .select()
