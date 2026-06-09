@@ -158,7 +158,7 @@ export default function ChapterEditor() {
     },
   });
 
-  let autoSaveTimeout: NodeJS.Timeout;
+  let autoSaveTimeout: ReturnType<typeof setTimeout>;
 
   useEffect(() => {
     if (chapterId) {

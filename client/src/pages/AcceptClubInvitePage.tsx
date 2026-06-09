@@ -68,7 +68,7 @@ export default function AcceptClubInvitePage() {
     }
   }
 
-  const redirectParam = encodeURIComponent(`/clubs/accept/${token}`);
+  // redirectParam kept for potential future use; links use the path directly
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--color-bg)]">

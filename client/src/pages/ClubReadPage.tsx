@@ -151,7 +151,6 @@ export default function ClubReadPage() {
 
   // Group: ahead / on track / not started
   const myStats = stats.find(s => s.user_id === currentUserId);
-  const myPct = myStats && totalChapters > 0 ? (myStats.chapters_completed / totalChapters) * 100 : 0;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -255,7 +254,6 @@ export default function ClubReadPage() {
             <div className="divide-y divide-white/5">
               {stats.map((s, i) => {
                 const chapterPct = totalChapters > 0 ? (s.chapters_completed / totalChapters) * 100 : 0;
-                const itemPct = totalItems > 0 ? (s.items_completed / totalItems) * 100 : 0;
                 const isMe = s.user_id === currentUserId;
                 const finished = totalChapters > 0 && s.chapters_completed >= totalChapters;
 

@@ -535,7 +535,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
 
   const acceptTypes = type === 'audio'

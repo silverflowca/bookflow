@@ -40,7 +40,7 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const { userId } = useParams<{ userId?: string }>();
-  const { user, profile: authProfile } = useAuth();
+  const { user } = useAuth();
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
