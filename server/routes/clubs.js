@@ -214,7 +214,7 @@ router.get('/:clubId', authenticate, async (req, res) => {
       .eq('club_id', req.params.clubId)
       .order('added_at', { ascending: false });
 
-    res.json({ ...club, my_role: role, members: members || [], pending_invites: pendingInvites, books: clubBooks || [] });
+    res.json({ ...club, my_role: role, members: members || [], member_count: (members || []).length, pending_invites: pendingInvites, books: clubBooks || [] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

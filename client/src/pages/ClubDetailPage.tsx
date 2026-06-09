@@ -73,6 +73,7 @@ interface Club {
   created_at: string;
   created_by?: string;
   my_role?: 'owner' | 'admin' | 'member' | null;
+  member_count?: number;
   creator?: { id: string; display_name: string };
   members?: Member[];
   books?: ClubBook[];
@@ -743,13 +744,15 @@ export default function ClubDetailPage() {
     );
   }
 
-  const acceptedMembers = club.members?.filter(m => m.invite_accepted_at) ?? [];
+  // Server already filters to accepted-only in the members array
+  const acceptedMembers = club.members ?? [];
+  const memberCount = club.member_count ?? acceptedMembers.length;
   const pendingInvites = club.members?.filter(m => !m.invite_accepted_at) ?? [];
   const currentBook = club.books?.find(b => b.is_current);
 
   const tabs: { key: PanelTab; label: string; icon: React.ReactNode }[] = [
     { key: 'overview', label: 'Overview', icon: <BookOpen className="h-4 w-4" /> },
-    { key: 'members', label: `Members (${acceptedMembers.length})`, icon: <Users className="h-4 w-4" /> },
+    { key: 'members', label: `Members (${memberCount})`, icon: <Users className="h-4 w-4" /> },
     { key: 'books', label: `Books (${club.books?.length ?? 0})`, icon: <BookOpen className="h-4 w-4" /> },
     { key: 'discussions', label: 'Discussions', icon: <MessageSquare className="h-4 w-4" /> },
     {
@@ -785,7 +788,7 @@ export default function ClubDetailPage() {
               </div>
               {club.description && <p className="text-muted mt-1">{club.description}</p>}
               <p className="text-xs text-muted mt-2">
-                Created by {club.creator?.display_name ?? 'Unknown'} · {acceptedMembers.length} / {club.max_members} members
+                Created by {club.creator?.display_name ?? 'Unknown'} · {memberCount} / {club.max_members} members
               </p>
             </div>
             {isAdmin && (
@@ -880,7 +883,7 @@ export default function ClubDetailPage() {
       {tab === 'members' && (
         <div className="space-y-4">
           <div className="theme-section rounded-xl p-4">
-            <h3 className="font-semibold text-theme text-sm mb-4">Active Members ({acceptedMembers.length})</h3>
+            <h3 className="font-semibold text-theme text-sm mb-4">Active Members ({memberCount})</h3>
             <div className="space-y-3">
               {acceptedMembers.map(m => (
                 <div key={m.id} className="flex items-center gap-3">
