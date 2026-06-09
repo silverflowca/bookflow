@@ -881,6 +881,8 @@ function ChapterContent({
 
   // If we have TipTap JSON, render it properly
   if (parsedContent && parsedContent.type === 'doc' && parsedContent.content) {
+    console.log('[BookReader] parsedContent nodes:', JSON.stringify(parsedContent.content.map((n: any) => ({ type: n.type, attrs: n.attrs, childTypes: n.content?.map((c: any) => c.type) }))));
+
     // Pre-assign each inline content item to exactly one text node, before any rendering.
     // This avoids mutating a Set during render (which breaks under React StrictMode double-invoke).
     const assignedIds = new Set<string>();
@@ -1288,6 +1290,8 @@ function TipTapNode({
       const attrContentData = node.attrs?.contentData;
       const ic = inlineContent.find(i => i.id === contentId);
 
+      console.log('[inlineFormWidget] node.attrs=', JSON.stringify(node.attrs), 'ic=', ic, 'attrContentType=', attrContentType, 'attrContentData=', attrContentData);
+
       // Build a synthetic InlineContent from node attrs as fallback when DB record isn't loaded
       const effectiveIc = ic ?? (attrContentType && attrContentData ? {
         id: contentId || '',
@@ -1625,7 +1629,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
             </button>
 
             {/* Time / seek */}
-            <div className="flex-1 flex items-center gap-2">
+            <div className="flex-1 flex items-center">
               <span className="text-xs tabular-nums w-9 shrink-0 text-muted">
                 {formatTime(currentTime)}
               </span>
@@ -1636,7 +1640,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 step={0.1}
                 value={currentTime}
                 onChange={handleSeek}
-                className="flex-1 h-1 appearance-none cursor-pointer rounded-none"
+                className="media-seek flex-1"
                 style={{
                   background: `linear-gradient(to right, var(--color-accent) ${progressPct}%, var(--color-border) ${progressPct}%)`
                 }}
@@ -1658,7 +1662,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
         {/* Title */}
         {data.title && (
-          <div className="px-4 py-2 border-t border-[var(--color-border)]">
+          <div className="px-4 pb-2 pt-1">
             <p className="text-xs font-medium tracking-wide uppercase text-muted">{data.title}</p>
           </div>
         )}
@@ -2542,6 +2546,9 @@ function InlineFormElement({ content }: { content: InlineContent }) {
       return <InlineScripture content={content} />;
     case 'image':
       return <ImageBlock content={content} />;
+    case 'audio':
+    case 'video':
+      return <MediaBlock content={content} />;
     default:
       return null;
   }

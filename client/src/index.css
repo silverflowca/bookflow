@@ -426,6 +426,46 @@ body {
   background: var(--color-border-strong);
 }
 
+/* Media player seek bar */
+.media-seek {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+  margin: 0 6px;
+  align-self: center;
+}
+.media-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: none;
+  margin-top: -3px;
+}
+.media-seek::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: none;
+}
+.media-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+}
+.media-seek::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+}
+
 /* Theme color swatch for picker */
 .color-swatch {
   width: 2.5rem;

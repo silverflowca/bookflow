@@ -1046,7 +1046,7 @@ export default function ChapterEditor() {
         </div>
 
         {/* Right Panel — tabbed: Comments / Inline Content */}
-        <div className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 self-start max-h-[calc(100vh-6rem)]">
+        <div className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 h-[calc(100vh-6rem)]">
           {/* Tab bar */}
           <div className="flex border-2 border-theme rounded-t-lg overflow-hidden bg-surface flex-shrink-0">
             <button
