@@ -1507,20 +1507,25 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const [loaded, setLoaded] = useState(false);
   const [sticky, setSticky] = useState(false);
 
-  // Show sticky mini-player when the block scrolls out of view (only while playing)
+  // Show PiP when block scrolls out of view (once activated by playing); dismiss only when back in view or closed
+  const hasPlayedRef = useRef(false);
+  useEffect(() => { if (playing) hasPlayedRef.current = true; }, [playing]);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (playing) setSticky(!entry.isIntersecting); },
-      { threshold: 0, rootMargin: '0px 0px 0px 0px' }
+      ([entry]) => {
+        if (hasPlayedRef.current) {
+          if (entry.isIntersecting) setSticky(false);
+          else setSticky(true);
+        }
+      },
+      { threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [playing]);
-
-  // Dismiss sticky when playback stops
-  useEffect(() => { if (!playing) setSticky(false); }, [playing]);
+  }, []);
 
   const handleTimeUpdate = () => {
     const el = mediaRef.current;
@@ -1612,13 +1617,21 @@ function MediaBlock({ content }: { content: InlineContent }) {
             {/* PiP controls overlay */}
             {sticky && (
               <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', zIndex: 52, borderRadius: '8px', overflow: 'hidden' }}>
-                {/* Top: jump back hint */}
-                <button
-                  onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                  className="w-full flex items-center justify-center gap-1 py-1 text-xs text-white bg-black/50 hover:bg-black/70 transition-colors"
-                >
-                  <ArrowUp className="h-3 w-3" /> Jump to player
-                </button>
+                {/* Top: scroll-back + close */}
+                <div className="flex items-center bg-black/50">
+                  <button
+                    onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                    className="flex-1 flex items-center justify-center py-1.5 text-white/80 hover:text-white hover:bg-black/30 transition-colors"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => { setSticky(false); hasPlayedRef.current = false; }}
+                    className="flex items-center justify-center px-3 py-1.5 text-white/60 hover:text-white hover:bg-black/30 transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
                 {/* Bottom controls bar */}
                 <div className="flex items-center gap-2 px-2 py-1.5 bg-black/70">
                   <button onClick={togglePlay} className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-white/20 hover:bg-white/30 text-white transition-colors">
