@@ -153,6 +153,11 @@ function AppRoutes() {
             <ClubReadPage />
           </ProtectedRoute>
         } />
+        <Route path="clubs/:clubId/read" element={
+          <ProtectedRoute>
+            <ClubReadPage />
+          </ProtectedRoute>
+        } />
 
         {/* Live Show */}
         <Route path="live" element={

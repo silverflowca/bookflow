@@ -485,9 +485,9 @@ function PrivacyToggle({
       <button
         type="button"
         onClick={() => onChange(!value)}
-        className={`relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition-colors ${value ? 'bg-accent' : 'bg-surface-hover border border-theme'}`}
+        className={`relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition-colors ${value ? 'bg-accent' : 'bg-white/20 border border-white/30'}`}
       >
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full shadow transition-transform ${value ? 'bg-white translate-x-4' : 'bg-white/70 translate-x-0.5'}`} />
       </button>
       <div>
         <p className="text-sm font-medium text-theme leading-tight">{label}</p>

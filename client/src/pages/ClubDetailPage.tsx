@@ -1274,7 +1274,7 @@ export default function ClubDetailPage() {
                   <button
                     disabled={!editingSettings}
                     onClick={() => editingSettings && setSettingsDraft(prev => prev ? { ...prev, [key]: !prev[key] } : prev)}
-                    className={`w-11 h-6 rounded-full transition-colors relative ${current ? 'bg-indigo-500' : 'bg-white/20'} ${editingSettings ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${current ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'} ${editingSettings ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
                   >
                     <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${current ? 'translate-x-5' : ''}`} />
                   </button>
