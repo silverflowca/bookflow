@@ -1590,20 +1590,27 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
         {/* Native video with custom controls */}
         {!isAudio && !embedUrl && (
-          <div className="relative group bg-[var(--color-surface-hover)] p-2">
+          <div
+            className="relative group bg-[var(--color-surface-hover)] p-2"
+            style={sticky ? { minHeight: '160px' } : undefined}
+          >
             <video
               ref={mediaRef as React.RefObject<HTMLVideoElement>}
               src={data.url}
-              className="w-full block rounded-lg"
+              className="block rounded-lg"
               preload="metadata"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={() => { setDuration(mediaRef.current?.duration || 0); setLoaded(true); }}
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
-              style={{ maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }}
+              style={sticky
+                ? { position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', height: 'auto', maxHeight: '160px', objectFit: 'contain', zIndex: 51, borderRadius: '8px', background: '#000', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', cursor: 'pointer' }
+                : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }
+              }
+              onClick={sticky ? () => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : undefined}
             />
-            {!playing && (
+            {!playing && !sticky && (
               <button
                 onClick={togglePlay}
                 className="absolute inset-0 flex items-center justify-center transition-colors hover:bg-[var(--color-surface-hover)]/40"
@@ -1688,17 +1695,10 @@ function MediaBlock({ content }: { content: InlineContent }) {
       {/* Sticky mini-player — floats at top when playing and scrolled away */}
       {sticky && (
         <div className="fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4 py-2.5 bg-[var(--color-surface)] border-b-2 border-[var(--color-accent)] shadow-lg">
-          {/* Thumbnail / icon */}
-          {!isAudio && (
-            <div className="w-14 h-10 rounded overflow-hidden flex-shrink-0 bg-[var(--color-surface-hover)] flex items-center justify-center">
-              <Video className="h-4 w-4 text-muted" />
-            </div>
-          )}
-          {isAudio && (
-            <div className="w-8 h-8 rounded-full flex-shrink-0 bg-accent/10 flex items-center justify-center">
-              <Volume2 className="h-4 w-4 text-accent" />
-            </div>
-          )}
+          {/* Icon */}
+          <div className={`flex-shrink-0 ${isAudio ? 'w-8 h-8 rounded-full bg-accent/10' : 'w-8 h-8 rounded bg-accent/10'} flex items-center justify-center`}>
+            {isAudio ? <Volume2 className="h-4 w-4 text-accent" /> : <Video className="h-4 w-4 text-accent" />}
+          </div>
 
           {/* Title */}
           <div className="flex-1 min-w-0">
@@ -1740,12 +1740,14 @@ function MediaBlock({ content }: { content: InlineContent }) {
           </button>
 
           {/* Scroll back to player */}
-          <button
-            onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-            className="flex-shrink-0 text-xs text-accent hover:underline whitespace-nowrap"
-          >
-            Jump to ↓
-          </button>
+          {isAudio && (
+            <button
+              onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              className="flex-shrink-0 text-xs text-accent hover:underline whitespace-nowrap"
+            >
+              Jump to ↓
+            </button>
+          )}
         </div>
       )}
     </div>
