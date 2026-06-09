@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, AlertCircle } from 'lucide-react';
 
@@ -11,6 +11,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +20,8 @@ export default function Register() {
 
     try {
       await register(email, password, displayName);
-      navigate('/dashboard');
+      const redirect = searchParams.get('redirect');
+      navigate(redirect || '/dashboard');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     } finally {
@@ -37,7 +39,10 @@ export default function Register() {
           </h2>
           <p className="mt-2 text-sm text-muted">
             Already have an account?{' '}
-            <Link to="/login" className="text-accent hover:text-accent font-medium">
+            <Link
+              to={searchParams.get('redirect') ? `/login?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/login'}
+              className="text-accent hover:text-accent font-medium"
+            >
               Sign in
             </Link>
           </p>
