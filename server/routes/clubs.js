@@ -411,7 +411,7 @@ router.get('/invite/:token', async (req, res) => {
       .maybeSingle();
 
     if (error || !member) return res.status(404).json({ error: 'Invalid or expired invite link' });
-    if (member.invite_accepted_at) return res.status(409).json({ error: 'This invite has already been accepted' });
+    // Note: don't reject already-accepted invites here — the accept endpoint handles it gracefully
 
     const club = Array.isArray(member.club) ? member.club[0] : member.club;
     const currentBook = (club?.club_books || []).find(cb => cb.is_current);
@@ -439,26 +439,43 @@ router.get('/invite/:token', async (req, res) => {
 // ── POST /api/clubs/accept/:token — accept a club invite ─────────────────────
 router.post('/accept/:token', authenticate, async (req, res) => {
   try {
+    // Look up invite row by token — don't filter on invite_accepted_at so retries work
     const { data: member, error } = await supabase
       .from('club_members')
       .select('*, club:book_clubs(id, name)')
       .eq('invite_token', req.params.token)
-      .is('invite_accepted_at', null)
-      .single();
+      .maybeSingle();
 
-    if (error || !member) return res.status(404).json({ error: 'Invalid or expired invite token' });
+    if (error) throw error;
 
-    // Check if user is already an accepted member of this club
+    // If invite row not found by token, check if this user is already a member of
+    // a club they were invited to (token may have been cleared after a prior accept)
+    if (!member) {
+      // We can't identify the club without the token, so return a friendly error
+      return res.status(404).json({ error: 'Invalid or expired invite token' });
+    }
+
+    // If the invite was already accepted (any user), check if the current user is the one
+    if (member.invite_accepted_at) {
+      // Check if the accepting user is the one on this row
+      if (member.user_id === req.user.id) {
+        return res.json({ success: true, club: member.club, already_member: true });
+      }
+      // Accepted by someone else — not valid for this user
+      return res.status(409).json({ error: 'This invite has already been used' });
+    }
+
+    // Check if user is already an accepted member of this club via a different row
     const { data: existing } = await supabase
       .from('club_members')
-      .select('id, invite_accepted_at')
+      .select('id')
       .eq('club_id', member.club_id)
       .eq('user_id', req.user.id)
       .not('invite_accepted_at', 'is', null)
       .maybeSingle();
 
     if (existing) {
-      // Already a member — delete the dangling invite row and return success
+      // Already a member — clean up the pending invite row and return success
       await supabase.from('club_members').delete().eq('id', member.id);
       return res.json({ success: true, club: member.club, already_member: true });
     }
@@ -470,6 +487,7 @@ router.post('/accept/:token', authenticate, async (req, res) => {
         invite_accepted_at: now,
         user_id: req.user.id,
         invite_token: null,
+        joined_at: now,
       })
       .eq('id', member.id);
 
