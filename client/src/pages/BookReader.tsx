@@ -1499,11 +1499,28 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [sticky, setSticky] = useState(false);
+
+  // Show sticky mini-player when the block scrolls out of view (only while playing)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (playing) setSticky(!entry.isIntersecting); },
+      { threshold: 0, rootMargin: '0px 0px 0px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [playing]);
+
+  // Dismiss sticky when playback stops
+  useEffect(() => { if (!playing) setSticky(false); }, [playing]);
 
   const handleTimeUpdate = () => {
     const el = mediaRef.current;
@@ -1555,7 +1572,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
+    <div ref={containerRef} className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined}>
       <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)]">
 
         {/* Embed (YouTube/Vimeo) */}
@@ -1667,6 +1684,70 @@ function MediaBlock({ content }: { content: InlineContent }) {
           </div>
         )}
       </div>
+
+      {/* Sticky mini-player — floats at top when playing and scrolled away */}
+      {sticky && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4 py-2.5 bg-[var(--color-surface)] border-b-2 border-[var(--color-accent)] shadow-lg">
+          {/* Thumbnail / icon */}
+          {!isAudio && (
+            <div className="w-14 h-10 rounded overflow-hidden flex-shrink-0 bg-[var(--color-surface-hover)] flex items-center justify-center">
+              <Video className="h-4 w-4 text-muted" />
+            </div>
+          )}
+          {isAudio && (
+            <div className="w-8 h-8 rounded-full flex-shrink-0 bg-accent/10 flex items-center justify-center">
+              <Volume2 className="h-4 w-4 text-accent" />
+            </div>
+          )}
+
+          {/* Title */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-theme truncate">{data.title || (isAudio ? 'Audio' : 'Video')}</p>
+            <p className="text-xs text-muted tabular-nums">{formatTime(currentTime)} / {formatTime(duration)}</p>
+          </div>
+
+          {/* Seek bar */}
+          <div className="flex-1 hidden sm:block">
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeek}
+              className="media-seek w-full"
+              style={{ background: `linear-gradient(to right, var(--color-accent) ${progressPct}%, var(--color-border) ${progressPct}%)` }}
+            />
+          </div>
+
+          {/* Play/Pause */}
+          <button
+            onClick={togglePlay}
+            className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-[var(--color-accent)] text-white hover:opacity-80 transition-opacity"
+          >
+            {playing
+              ? <span className="flex gap-[3px]"><span className="w-[3px] h-3 bg-current" /><span className="w-[3px] h-3 bg-current" /></span>
+              : <Play className="h-3.5 w-3.5 ml-0.5" />
+            }
+          </button>
+
+          {/* Mute */}
+          <button
+            onClick={toggleMute}
+            className="flex-shrink-0 w-7 h-7 flex items-center justify-center text-muted hover:text-theme transition-colors"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+
+          {/* Scroll back to player */}
+          <button
+            onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+            className="flex-shrink-0 text-xs text-accent hover:underline whitespace-nowrap"
+          >
+            Jump to ↓
+          </button>
+        </div>
+      )}
     </div>
   );
 }
