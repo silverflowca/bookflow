@@ -11,13 +11,14 @@ interface Club {
   visibility: 'public' | 'private';
   max_members: number;
   created_at: string;
+  member_count?: number;
   creator?: { id: string; display_name: string; avatar_url?: string };
   members?: { id: string; role: string; user_id: string; invite_accepted_at?: string }[];
   books?: { id: string; is_current: boolean; book?: { id: string; title: string; cover_image_url?: string } }[];
 }
 
 function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }) {
-  const memberCount = club.members?.filter(m => m.invite_accepted_at).length ?? 0;
+  const memberCount = club.member_count ?? club.members?.filter(m => m.invite_accepted_at).length ?? 0;
   const currentBook = club.books?.find(b => b.is_current)?.book;
 
   return (
