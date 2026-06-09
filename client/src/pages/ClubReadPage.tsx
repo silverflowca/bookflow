@@ -304,7 +304,7 @@ export default function ClubReadPage() {
         </div>
         <div className="sm:ml-auto flex gap-2">
           <Link
-            to={`/books/${bookId}/read`}
+            to={`/book/${bookId}`}
             className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg text-sm font-medium"
           >
             <BookOpen className="h-4 w-4" /> Read Book
