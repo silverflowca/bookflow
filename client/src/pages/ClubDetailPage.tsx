@@ -1211,15 +1211,15 @@ export default function ClubDetailPage() {
                     type="button"
                     disabled={!isEditing}
                     onClick={() => isEditing && setVisibilityDraft(opt.value)}
-                    className={`flex flex-col items-start gap-1.5 p-4 rounded-xl border-2 text-left transition-colors ${
+                    className={`flex flex-col items-start gap-1.5 p-4 rounded-xl text-left transition-all ${
                       isSelected
-                        ? 'border-accent bg-accent/10 text-theme'
-                        : 'border-[var(--color-border)] text-muted'
-                    } ${isEditing ? 'cursor-pointer hover:border-accent/50' : 'cursor-default'}`}
+                        ? 'border-[3px] border-accent bg-accent/20 text-theme shadow-[0_0_0_1px_var(--color-accent)]'
+                        : 'border-2 border-[var(--color-border)] text-muted bg-transparent'
+                    } ${isEditing ? 'cursor-pointer hover:border-accent/60 hover:bg-accent/10' : 'cursor-default'}`}
                   >
-                    <span className={isSelected ? 'text-accent' : ''}>{opt.icon}</span>
-                    <span className="text-sm font-semibold">{opt.label}</span>
-                    <span className="text-xs leading-snug">{opt.desc}</span>
+                    <span className={isSelected ? 'text-accent' : 'text-muted'}>{opt.icon}</span>
+                    <span className={`text-sm font-bold ${isSelected ? 'text-theme' : 'text-muted'}`}>{opt.label}</span>
+                    <span className={`text-xs leading-snug ${isSelected ? 'text-theme/80' : 'text-muted/70'}`}>{opt.desc}</span>
                   </button>
                 );
               })}
