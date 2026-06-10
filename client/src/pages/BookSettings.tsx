@@ -331,9 +331,9 @@ export default function BookSettings() {
           </p>
 
           <div className="flex items-start gap-6">
-            {/* Cover Preview — label wraps input so clicking always opens picker */}
-            <label
-              htmlFor="cover-upload"
+            {/* Cover Preview */}
+            <div
+              onClick={() => !uploadingCover && coverInputRef.current?.click()}
               className="w-32 h-48 rounded-lg border-2 border-dashed border-theme flex items-center justify-center overflow-hidden bg-surface-hover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
             >
               {coverUrl ? (
@@ -348,12 +348,11 @@ export default function BookSettings() {
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <Upload className="h-6 w-6 text-white" />
               </div>
-            </label>
+            </div>
 
             {/* Upload Controls */}
             <div className="flex-1 space-y-3">
               <input
-                id="cover-upload"
                 ref={coverInputRef}
                 type="file"
                 accept="image/*"
@@ -361,9 +360,10 @@ export default function BookSettings() {
                 className="hidden"
               />
 
-              <label
-                htmlFor="cover-upload"
-                className={`flex items-center gap-2 px-4 py-2 theme-button-primary rounded-lg cursor-pointer ${uploadingCover ? 'opacity-50 pointer-events-none' : ''}`}
+              <button
+                onClick={() => coverInputRef.current?.click()}
+                disabled={uploadingCover}
+                className="flex items-center gap-2 px-4 py-2 theme-button-primary rounded-lg disabled:opacity-50"
               >
                 {uploadingCover ? (
                   <>
@@ -376,7 +376,7 @@ export default function BookSettings() {
                     {coverUrl ? 'Change Cover' : 'Upload Cover'}
                   </>
                 )}
-              </label>
+              </button>
 
               {coverUrl && (
                 <button
