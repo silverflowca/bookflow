@@ -803,6 +803,10 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/members/${memberId}/resend-invite`, { method: 'POST' });
   }
 
+  async approveClubInvite(clubId: string, memberId: string): Promise<{ success: boolean }> {
+    return this.request(`/clubs/${clubId}/members/${memberId}/approve`, { method: 'POST' });
+  }
+
   async removeClubMember(clubId: string, memberId: string): Promise<void> {
     return this.request(`/clubs/${clubId}/members/${memberId}`, { method: 'DELETE' });
   }

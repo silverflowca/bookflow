@@ -487,18 +487,25 @@ function DiscussionThread({
 function PendingInviteRow({
   member,
   clubId,
+  isAdmin,
   onTokenRefreshed,
+  onApproved,
 }: {
   member: Member;
   clubId: string;
+  isAdmin: boolean;
   onTokenRefreshed: (memberId: string, newToken: string) => void;
+  onApproved: (memberId: string) => void;
 }) {
   const [token, setToken] = useState(member.invite_token ?? '');
   const [copied, setCopied] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const link = token ? `${window.location.origin}/clubs/accept/${token}` : '';
+  const hasAccount = !!member.user_id;
 
   async function handleCopy() {
     if (!link) return;
@@ -522,13 +529,68 @@ function PendingInviteRow({
     }
   }
 
+  async function handleApprove() {
+    setApproving(true);
+    setShowConfirm(false);
+    try {
+      await api.approveClubInvite(clubId, member.id);
+      onApproved(member.id);
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve invite');
+    } finally {
+      setApproving(false);
+    }
+  }
+
   return (
     <div className="space-y-1.5">
+      {/* Confirm dialog */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="theme-modal rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="font-semibold text-theme mb-2">Approve invite?</h3>
+            <p className="text-sm text-muted mb-4">
+              This will immediately add <span className="font-medium text-theme">{member.invited_email ?? 'this user'}</span> as a club member without requiring them to click the invite link.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 px-3 py-2 theme-button-secondary rounded-lg text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApprove}
+                className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Yes, Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <div className="h-7 w-7 rounded-full bg-gray-500/30 flex items-center justify-center flex-shrink-0">
           <Mail className="h-3.5 w-3.5 text-muted" />
         </div>
-        <span className="text-sm text-theme flex-1">{member.invited_email ?? 'Unknown'}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-theme">{member.invited_email ?? 'Unknown'}</span>
+          {hasAccount && (
+            <span className="ml-2 text-xs text-green-600 bg-green-500/10 px-1.5 py-0.5 rounded-full">has account</span>
+          )}
+        </div>
+        {isAdmin && hasAccount && (
+          <button
+            onClick={() => setShowConfirm(true)}
+            disabled={approving}
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+            title="Approve — add member without requiring them to click the link"
+          >
+            {approving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+            Approve
+          </button>
+        )}
         <button
           onClick={handleResend}
           disabled={resending}
@@ -952,11 +1014,20 @@ export default function ClubDetailPage() {
                     key={m.id}
                     member={m}
                     clubId={club.id}
+                    isAdmin={isAdmin}
                     onTokenRefreshed={(memberId, newToken) => {
                       setClub(prev => prev ? {
                         ...prev,
                         members: prev.members?.map(mm =>
                           mm.id === memberId ? { ...mm, invite_token: newToken } : mm
+                        )
+                      } : prev);
+                    }}
+                    onApproved={(memberId) => {
+                      setClub(prev => prev ? {
+                        ...prev,
+                        members: prev.members?.map(mm =>
+                          mm.id === memberId ? { ...mm, invite_accepted_at: new Date().toISOString() } : mm
                         )
                       } : prev);
                     }}

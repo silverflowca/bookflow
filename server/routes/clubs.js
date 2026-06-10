@@ -857,6 +857,45 @@ router.get('/:clubId/members/:memberUserId/answers', authenticate, async (req, r
   }
 });
 
+// ── POST /api/clubs/:clubId/members/:memberId/approve — admin directly approves a pending invite
+router.post('/:clubId/members/:memberId/approve', authenticate, async (req, res) => {
+  const { clubId, memberId } = req.params;
+  const myRole = await getClubRole(clubId, req.user.id);
+  if (myRole !== 'owner' && myRole !== 'admin') {
+    return res.status(403).json({ error: 'Only owners and admins can approve invites' });
+  }
+
+  try {
+    // Load the pending invite row
+    const { data: member, error: mErr } = await supabase
+      .from('club_members')
+      .select('id, user_id, invite_accepted_at, invited_email')
+      .eq('id', memberId)
+      .eq('club_id', clubId)
+      .maybeSingle();
+
+    if (mErr) throw mErr;
+    if (!member) return res.status(404).json({ error: 'Invite not found' });
+    if (member.invite_accepted_at) return res.json({ success: true, already_accepted: true });
+
+    // Must have a user_id to approve (the invitee must have an account)
+    if (!member.user_id) {
+      return res.status(400).json({ error: 'Cannot approve — invitee does not have an account yet' });
+    }
+
+    const { error: updateErr } = await supabase
+      .from('club_members')
+      .update({ invite_accepted_at: new Date().toISOString(), invite_token: null })
+      .eq('id', memberId);
+
+    if (updateErr) throw updateErr;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Approve invite error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/clubs/:clubId/members/:memberUserId/submissions ──────────────────
 // Returns all completions + submitted responses for a member, grouped by chapter.
 router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (req, res) => {
