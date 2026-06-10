@@ -331,8 +331,11 @@ export default function BookSettings() {
           </p>
 
           <div className="flex items-start gap-6">
-            {/* Cover Preview */}
-            <div className="w-32 h-48 rounded-lg border-2 border-dashed border-theme flex items-center justify-center overflow-hidden bg-surface-hover flex-shrink-0">
+            {/* Cover Preview — click to open file picker */}
+            <div
+              onClick={() => coverInputRef.current?.click()}
+              className="w-32 h-48 rounded-lg border-2 border-dashed border-theme flex items-center justify-center overflow-hidden bg-surface-hover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
+            >
               {coverUrl ? (
                 <img
                   src={coverUrl}
@@ -342,6 +345,9 @@ export default function BookSettings() {
               ) : (
                 <Image className="h-12 w-12 text-muted" />
               )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Upload className="h-6 w-6 text-white" />
+              </div>
             </div>
 
             {/* Upload Controls */}
