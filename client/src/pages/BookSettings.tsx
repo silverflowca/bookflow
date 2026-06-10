@@ -359,7 +359,6 @@ export default function BookSettings() {
                 accept="image/*"
                 onChange={handleCoverUpload}
                 className="hidden"
-                disabled={uploadingCover}
               />
 
               <label
