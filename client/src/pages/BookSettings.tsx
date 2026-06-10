@@ -331,11 +331,15 @@ export default function BookSettings() {
           </p>
 
           <div className="flex items-start gap-6">
-            {/* Cover Preview */}
-            <div
-              onClick={() => !uploadingCover && coverInputRef.current?.click()}
-              className="w-32 h-48 rounded-lg border-2 border-dashed border-theme flex items-center justify-center overflow-hidden bg-surface-hover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
-            >
+            {/* Cover Preview — input inside label so click natively opens picker */}
+            <label className="w-32 h-48 rounded-lg border-2 border-dashed border-theme flex items-center justify-center overflow-hidden bg-surface-hover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group block">
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverUpload}
+                className="hidden"
+              />
               {coverUrl ? (
                 <img
                   src={coverUrl}
@@ -348,23 +352,19 @@ export default function BookSettings() {
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <Upload className="h-6 w-6 text-white" />
               </div>
-            </div>
+            </label>
 
             {/* Upload Controls */}
             <div className="flex-1 space-y-3">
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleCoverUpload}
-                className="hidden"
-              />
-
-              <button
-                onClick={() => coverInputRef.current?.click()}
-                disabled={uploadingCover}
-                className="flex items-center gap-2 px-4 py-2 theme-button-primary rounded-lg disabled:opacity-50"
+              <label
+                className={`flex items-center gap-2 px-4 py-2 theme-button-primary rounded-lg cursor-pointer ${uploadingCover ? 'opacity-50 pointer-events-none' : ''}`}
               >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverUpload}
+                  className="hidden"
+                />
                 {uploadingCover ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -376,7 +376,7 @@ export default function BookSettings() {
                     {coverUrl ? 'Change Cover' : 'Upload Cover'}
                   </>
                 )}
-              </button>
+              </label>
 
               {coverUrl && (
                 <button

@@ -251,41 +251,38 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
 
   return (
     <div className="theme-card rounded-xl overflow-hidden">
-      {/* Cover */}
-      <Link to={`/edit/book/${book.id}`}>
-        <div
-          className="aspect-[3/2] bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer"
-          onMouseEnter={() => setShowCoverUpload(true)}
-          onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
-          onClick={(e) => { e.preventDefault(); coverInputRef.current?.click(); }}
-        >
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleCoverUpload}
-            className="hidden"
+      {/* Cover — label contains the file input so click always opens picker */}
+      <label
+        className="aspect-[3/2] bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block"
+        onMouseEnter={() => setShowCoverUpload(true)}
+        onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
+      >
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleCoverUpload}
+          className="hidden"
+        />
+        {book.cover_image_url ? (
+          <img
+            src={book.cover_image_url}
+            alt={book.title}
+            className="w-full h-full object-cover"
           />
-          {book.cover_image_url ? (
-            <img
-              src={book.cover_image_url}
-              alt={book.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <BookOpen className="h-12 w-12 text-accent opacity-30" />
-          )}
-          {(showCoverUpload || uploadingCover) && (
-            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center">
-              {uploadingCover ? (
-                <Loader2 className="h-6 w-6 text-white animate-spin" />
-              ) : (
-                <Upload className="h-6 w-6 text-white opacity-80" />
-              )}
-            </div>
-          )}
-        </div>
-      </Link>
+        ) : (
+          <BookOpen className="h-12 w-12 text-accent opacity-30" />
+        )}
+        {(showCoverUpload || uploadingCover) && (
+          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center">
+            {uploadingCover ? (
+              <Loader2 className="h-6 w-6 text-white animate-spin" />
+            ) : (
+              <Upload className="h-6 w-6 text-white opacity-80" />
+            )}
+          </div>
+        )}
+      </label>
 
       {/* Content */}
       <div className="p-4">
