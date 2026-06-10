@@ -275,15 +275,16 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
       .eq('is_current', true)
       .maybeSingle();
 
-    if (!clubBook) return res.json([]);
+    if (!clubBook) return res.json({ members: [], chapters: [] });
 
-    // Load all chapters for the current book
+    // Load all chapters for the current book (ordered for consistent breakdown array)
     const { data: chapters } = await supabase
       .schema('bookflow')
       .from('chapters')
-      .select('id, content')
+      .select('id, title, order_index, content')
       .eq('book_id', clubBook.book_id)
-      .eq('status', 'published');
+      .eq('status', 'published')
+      .order('order_index', { ascending: true });
 
     const chapterIds = (chapters || []).map(c => c.id);
 
@@ -316,15 +317,15 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
     // Aggregate per user
     const result = (members || []).map(member => {
       const userCompletions = (allCompletions || []).filter(c => c.user_id === member.user_id);
-      const completedChapters = new Set(
-        userCompletions
-          .filter(c => {
-            const t = totalByChapter[c.chapter_id] || 0;
-            const done = userCompletions.filter(x => x.chapter_id === c.chapter_id).length;
-            return t > 0 && done >= t;
-          })
-          .map(c => c.chapter_id)
-      ).size;
+
+      // Per-chapter breakdown: completed items and total items per chapter (in order)
+      const chapters_breakdown = (chapters || []).map(ch => ({
+        chapter_id: ch.id,
+        completed: userCompletions.filter(c => c.chapter_id === ch.id).length,
+        total: totalByChapter[ch.id] || 0,
+      }));
+
+      const completedChapters = chapters_breakdown.filter(b => b.total > 0 && b.completed >= b.total).length;
 
       const lastActive = userCompletions.length
         ? userCompletions.reduce((latest, c) =>
@@ -343,13 +344,124 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
         items_total: grandTotal,
         chapters_completed: completedChapters,
         chapters_total: chapterIds.length,
+        chapters_breakdown,
         last_active: lastActive,
       };
     });
 
-    res.json(result);
+    res.json({
+      members: result,
+      chapters: (chapters || []).map(c => ({ id: c.id, title: c.title })),
+    });
   } catch (err) {
     console.error('Club progress error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/progress/my-submissions/:bookId
+ * Returns the authenticated user's completions + submitted responses for a book,
+ * grouped by chapter. Used for per-user reading stats on the Dashboard.
+ */
+router.get('/my-submissions/:bookId', authenticate, async (req, res) => {
+  const { bookId } = req.params;
+
+  try {
+    // Load published chapters ordered
+    const { data: chapters, error: chErr } = await supabase
+      .schema('bookflow')
+      .from('chapters')
+      .select('id, title, order_index, content')
+      .eq('book_id', bookId)
+      .eq('status', 'published')
+      .order('order_index', { ascending: true });
+
+    if (chErr) throw chErr;
+    const chapterIds = (chapters || []).map(c => c.id);
+
+    // Load inline content and completions in parallel
+    const [{ data: allInline }, { data: completions }] = await Promise.all([
+      supabase.schema('bookflow').from('inline_content')
+        .select('id, chapter_id, content_type, content_data')
+        .in('chapter_id', chapterIds)
+        .in('content_type', TRACKABLE_TYPES),
+      supabase.schema('bookflow').from('chapter_item_completions')
+        .select('chapter_id, item_key, item_type, completed_at')
+        .eq('user_id', req.user.id)
+        .in('chapter_id', chapterIds),
+    ]);
+
+    // Batch load all responses for completed ic: items
+    const icIds = (completions || [])
+      .filter(c => c.item_key.startsWith('ic:'))
+      .map(c => c.item_key.slice(3));
+
+    const [{ data: qAnswers }, { data: pollVotes }, { data: formResps }] = await Promise.all([
+      icIds.length ? supabase.schema('bookflow').from('question_answers')
+        .select('inline_content_id, answer_text, selected_options, is_correct')
+        .in('inline_content_id', icIds).eq('user_id', req.user.id) : Promise.resolve({ data: [] }),
+      icIds.length ? supabase.schema('bookflow').from('poll_responses')
+        .select('inline_content_id, selected_option')
+        .in('inline_content_id', icIds).eq('user_id', req.user.id) : Promise.resolve({ data: [] }),
+      icIds.length ? supabase.schema('bookflow').from('form_responses')
+        .select('inline_content_id, response_data')
+        .in('inline_content_id', icIds).eq('user_id', req.user.id) : Promise.resolve({ data: [] }),
+    ]);
+
+    // Build lookup maps
+    const inlineMap = Object.fromEntries((allInline || []).map(ic => [ic.id, ic]));
+    const qMap = Object.fromEntries((qAnswers || []).map(r => [r.inline_content_id, r]));
+    const pollMap = Object.fromEntries((pollVotes || []).map(r => [r.inline_content_id, r]));
+    const formMap = Object.fromEntries((formResps || []).map(r => [r.inline_content_id, r]));
+
+    // Group completions by chapter
+    const byChapter = {};
+    for (const ch of (chapters || [])) byChapter[ch.id] = [];
+    for (const comp of (completions || [])) {
+      if (!byChapter[comp.chapter_id]) byChapter[comp.chapter_id] = [];
+      byChapter[comp.chapter_id].push(comp);
+    }
+
+    // Build totalByChapter
+    const totalByChapter = {};
+    for (const ch of (chapters || [])) {
+      const formCount = (allInline || []).filter(ic => ic.chapter_id === ch.id).length;
+      const mediaCount = extractMediaKeys(ch.content?.content || [], ch.id).length;
+      totalByChapter[ch.id] = formCount + mediaCount;
+    }
+
+    const chapterData = (chapters || []).map(ch => {
+      const chCompletions = byChapter[ch.id] || [];
+      const items = chCompletions.map(comp => {
+        if (comp.item_key.startsWith('ic:')) {
+          const icId = comp.item_key.slice(3);
+          const ic = inlineMap[icId];
+          const ct = ic?.content_type;
+          let prompt = ic?.content_data?.label || ic?.content_data?.question || ic?.content_data?.prompt || '';
+          let response = null;
+          if (ct === 'question') response = qMap[icId] ? { answer_text: qMap[icId].answer_text, selected_options: qMap[icId].selected_options, is_correct: qMap[icId].is_correct } : null;
+          else if (ct === 'poll') response = pollMap[icId] ? { selected_option: pollMap[icId].selected_option } : null;
+          else response = formMap[icId] ? formMap[icId].response_data : null;
+          return { item_key: comp.item_key, item_type: comp.item_type, content_type: ct, prompt, response, completed_at: comp.completed_at };
+        }
+        // media item
+        return { item_key: comp.item_key, item_type: comp.item_type, content_type: comp.item_type, prompt: null, response: null, completed_at: comp.completed_at };
+      });
+
+      return {
+        chapter_id: ch.id,
+        chapter_title: ch.title,
+        order_index: ch.order_index,
+        completed: chCompletions.length,
+        total: totalByChapter[ch.id] || 0,
+        items,
+      };
+    });
+
+    res.json({ chapters: chapterData });
+  } catch (err) {
+    console.error('My submissions error:', err);
     res.status(500).json({ error: err.message });
   }
 });

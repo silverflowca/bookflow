@@ -857,4 +857,151 @@ router.get('/:clubId/members/:memberUserId/answers', authenticate, async (req, r
   }
 });
 
+// ── GET /api/clubs/:clubId/members/:memberUserId/submissions ──────────────────
+// Returns all completions + submitted responses for a member, grouped by chapter.
+router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (req, res) => {
+  const { clubId, memberUserId } = req.params;
+  const myRole = await getClubRole(clubId, req.user.id);
+  if (!myRole) return res.status(403).json({ error: 'Not a member of this club' });
+
+  try {
+    const { data: settings } = await supabase
+      .from('club_settings')
+      .select('enable_progress_tracking, show_member_answers')
+      .eq('club_id', clubId)
+      .single();
+
+    if (!settings?.enable_progress_tracking) {
+      return res.status(403).json({ error: 'Progress tracking not enabled for this club' });
+    }
+
+    const isPrivileged = myRole === 'owner' || myRole === 'admin';
+    const isOwnData = memberUserId === req.user.id;
+    const canSeeResponses = isPrivileged || settings.show_member_answers || isOwnData;
+
+    // Verify target user is a club member
+    const targetRole = await getClubRole(clubId, memberUserId);
+    if (!targetRole) return res.status(404).json({ error: 'Member not found in this club' });
+
+    // Get member profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name, avatar_url')
+      .eq('id', memberUserId)
+      .single();
+
+    // Get current club book
+    const { data: clubBook } = await supabase
+      .from('club_books')
+      .select('book_id')
+      .eq('club_id', clubId)
+      .eq('is_current', true)
+      .maybeSingle();
+
+    if (!clubBook) return res.json({ member: { user_id: memberUserId, display_name: profile?.display_name || 'Member', avatar_url: profile?.avatar_url || null, role: targetRole }, chapters: [], can_see_responses: canSeeResponses });
+
+    // Load published chapters ordered
+    const { data: chapters } = await supabase
+      .from('chapters')
+      .select('id, title, order_index, content')
+      .eq('book_id', clubBook.book_id)
+      .eq('status', 'published')
+      .order('order_index', { ascending: true });
+
+    const chapterIds = (chapters || []).map(c => c.id);
+
+    // Load inline content and member completions in parallel
+    const TRACKABLE = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'question'];
+    const [{ data: allInline }, { data: completions }] = await Promise.all([
+      supabase.from('inline_content')
+        .select('id, chapter_id, content_type, content_data')
+        .in('chapter_id', chapterIds)
+        .in('content_type', TRACKABLE),
+      supabase.from('chapter_item_completions')
+        .select('chapter_id, item_key, item_type, completed_at')
+        .eq('user_id', memberUserId)
+        .in('chapter_id', chapterIds),
+    ]);
+
+    // Batch load responses if allowed
+    const icIds = canSeeResponses
+      ? (completions || []).filter(c => c.item_key.startsWith('ic:')).map(c => c.item_key.slice(3))
+      : [];
+
+    const [{ data: qAnswers }, { data: pollVotes }, { data: formResps }] = await Promise.all([
+      icIds.length ? supabase.from('question_answers').select('inline_content_id, answer_text, selected_options, is_correct').in('inline_content_id', icIds).eq('user_id', memberUserId) : Promise.resolve({ data: [] }),
+      icIds.length ? supabase.from('poll_responses').select('inline_content_id, selected_option').in('inline_content_id', icIds).eq('user_id', memberUserId) : Promise.resolve({ data: [] }),
+      icIds.length ? supabase.from('form_responses').select('inline_content_id, response_data').in('inline_content_id', icIds).eq('user_id', memberUserId) : Promise.resolve({ data: [] }),
+    ]);
+
+    const inlineMap = Object.fromEntries((allInline || []).map(ic => [ic.id, ic]));
+    const qMap = Object.fromEntries((qAnswers || []).map(r => [r.inline_content_id, r]));
+    const pollMap = Object.fromEntries((pollVotes || []).map(r => [r.inline_content_id, r]));
+    const formMap = Object.fromEntries((formResps || []).map(r => [r.inline_content_id, r]));
+
+    // totalByChapter (reuse media key extraction logic inline)
+    function countMediaKeys(content, chId, counter = { n: 0 }) {
+      let count = 0;
+      if (!content || !Array.isArray(content)) return count;
+      for (const node of content) {
+        if (node.type === 'audio' || node.type === 'video') { count++; counter.n++; }
+        if (node.content) count += countMediaKeys(node.content, chId, counter);
+      }
+      return count;
+    }
+
+    const totalByChapter = {};
+    for (const ch of (chapters || [])) {
+      const formCount = (allInline || []).filter(ic => ic.chapter_id === ch.id).length;
+      const mediaCount = countMediaKeys(ch.content?.content || [], ch.id);
+      totalByChapter[ch.id] = formCount + mediaCount;
+    }
+
+    // Group completions by chapter
+    const byChapter = {};
+    for (const ch of (chapters || [])) byChapter[ch.id] = [];
+    for (const comp of (completions || [])) {
+      if (byChapter[comp.chapter_id]) byChapter[comp.chapter_id].push(comp);
+    }
+
+    const chapterData = (chapters || []).map(ch => {
+      const chCompletions = byChapter[ch.id] || [];
+      const items = chCompletions.map(comp => {
+        if (comp.item_key.startsWith('ic:')) {
+          const icId = comp.item_key.slice(3);
+          const ic = inlineMap[icId];
+          const ct = ic?.content_type;
+          const prompt = ic?.content_data?.label || ic?.content_data?.question || ic?.content_data?.prompt || '';
+          let response = null;
+          if (canSeeResponses) {
+            if (ct === 'question') response = qMap[icId] ? { answer_text: qMap[icId].answer_text, selected_options: qMap[icId].selected_options, is_correct: qMap[icId].is_correct } : null;
+            else if (ct === 'poll') response = pollMap[icId] ? { selected_option: pollMap[icId].selected_option } : null;
+            else response = formMap[icId] ? formMap[icId].response_data : null;
+          }
+          return { item_key: comp.item_key, item_type: comp.item_type, content_type: ct, prompt, response, completed_at: comp.completed_at };
+        }
+        return { item_key: comp.item_key, item_type: comp.item_type, content_type: comp.item_type, prompt: null, response: null, completed_at: comp.completed_at };
+      });
+
+      return {
+        chapter_id: ch.id,
+        chapter_title: ch.title,
+        order_index: ch.order_index,
+        completed: chCompletions.length,
+        total: totalByChapter[ch.id] || 0,
+        items,
+      };
+    });
+
+    res.json({
+      member: { user_id: memberUserId, display_name: profile?.display_name || 'Member', avatar_url: profile?.avatar_url || null, role: targetRole },
+      chapters: chapterData,
+      can_see_responses: canSeeResponses,
+    });
+  } catch (err) {
+    console.error('Member submissions error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

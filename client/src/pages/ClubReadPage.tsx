@@ -6,6 +6,30 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 
+// Each segment width ∝ chapter's share of total items; fill ∝ items completed in that chapter
+function SegmentedBar({ breakdown }: { breakdown: { completed: number; total: number }[] }) {
+  if (!breakdown.length) return null;
+  const grandTotal = breakdown.reduce((s, b) => s + (b.total || 1), 0);
+  return (
+    <div className="flex gap-px w-full h-2.5 rounded-full overflow-hidden">
+      {breakdown.map((seg, i) => {
+        const widthPct = ((seg.total || 1) / grandTotal) * 100;
+        const fillPct = seg.total > 0 ? Math.min(100, (seg.completed / seg.total) * 100) : 0;
+        const done = seg.total > 0 && seg.completed >= seg.total;
+        const started = fillPct > 0 && !done;
+        return (
+          <div key={i} style={{ width: `${widthPct}%` }} className="relative h-full bg-white/10 rounded-sm overflow-hidden flex-shrink-0">
+            <div
+              className={`absolute inset-y-0 left-0 transition-all duration-300 ${done ? 'bg-green-500' : started ? 'bg-amber-400' : ''}`}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MemberStat {
@@ -17,6 +41,7 @@ interface MemberStat {
   items_total: number;
   chapters_completed: number;
   chapters_total: number;
+  chapters_breakdown: { chapter_id: string; completed: number; total: number }[];
   last_active: string | null;
 }
 
@@ -56,13 +81,6 @@ function timeAgo(dateStr: string | null) {
   return days < 7 ? `${days}d ago` : new Date(dateStr).toLocaleDateString();
 }
 
-function MiniBar({ pct, color = 'bg-indigo-500' }: { pct: number; color?: string }) {
-  return (
-    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-      <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
-    </div>
-  );
-}
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <span className="text-yellow-400 font-bold text-sm">🥇</span>;
@@ -111,12 +129,12 @@ export default function ClubReadPage() {
 
       // Load bulk member stats
       setStatsLoading(true);
-      const memberStats = await api.getClubProgress(clubId!).catch((e: any) => {
+      const progressData = await api.getClubProgress(clubId!).catch((e: any) => {
         setStatsError(e?.message || 'Could not load progress');
-        return [];
+        return { members: [], chapters: [] };
       });
       // Sort by chapters completed desc, then items completed desc
-      const sorted = [...memberStats].sort((a, b) =>
+      const sorted = [...(progressData.members || [])].sort((a, b) =>
         b.chapters_completed - a.chapters_completed || b.items_completed - a.items_completed
       );
       setStats(sorted);
@@ -277,21 +295,24 @@ export default function ClubReadPage() {
                       {finished && <span className="ml-auto text-green-400 text-xs font-medium hidden sm:block">✓ Done</span>}
                     </div>
 
-                    {/* Progress bar — hidden on mobile */}
+                    {/* Segmented progress bar — hidden on mobile */}
                     <div className="hidden sm:block">
                       <div className="flex items-center gap-2">
-                        <MiniBar
-                          pct={chapterPct}
-                          color={finished ? 'bg-green-500' : chapterPct > 50 ? 'bg-indigo-500' : 'bg-indigo-400'}
-                        />
+                        <SegmentedBar breakdown={s.chapters_breakdown ?? []} />
                         <span className="text-xs text-muted whitespace-nowrap w-8 text-right">{Math.round(chapterPct)}%</span>
                       </div>
                     </div>
 
-                    {/* Chapters */}
+                    {/* Chapters — clickable to detail page */}
                     <div className="hidden sm:block text-right">
-                      <span className="text-sm font-medium text-theme">{s.chapters_completed}</span>
-                      <span className="text-xs text-muted">/{totalChapters}</span>
+                      <Link
+                        to={`/clubs/${clubId}/members/${s.user_id}/progress`}
+                        className="hover:text-accent transition-colors"
+                        title="View submissions"
+                      >
+                        <span className="text-sm font-medium text-theme">{s.chapters_completed}</span>
+                        <span className="text-xs text-muted">/{totalChapters}</span>
+                      </Link>
                     </div>
 
                     {/* Items */}
@@ -309,20 +330,24 @@ export default function ClubReadPage() {
               })}
             </div>
 
-            {/* Mobile: show progress bar below each row */}
+            {/* Mobile: segmented bar + chapter count below each row */}
             <div className="sm:hidden divide-y divide-white/5">
-              {stats.map((s) => {
-                const chapterPct = totalChapters > 0 ? (s.chapters_completed / totalChapters) * 100 : 0;
-                return (
-                  <div key={`mobile-bar-${s.user_id}`} className="px-4 pb-3 -mt-1">
-                    <div className="flex items-center gap-2 pl-[calc(2rem+0.75rem)]">
-                      <MiniBar pct={chapterPct} />
-                      <span className="text-xs text-muted whitespace-nowrap">{s.chapters_completed}/{totalChapters}</span>
-                      <span className="text-xs text-muted whitespace-nowrap">{timeAgo(s.last_active)}</span>
+              {stats.map((s) => (
+                <div key={`mobile-bar-${s.user_id}`} className="px-4 pb-3 -mt-1">
+                  <div className="flex items-center gap-2 pl-[calc(2rem+0.75rem)]">
+                    <div className="flex-1">
+                      <SegmentedBar breakdown={s.chapters_breakdown ?? []} />
                     </div>
+                    <Link
+                      to={`/clubs/${clubId}/members/${s.user_id}/progress`}
+                      className="text-xs text-muted whitespace-nowrap hover:text-accent"
+                    >
+                      {s.chapters_completed}/{totalChapters}
+                    </Link>
+                    <span className="text-xs text-muted whitespace-nowrap">{timeAgo(s.last_active)}</span>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </>
         )}

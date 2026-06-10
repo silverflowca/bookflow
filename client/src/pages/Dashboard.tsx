@@ -1,30 +1,117 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
+
+// Each segment width ∝ chapter's share of total items; fill ∝ % items complete in that chapter
+function SegmentedBar({ breakdown }: { breakdown: { completed: number; total: number }[] }) {
+  if (!breakdown.length) return null;
+  const grandTotal = breakdown.reduce((s, b) => s + (b.total || 1), 0);
+  return (
+    <div className="flex gap-px w-full h-2 rounded-full overflow-hidden">
+      {breakdown.map((seg, i) => {
+        const widthPct = ((seg.total || 1) / grandTotal) * 100;
+        const fillPct = seg.total > 0 ? Math.min(100, (seg.completed / seg.total) * 100) : 0;
+        const done = seg.total > 0 && seg.completed >= seg.total;
+        const started = fillPct > 0 && !done;
+        return (
+          <div key={i} style={{ width: `${widthPct}%` }} className="relative h-full bg-surface-hover rounded-sm overflow-hidden flex-shrink-0">
+            <div
+              className={`absolute inset-y-0 left-0 transition-all duration-300 ${done ? 'bg-green-500' : started ? 'bg-amber-400' : ''}`}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Lazy-loads progress for a single book and renders a reading card
+function ReadingProgressCard({ bookId, bookTitle, coverUrl, clubId, clubName }: {
+  bookId: string; bookTitle: string; coverUrl?: string | null;
+  clubId?: string; clubName?: string;
+}) {
+  const [breakdown, setBreakdown] = useState<{ completed: number; total: number }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    api.getBookProgress(bookId)
+      .then(stats => setBreakdown(stats.map(s => ({ completed: s.completed, total: s.total }))))
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, [bookId]);
+
+  const totalDone = breakdown.filter(b => b.total > 0 && b.completed >= b.total).length;
+  const total = breakdown.length;
+  const hasProgress = breakdown.some(b => b.completed > 0);
+
+  if (loaded && !hasProgress) return null;
+
+  return (
+    <Link
+      to={`/book/${bookId}`}
+      className="theme-section rounded-xl p-4 flex gap-3 hover:shadow-md transition-shadow group"
+    >
+      {coverUrl
+        ? <img src={coverUrl} alt={bookTitle} className="w-10 h-14 object-cover rounded-md flex-shrink-0" />
+        : <div className="w-10 h-14 bg-indigo-500/20 rounded-md flex items-center justify-center flex-shrink-0">
+            <BookOpen className="h-4 w-4 text-indigo-400" />
+          </div>
+      }
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-theme truncate text-sm group-hover:text-accent transition-colors">{bookTitle}</p>
+        {clubName && <p className="text-xs text-muted truncate">{clubName}</p>}
+        <div className="mt-2">
+          {loaded
+            ? <SegmentedBar breakdown={breakdown} />
+            : <div className="h-2 bg-surface-hover rounded-full animate-pulse" />
+          }
+        </div>
+        {loaded && total > 0 && (
+          <p className="text-xs text-muted mt-1">{totalDone}/{total} chapters</p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+interface Club {
+  id: string;
+  name: string;
+  description?: string;
+  cover_image_url?: string;
+  visibility: 'public' | 'private';
+  max_members: number;
+  member_count?: number;
+  books?: { id: string; is_current: boolean; book?: { id: string; title: string } }[];
+}
 
 export default function Dashboard() {
   const [books, setBooks] = useState<Book[]>([]);
   const [collaboratingBooks, setCollaboratingBooks] = useState<Book[]>([]);
+  const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewBookModal, setShowNewBookModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadBooks();
+    loadAll();
   }, []);
 
-  async function loadBooks() {
+  async function loadAll() {
     try {
-      const [ownBooks, collabBooks] = await Promise.all([
+      const [ownBooks, collabBooks, myClubs] = await Promise.all([
         api.getMyBooks(),
         api.getCollaboratingBooks().catch(() => []),
+        api.getMyClubs().catch(() => []),
       ]);
       setBooks(ownBooks);
       setCollaboratingBooks(collabBooks);
+      setClubs(myClubs);
     } catch (err) {
-      console.error('Failed to load books:', err);
+      console.error('Failed to load dashboard:', err);
     } finally {
       setLoading(false);
     }
@@ -143,24 +230,94 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Book Clubs Quick Link */}
-      <div className="mt-10">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="h-5 w-5 text-accent" />
-          <h2 className="text-lg font-semibold text-theme">Book Clubs</h2>
+      {/* Currently Reading — club books with progress bars */}
+      {clubs.some(c => c.books?.some(b => b.is_current && b.book)) && (
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold text-theme">Currently Reading</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {clubs
+              .filter(c => c.books?.some(b => b.is_current && b.book))
+              .map(club => {
+                const currentBook = club.books!.find(b => b.is_current && b.book)!.book!;
+                return (
+                  <ReadingProgressCard
+                    key={club.id + currentBook.id}
+                    bookId={currentBook.id}
+                    bookTitle={currentBook.title}
+                    clubId={club.id}
+                    clubName={club.name}
+                  />
+                );
+              })
+            }
+          </div>
         </div>
-        <Link
-          to="/clubs"
-          className="flex items-center gap-4 theme-section rounded-xl p-4 hover:shadow-md transition-shadow group w-full sm:w-fit"
-        >
-          <div className="h-12 w-12 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
-            <Users className="h-6 w-6 text-indigo-400" />
+      )}
+
+      {/* Book Clubs */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold text-theme">Book Clubs</h2>
           </div>
-          <div>
-            <p className="font-medium text-theme group-hover:text-accent transition-colors">My Clubs</p>
-            <p className="text-xs text-muted">Read and discuss books with others</p>
+          <Link to="/clubs" className="flex items-center gap-1 text-sm text-accent hover:underline">
+            View all <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+        {clubs.length === 0 ? (
+          <Link
+            to="/clubs"
+            className="flex items-center gap-4 theme-section rounded-xl p-4 hover:shadow-md transition-shadow group w-full sm:w-fit"
+          >
+            <div className="h-12 w-12 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+              <Users className="h-6 w-6 text-indigo-400" />
+            </div>
+            <div>
+              <p className="font-medium text-theme group-hover:text-accent transition-colors">Join or create a club</p>
+              <p className="text-xs text-muted">Read and discuss books with others</p>
+            </div>
+          </Link>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {clubs.map((club) => (
+              <Link key={club.id} to={`/clubs/${club.id}`} className="theme-section rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+                {/* Cover */}
+                <div className="h-24 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 relative">
+                  {club.cover_image_url && (
+                    <img src={club.cover_image_url} alt={club.name} className="w-full h-full object-cover" />
+                  )}
+                  <div className="absolute top-2 right-2">
+                    {club.visibility === 'public'
+                      ? <Globe className="h-3.5 w-3.5 text-white/70" />
+                      : <Lock className="h-3.5 w-3.5 text-white/70" />}
+                  </div>
+                </div>
+                {/* Info */}
+                <div className="p-3">
+                  <p className="font-medium text-theme truncate group-hover:text-accent transition-colors">{club.name}</p>
+                  {club.description && (
+                    <p className="text-xs text-muted mt-0.5 line-clamp-1">{club.description}</p>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-muted flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {club.member_count ?? 1} / {club.max_members}
+                    </span>
+                    {club.books?.find(b => b.is_current)?.book && (
+                      <span className="text-xs text-muted truncate max-w-[120px]">
+                        {club.books.find(b => b.is_current)!.book!.title}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
-        </Link>
+        )}
       </div>
 
       {/* New Book Modal */}
@@ -250,10 +407,10 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
   }
 
   return (
-    <div className="theme-card rounded-xl overflow-hidden">
+    <div className="theme-card rounded-xl">
       {/* Cover — label contains the file input so click always opens picker */}
       <label
-        className="aspect-[3/2] bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block"
+        className="aspect-[3/2] bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block rounded-t-xl overflow-hidden"
         onMouseEnter={() => setShowCoverUpload(true)}
         onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
       >
@@ -303,7 +460,15 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
               <MoreVertical className="h-4 w-4" />
             </button>
             {showMenu && (
-              <div className="absolute right-0 mt-1 w-48 theme-modal rounded-xl shadow-lg z-10 overflow-hidden py-1">
+              <div className="absolute right-0 mt-1 w-48 theme-modal rounded-xl shadow-lg z-50 overflow-hidden py-1">
+                <Link
+                  to={`/edit/book/${book.id}/dashboard`}
+                  onClick={() => setShowMenu(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  Stats
+                </Link>
                 <Link
                   to={`/edit/book/${book.id}/settings`}
                   onClick={() => setShowMenu(false)}
@@ -337,7 +502,7 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
         {/* Meta row */}
         <div className="flex items-center justify-between mt-2 mb-3">
           <span className="text-xs text-muted">
-            {book.chapters?.length || 0} {book.chapters?.length === 1 ? 'chapter' : 'chapters'}
+            {(() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })()}
           </span>
           <button
             onClick={handleToggleVisibility}

@@ -22,6 +22,7 @@ import PublishSubmitPage from './pages/PublishSubmitPage';
 import ClubsPage from './pages/ClubsPage';
 import ClubDetailPage from './pages/ClubDetailPage';
 import ClubReadPage from './pages/ClubReadPage';
+import ClubMemberProgressPage from './pages/ClubMemberProgressPage';
 import AcceptClubInvitePage from './pages/AcceptClubInvitePage';
 import LiveSchedule from './pages/live/LiveSchedule';
 import LiveEpisode from './pages/live/LiveEpisode';
@@ -156,6 +157,11 @@ function AppRoutes() {
         <Route path="clubs/:clubId/read" element={
           <ProtectedRoute>
             <ClubReadPage />
+          </ProtectedRoute>
+        } />
+        <Route path="clubs/:clubId/members/:memberId/progress" element={
+          <ProtectedRoute>
+            <ClubMemberProgressPage />
           </ProtectedRoute>
         } />
 

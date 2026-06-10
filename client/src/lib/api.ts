@@ -286,8 +286,39 @@ class ApiClient {
     return this.request(`/progress/book/${bookId}`);
   }
 
-  async getClubProgress(clubId: string): Promise<{ user_id: string; display_name: string; avatar_url: string | null; role: string; items_completed: number; items_total: number; chapters_completed: number; chapters_total: number; last_active: string | null }[]> {
+  async getClubProgress(clubId: string): Promise<{
+    members: {
+      user_id: string; display_name: string; avatar_url: string | null; role: string;
+      items_completed: number; items_total: number;
+      chapters_completed: number; chapters_total: number;
+      chapters_breakdown: { chapter_id: string; completed: number; total: number }[];
+      last_active: string | null;
+    }[];
+    chapters: { id: string; title: string }[];
+  }> {
     return this.request(`/progress/club/${clubId}`);
+  }
+
+  async getMySubmissions(bookId: string): Promise<{
+    chapters: {
+      chapter_id: string; chapter_title: string; order_index: number;
+      completed: number; total: number;
+      items: { item_key: string; item_type: string; content_type: string; prompt: string | null; response: any; completed_at: string }[];
+    }[];
+  }> {
+    return this.request(`/progress/my-submissions/${bookId}`);
+  }
+
+  async getClubMemberSubmissions(clubId: string, memberId: string): Promise<{
+    member: { user_id: string; display_name: string; avatar_url: string | null; role: string };
+    chapters: {
+      chapter_id: string; chapter_title: string; order_index: number;
+      completed: number; total: number;
+      items: { item_key: string; item_type: string; content_type: string; prompt: string | null; response: any; completed_at: string }[];
+    }[];
+    can_see_responses: boolean;
+  }> {
+    return this.request(`/clubs/${clubId}/members/${memberId}/submissions`);
   }
 
   async getBookStats(bookId: string): Promise<{

@@ -60,7 +60,31 @@ interface ClubProgressEntry {
   items_total: number;
   chapters_completed: number;
   chapters_total: number;
+  chapters_breakdown: { chapter_id: string; completed: number; total: number }[];
   last_active: string | null;
+}
+
+function SegmentedBar({ breakdown }: { breakdown: { completed: number; total: number }[] }) {
+  if (!breakdown?.length) return null;
+  const grandTotal = breakdown.reduce((s, b) => s + (b.total || 1), 0);
+  return (
+    <div className="flex gap-px w-full h-2 rounded-full overflow-hidden">
+      {breakdown.map((seg, i) => {
+        const widthPct = ((seg.total || 1) / grandTotal) * 100;
+        const fillPct = seg.total > 0 ? Math.min(100, (seg.completed / seg.total) * 100) : 0;
+        const done = seg.total > 0 && seg.completed >= seg.total;
+        const started = fillPct > 0 && !done;
+        return (
+          <div key={i} style={{ width: `${widthPct}%` }} className="relative h-full bg-surface-hover rounded-sm overflow-hidden flex-shrink-0">
+            <div
+              className={`absolute inset-y-0 left-0 transition-all duration-300 ${done ? 'bg-green-500' : started ? 'bg-amber-400' : ''}`}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 interface Club {
@@ -562,6 +586,7 @@ export default function ClubDetailPage() {
   const [savingVisibility, setSavingVisibility] = useState(false);
   const [progressData, setProgressData] = useState<ClubProgressEntry[] | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
+  const [progressClubId, setProgressClubId] = useState<string | null>(null);
   const postRef = useRef<HTMLTextAreaElement>(null);
 
   const myRole = club?.my_role ?? null;
@@ -581,8 +606,9 @@ export default function ClubDetailPage() {
     if (!clubId) return;
     setProgressLoading(true);
     try {
-      const data = await api.getClubProgress(clubId);
-      setProgressData(data);
+      const result = await api.getClubProgress(clubId);
+      setProgressData(result.members ?? []);
+      setProgressClubId(clubId);
     } catch { setProgressData([]); }
     finally { setProgressLoading(false); }
   }
@@ -1120,14 +1146,14 @@ export default function ClubDetailPage() {
                 <thead>
                   <tr className="text-left text-muted border-b border-theme">
                     <th className="pb-2 pr-4 font-medium">Member</th>
+                    <th className="pb-2 pr-4 font-medium">Progress</th>
                     <th className="pb-2 pr-4 font-medium text-center">Chapters</th>
-                    <th className="pb-2 pr-4 font-medium text-center">Items</th>
                     <th className="pb-2 font-medium text-right">Last active</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-theme/30">
                   {progressData.map(entry => {
-                    const itemPct = entry.items_total > 0 ? Math.round((entry.items_completed / entry.items_total) * 100) : 0;
+                    const chapterPct = entry.chapters_total > 0 ? Math.round((entry.chapters_completed / entry.chapters_total) * 100) : 0;
                     return (
                       <tr key={entry.user_id} className="py-2">
                         <td className="py-3 pr-4">
@@ -1141,16 +1167,22 @@ export default function ClubDetailPage() {
                             {entry.role === 'admin' && <Shield className="h-3 w-3 text-blue-500" />}
                           </div>
                         </td>
-                        <td className="py-3 pr-4 text-center text-muted">
-                          {entry.chapters_completed}/{entry.chapters_total}
-                        </td>
                         <td className="py-3 pr-4">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
-                              <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${itemPct}%` }} />
+                          <div className="flex items-center gap-2 min-w-[120px]">
+                            <div className="flex-1">
+                              <SegmentedBar breakdown={entry.chapters_breakdown ?? []} />
                             </div>
-                            <span className="text-muted text-xs shrink-0">{itemPct}%</span>
+                            <span className="text-muted text-xs shrink-0">{chapterPct}%</span>
                           </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center">
+                          <Link
+                            to={`/clubs/${progressClubId}/members/${entry.user_id}/progress`}
+                            className="text-sm font-medium text-theme hover:text-accent transition-colors"
+                            title="View submissions"
+                          >
+                            {entry.chapters_completed}/{entry.chapters_total}
+                          </Link>
                         </td>
                         <td className="py-3 text-right text-muted text-xs">
                           {entry.last_active ? timeAgo(entry.last_active) : '—'}
