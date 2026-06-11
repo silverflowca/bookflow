@@ -6,7 +6,7 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 const router = express.Router({ mergeParams: true });
 
 // GET /api/books/:bookId/collaborators
-router.get('/', authenticate, requireRole(['owner']), async (req, res) => {
+router.get('/', authenticate, requireRole(['owner', 'author']), async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('book_collaborators')
@@ -26,7 +26,7 @@ router.get('/', authenticate, requireRole(['owner']), async (req, res) => {
 });
 
 // POST /api/books/:bookId/collaborators — invite by email or userId
-router.post('/', authenticate, requireRole(['owner']), async (req, res) => {
+router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res) => {
   const { email, userId, role } = req.body;
 
   if (!role || !['author', 'editor', 'reviewer'].includes(role)) {
@@ -112,7 +112,7 @@ router.post('/', authenticate, requireRole(['owner']), async (req, res) => {
   }
 });
 
-// PUT /api/books/:bookId/collaborators/:id — change role
+// PUT /api/books/:bookId/collaborators/:id — change role (owner only)
 router.put('/:id', authenticate, requireRole(['owner']), async (req, res) => {
   const { role } = req.body;
 

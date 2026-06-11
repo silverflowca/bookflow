@@ -157,7 +157,7 @@ router.post('/books/:bookId/chapters', authenticate, async (req, res) => {
 
 // Update chapter
 router.put('/chapters/:id', authenticate, async (req, res) => {
-  const { title, content, content_text, order_index, status } = req.body;
+  const { title, content, content_text, order_index, status, word_count, estimated_read_time_minutes } = req.body;
 
   try {
     // Check author
@@ -173,15 +173,22 @@ router.put('/chapters/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
+    // Compute word count server-side if not provided but content_text is
+    let finalWordCount = word_count;
+    let finalReadTime = estimated_read_time_minutes;
+    if (finalWordCount == null && content_text != null) {
+      const words = content_text.trim() ? content_text.trim().split(/\s+/).length : 0;
+      finalWordCount = words;
+      finalReadTime = Math.max(1, Math.round(words / 200));
+    }
+
+    const updatePayload = { title, content, content_text, order_index, status };
+    if (finalWordCount != null) updatePayload.word_count = finalWordCount;
+    if (finalReadTime != null) updatePayload.estimated_read_time_minutes = finalReadTime;
+
     const { data: updated, error } = await supabase
       .from('chapters')
-      .update({
-        title,
-        content,
-        content_text,
-        order_index,
-        status
-      })
+      .update(updatePayload)
       .eq('id', req.params.id)
       .select()
       .single();

@@ -53,36 +53,11 @@ export async function optionalAuth(req, res, next) {
 }
 
 /**
- * Author-only middleware - requires user to be book author
+ * Author-only middleware - requires user to be book owner OR accepted author-collaborator.
+ * Kept for backwards compatibility; prefer requireRole(['owner', 'author']) for new routes.
  */
 export async function requireAuthor(req, res, next) {
-  const bookId = req.params.bookId || req.params.id || req.body.book_id;
-
-  if (!bookId) {
-    return res.status(400).json({ error: 'Book ID required' });
-  }
-
-  try {
-    const { data: book, error } = await supabase
-      .from('books')
-      .select('author_id')
-      .eq('id', bookId)
-      .single();
-
-    if (error || !book) {
-      return res.status(404).json({ error: 'Book not found' });
-    }
-
-    if (book.author_id !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized - author only' });
-    }
-
-    req.book = book;
-    next();
-  } catch (err) {
-    console.error('Author check error:', err);
-    return res.status(500).json({ error: 'Authorization check failed' });
-  }
+  return requireRole(['owner', 'author'])(req, res, next);
 }
 
 /**

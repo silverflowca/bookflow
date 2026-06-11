@@ -4,7 +4,7 @@ import {
   ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen,
-  LayoutGrid, Image, ArrowUp, ArrowDown
+  LayoutGrid, Image, ArrowUp, ArrowDown, Copy
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -238,6 +238,18 @@ export default function ChapterEditor() {
   // Keep ref in sync so onUpdate closure can access current inlineContents without stale capture
   useEffect(() => { inlineContentsRef.current = inlineContents; }, [inlineContents]);
 
+  // Double-click on any inlineFormWidget node opens its config modal
+  useEffect(() => {
+    function handleInlineEdit(e: Event) {
+      const { contentId } = (e as CustomEvent<{ contentId: string }>).detail;
+      const item = inlineContentsRef.current.find(ic => ic.id === contentId);
+      if (item) handleEditInlineContent(item);
+    }
+    const editorEl = editor?.view?.dom;
+    editorEl?.addEventListener('inlineform:edit', handleInlineEdit);
+    return () => editorEl?.removeEventListener('inlineform:edit', handleInlineEdit);
+  }, [editor]);
+
   // Close column picker on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -309,13 +321,17 @@ export default function ChapterEditor() {
     setSaving(true);
     try {
       const updateData: Partial<Chapter> = { title };
+      const rawText = contentText ?? (editor?.getText() ?? '');
       if (content) {
         updateData.content = content;
         updateData.content_text = contentText;
       } else if (editor) {
         updateData.content = editor.getJSON();
-        updateData.content_text = editor.getText();
+        updateData.content_text = rawText;
       }
+      const words = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
+      updateData.word_count = words;
+      updateData.estimated_read_time_minutes = Math.max(1, Math.round(words / 200));
       await api.updateChapter(chapterId, updateData);
       setLastSaved(new Date());
     } catch (err) {
@@ -387,9 +403,9 @@ export default function ChapterEditor() {
     setShowInlineModal({ type, selection: { from, to, text } });
   }
 
-  const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox'];
+  const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll'];
   // Types that can be inserted as an atom node at the cursor (no text selection needed)
-  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'question', 'poll', 'highlight', 'note', 'link', 'code_block', 'scripture_block'];
+  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
@@ -404,7 +420,7 @@ export default function ChapterEditor() {
       // When no text is selected, use the label from content_data as the anchor text
       const anchorText = hasSelection
         ? showInlineModal.selection!.text
-        : ((data.content_data as any)?.label || (data.content_data as any)?.title || '');
+        : ((data.content_data as any)?.label || (data.content_data as any)?.question || (data.content_data as any)?.title || '');
 
       // Determine insertion position:
       // - Has selection → inline (form/mark)
@@ -633,6 +649,57 @@ export default function ChapterEditor() {
       setShowInlineModal(null);
     } catch (err) {
       console.error('Failed to update inline content:', err);
+    }
+  }
+
+  async function handleDuplicateInlineContent(id: string) {
+    const item = inlineContents.find(i => i.id === id);
+    if (!item || !chapterId) return;
+    try {
+      const isFormType = INLINE_FORM_TYPES.includes(item.content_type);
+      const created = await api.createInlineContent(chapterId, {
+        content_type: item.content_type,
+        content_data: item.content_data,
+        anchor_text: item.anchor_text,
+        position_in_chapter: item.position_in_chapter ?? 'inline',
+        visibility: item.visibility,
+        response_visibility: (item as any).response_visibility,
+        // place it after the original (end of list)
+        start_offset: item.start_offset,
+        end_offset: item.end_offset,
+      });
+
+      // Insert a new editor node for form types so it's visible in the document
+      if (editor && isFormType && (!item.position_in_chapter || item.position_in_chapter === 'inline')) {
+        // Find the original node and insert the duplicate right after it
+        const { state } = editor;
+        let insertPos: number | null = null;
+        state.doc.descendants((node, pos) => {
+          if (insertPos !== null) return false;
+          if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
+            insertPos = pos + node.nodeSize;
+          }
+        });
+        if (insertPos !== null) {
+          editor
+            .chain()
+            .focus()
+            .setTextSelection(insertPos)
+            .insertInlineFormNode({
+              contentId: created.id,
+              contentType: created.content_type,
+              anchorText: created.anchor_text || '',
+              contentData: created.content_data ?? null,
+              position: (created.position_in_chapter as any) ?? 'inline',
+            })
+            .run();
+        }
+      }
+
+      setInlineContents(prev => [...prev, created]);
+    } catch (err) {
+      console.error('Failed to duplicate inline content:', err);
+      alert('Failed to duplicate: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -1116,6 +1183,7 @@ export default function ChapterEditor() {
                         onMovePosition={handleMovePosition}
                         onReorder={handleReorderItem}
                         onEdit={handleEditInlineContent}
+                        onDuplicate={handleDuplicateInlineContent}
                       />
                     ))}
                   </div>
@@ -1207,6 +1275,7 @@ function InlineContentItem({
   onMovePosition,
   onReorder,
   onEdit,
+  onDuplicate,
   index,
   totalItems
 }: {
@@ -1216,6 +1285,7 @@ function InlineContentItem({
   onMovePosition: (id: string, position: InlineContent['position_in_chapter']) => void;
   onReorder: (id: string, direction: 'up' | 'down') => void;
   onEdit: (item: InlineContent) => void;
+  onDuplicate: (id: string) => void;
   index: number;
   totalItems: number;
 }) {
@@ -1363,6 +1433,19 @@ function InlineContentItem({
             >
               <Pencil className="h-3 w-3" />
               Edit
+            </button>
+
+            {/* Duplicate */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate(item.id);
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-violet-100 text-violet-600 hover:bg-violet-200 rounded"
+              title="Duplicate this component — creates a new copy with a new ID, tracked separately in progress"
+            >
+              <Copy className="h-3 w-3" />
+              Duplicate
             </button>
 
             {/* Delete */}

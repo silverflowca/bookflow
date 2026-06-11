@@ -17,6 +17,8 @@ export default function InviteModal({ bookId, bookTitle, onClose, onInvited }: I
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [addedDirectly, setAddedDirectly] = useState(false);
+  const [addedName, setAddedName] = useState('');
   const [copied, setCopied] = useState(false);
 
   async function handleInvite() {
@@ -38,7 +40,9 @@ export default function InviteModal({ bookId, bookTitle, onClose, onInvited }: I
       if (result.invite_token) {
         setInviteToken(result.invite_token);
       } else {
-        onClose();
+        // User already exists — was auto-approved, show confirmation
+        setAddedName((result as any).user?.display_name || email.trim());
+        setAddedDirectly(true);
       }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -53,6 +57,29 @@ export default function InviteModal({ bookId, bookTitle, onClose, onInvited }: I
     await navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteToken}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  // Show confirmation for existing users (auto-approved)
+  if (addedDirectly) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="theme-modal rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-theme">Collaborator added!</h3>
+            <button onClick={onClose} className="text-muted hover:text-theme"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl mb-4">
+            <Check className="h-5 w-5 text-green-600 shrink-0" />
+            <p className="text-sm text-green-800">
+              <strong>{addedName}</strong> already has an account and has been added directly as <strong>{role}</strong>. No invite link needed.
+            </p>
+          </div>
+          <button onClick={onClose} className="w-full theme-button-primary py-2 rounded-lg text-sm font-medium">
+            Done
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Show success with invite link

@@ -58,8 +58,8 @@ export default function BookCollaboratorsPage() {
     }
   }
 
-  async function handleRemove(collabId: string) {
-    if (!confirm('Remove this collaborator from the book?')) return;
+  async function handleRemove(collabId: string, name: string) {
+    if (!confirm(`Remove ${name} as a collaborator?\n\nTheir existing edits and comments will remain — they just won't be able to make new changes.`)) return;
     try {
       await api.removeCollaborator(bookId!, collabId);
       setCollaborators(prev => prev.filter(c => c.id !== collabId));
@@ -203,7 +203,7 @@ export default function BookCollaboratorsPage() {
 
             {/* Remove button */}
             <button
-              onClick={() => handleRemove(collab.id)}
+              onClick={() => handleRemove(collab.id, collab.user?.display_name || collab.invited_email || 'this collaborator')}
               className="text-muted hover:text-red-500 transition-colors p-1"
               title="Remove collaborator"
             >

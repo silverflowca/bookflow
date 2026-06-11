@@ -61,79 +61,97 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-modal role="dialog" aria-modal="true">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-bold">{titles[type]}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header — always visible */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
+          <h2 className="text-base font-bold flex-1 truncate">{titles[type]}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 border rounded text-sm text-gray-700 hover:bg-gray-50 shrink-0"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="modal-form"
+            className="px-3 py-1.5 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 shrink-0"
+          >
+            {isEditing ? 'Save' : 'Add'}
+          </button>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {selectedText && !isEditing && (
-          <div className="px-4 pt-4">
-            <p className="text-sm text-gray-500">Anchored to:</p>
-            <p className="text-sm bg-gray-100 p-2 rounded mt-1 italic">"{selectedText}"</p>
-          </div>
-        )}
-        {!selectedText && !isEditing && !isFormType && (
-          <div className="px-4 pt-4">
-            {hasCursor ? (
-              <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                Will be inserted <strong>inline at your cursor position</strong> in the chapter.
-              </p>
-            ) : (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                No cursor position — this will be added to the <strong>End of Chapter</strong> panel. Click in the chapter text first to insert it inline.
-              </p>
-            )}
-          </div>
-        )}
-
-        {isFormType && (
-          <div className="px-4 pt-4">
-            <p className="text-xs text-gray-500 mb-1.5">Who can see responses?</p>
-            <div className="flex items-center gap-1">
-              {([
-                { value: 'private' as const, icon: <Lock className="h-3 w-3" />, label: 'Private (only me)' },
-                { value: 'members_only' as const, icon: <Users className="h-3 w-3" />, label: 'Club members' },
-                { value: 'all_readers' as const, icon: <Globe className="h-3 w-3" />, label: 'All readers' },
-              ] as const).map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setResponseVisibility(opt.value)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
-                    responseVisibility === opt.value
-                      ? 'bg-blue-50 border-blue-400 text-blue-700'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
-                  }`}
-                >
-                  {opt.icon}
-                  {opt.label}
-                </button>
-              ))}
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          {selectedText && !isEditing && (
+            <div className="px-4 pt-4">
+              <p className="text-sm text-gray-500">Anchored to:</p>
+              <p className="text-sm bg-gray-100 p-2 rounded mt-1 italic">"{selectedText}"</p>
             </div>
-          </div>
-        )}
+          )}
+          {!selectedText && !isEditing && !isFormType && (
+            <div className="px-4 pt-4">
+              {hasCursor ? (
+                <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                  Will be inserted <strong>inline at your cursor position</strong> in the chapter.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  No cursor position — this will be added to the <strong>End of Chapter</strong> panel. Click in the chapter text first to insert it inline.
+                </p>
+              )}
+            </div>
+          )}
 
-        <div className="p-4">
-          {type === 'question' && <QuestionForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as QuestionData} isEditing={isEditing} />}
-          {type === 'poll' && <PollForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as PollData} isEditing={isEditing} />}
-          {type === 'highlight' && <HighlightForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as HighlightData} isEditing={isEditing} />}
-          {type === 'note' && <NoteForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as NoteData} isEditing={isEditing} />}
-          {type === 'link' && <LinkForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as LinkData} isEditing={isEditing} />}
-          {type === 'audio' && <MediaForm type="audio" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
-          {type === 'video' && <MediaForm type="video" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
-          {type === 'image' && <ImageForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ImageData} isEditing={isEditing} bookId={bookId} />}
-          
-          {type === 'select' && <SelectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SelectData} isEditing={isEditing} />}
-          {type === 'multiselect' && <MultiselectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MultiselectData} isEditing={isEditing} />}
-          {type === 'textbox' && <TextboxForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as TextboxData} isEditing={isEditing} />}
-          {type === 'textarea' && <TextareaForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as TextareaData} isEditing={isEditing} />}
-          {type === 'radio' && <RadioForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as RadioData} isEditing={isEditing} />}
-          {type === 'checkbox' && <CheckboxForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CheckboxData} isEditing={isEditing} />}
-          {type === 'code_block' && <CodeBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CodeBlockData} isEditing={isEditing} />}
-          {type === 'scripture_block' && <ScriptureBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ScriptureBlockData} isEditing={isEditing} />}
+          {isFormType && (
+            <div className="px-4 pt-4">
+              <p className="text-xs text-gray-500 mb-1.5">Who can see responses?</p>
+              <div className="flex items-center gap-1">
+                {([
+                  { value: 'private' as const, icon: <Lock className="h-3 w-3" />, label: 'Private (only me)' },
+                  { value: 'members_only' as const, icon: <Users className="h-3 w-3" />, label: 'Club members' },
+                  { value: 'all_readers' as const, icon: <Globe className="h-3 w-3" />, label: 'All readers' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setResponseVisibility(opt.value)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
+                      responseVisibility === opt.value
+                        ? 'bg-blue-50 border-blue-400 text-blue-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="p-4">
+            {type === 'question' && <QuestionForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as QuestionData} isEditing={isEditing} />}
+            {type === 'poll' && <PollForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as PollData} isEditing={isEditing} />}
+            {type === 'highlight' && <HighlightForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as HighlightData} isEditing={isEditing} />}
+            {type === 'note' && <NoteForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as NoteData} isEditing={isEditing} />}
+            {type === 'link' && <LinkForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as LinkData} isEditing={isEditing} />}
+            {type === 'audio' && <MediaForm type="audio" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
+            {type === 'video' && <MediaForm type="video" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
+            {type === 'image' && <ImageForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ImageData} isEditing={isEditing} bookId={bookId} />}
+
+            {type === 'select' && <SelectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SelectData} isEditing={isEditing} hideButtons />}
+            {type === 'multiselect' && <MultiselectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MultiselectData} isEditing={isEditing} hideButtons />}
+            {type === 'textbox' && <TextboxForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as TextboxData} isEditing={isEditing} hideButtons />}
+            {type === 'textarea' && <TextareaForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as TextareaData} isEditing={isEditing} hideButtons />}
+            {type === 'radio' && <RadioForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as RadioData} isEditing={isEditing} hideButtons />}
+            {type === 'checkbox' && <CheckboxForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CheckboxData} isEditing={isEditing} hideButtons />}
+            {type === 'code_block' && <CodeBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CodeBlockData} isEditing={isEditing} hideButtons />}
+            {type === 'scripture_block' && <ScriptureBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ScriptureBlockData} isEditing={isEditing} hideButtons />}
+          </div>
         </div>
       </div>
     </div>
@@ -165,7 +183,7 @@ function QuestionForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit:
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Question</label>
         <textarea
@@ -267,7 +285,7 @@ function QuestionForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit:
         </select>
       </div>
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={true} />
     </form>
   );
 }
@@ -298,7 +316,7 @@ function PollForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Poll Question</label>
         <input
@@ -367,7 +385,7 @@ function PollForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
         </label>
       </div>
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={true} />
     </form>
   );
 }
@@ -390,7 +408,7 @@ function HighlightForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-2">Highlight Color</label>
         <div className="flex gap-2">
@@ -417,7 +435,7 @@ function HighlightForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit
         />
       </div>
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={true} />
     </form>
   );
 }
@@ -433,7 +451,7 @@ function NoteForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Note Type</label>
         <select
@@ -459,7 +477,7 @@ function NoteForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
         />
       </div>
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={true} />
     </form>
   );
 }
@@ -476,7 +494,7 @@ function LinkForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">URL</label>
         <input
@@ -511,7 +529,7 @@ function LinkForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
         />
       </div>
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={true} />
     </form>
   );
 }
@@ -715,7 +733,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       {/* Mode Toggle */}
       <div className="flex rounded-lg border overflow-hidden">
         <button
@@ -959,6 +977,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
         loading={uploading}
         loadingText={`Uploading... ${uploadProgress}%`}
         submitText={isEditing ? 'Save' : 'Add'}
+        hidden={true}
       />
     </form>
   );
@@ -969,14 +988,17 @@ function FormButtons({
   disabled = false,
   loading = false,
   loadingText = 'Processing...',
-  submitText = 'Add'
+  submitText = 'Add',
+  hidden = false,
 }: {
   onClose: () => void;
   disabled?: boolean;
   loading?: boolean;
   loadingText?: string;
   submitText?: string;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   return (
     <div className="flex gap-3 pt-4 border-t">
       <button
@@ -1043,7 +1065,7 @@ function ImageForm({ onSubmit, onClose, initialData, isEditing, bookId }: { onSu
   const previewUrl = url.trim();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       {/* Source mode toggle */}
       <div className="flex rounded-lg border border-gray-200 overflow-hidden">
         {(['url', 'upload'] as const).map(m => (
@@ -1148,6 +1170,7 @@ function ImageForm({ onSubmit, onClose, initialData, isEditing, bookId }: { onSu
         onClose={onClose}
         disabled={!url.trim() || uploading}
         submitText={isEditing ? 'Save Image' : 'Add Image'}
+        hidden={true}
       />
     </form>
   );

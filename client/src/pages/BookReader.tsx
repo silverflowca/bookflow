@@ -68,6 +68,7 @@ export default function BookReader() {
   // Progress tracking
   const [chapterCompletions, setChapterCompletions] = useState<Set<string>>(new Set());
   const [chapterProgressTotal, setChapterProgressTotal] = useState(0);
+  const chapterProgressTotalRef = useRef(0);
   const [bookChapterStats, setBookChapterStats] = useState<Map<string, { completed: number; total: number }>>(new Map());
   const [showProgressPanel, setShowProgressPanel] = useState(false);
 
@@ -226,6 +227,7 @@ export default function BookReader() {
     }
   }, [bookId]);
 
+
   useEffect(() => {
     if (chapterId) {
       loadChapter();
@@ -236,6 +238,8 @@ export default function BookReader() {
         ttsAudio.currentTime = 0;
         setTtsPlaying(false);
       }
+      // Record that this reader visited this chapter
+      if (book) saveReadingProgress(chapterId);
     } else if (book?.chapters?.length) {
       // Navigate to first chapter
       navigate(`/book/${bookId}/chapter/${book.chapters[0].id}`, { replace: true });
@@ -358,6 +362,27 @@ export default function BookReader() {
     }
   }
 
+  // Save reading progress whenever the user reads a chapter (non-author, logged-in only)
+  const saveReadingProgress = useCallback(async (chapId: string) => {
+    if (!user || !bookId || !book || isAuthor) return;
+    try {
+      const publishedChapters = (book.chapters ?? []).filter((c: any) => c.status === 'published');
+      if (!publishedChapters.length) return;
+      const chapIndex = publishedChapters.findIndex((c: any) => c.id === chapId);
+      // percent = chapters reached / total, capped at 99 unless it's the last one
+      const pct = chapIndex < 0 ? 0
+        : chapIndex === publishedChapters.length - 1 ? 100
+        : Math.round(((chapIndex + 1) / publishedChapters.length) * 100);
+      await api.updateReadingProgress(bookId, {
+        current_chapter_id: chapId,
+        scroll_position: 0,
+        percent_complete: pct,
+      });
+    } catch (e) {
+      console.error('[Progress] save failed:', e);
+    }
+  }, [user, bookId, book, isAuthor]);
+
   const progressEnabled = !!(user && book?.settings?.enable_progress_tracking);
 
   // Load progress whenever chapterId or book settings become available
@@ -373,6 +398,7 @@ export default function BookReader() {
     ]).then(([chapProg, bookProg]) => {
       setChapterCompletions(new Set(chapProg.completions));
       setChapterProgressTotal(chapProg.total);
+      chapterProgressTotalRef.current = chapProg.total;
       const statsMap = new Map<string, { completed: number; total: number }>();
       bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
       setBookChapterStats(statsMap);
@@ -381,18 +407,24 @@ export default function BookReader() {
 
   const markComplete = useCallback(async (itemKey: string, itemType: string) => {
     if (!progressEnabled || !chapterId) return;
-    if (chapterCompletions.has(itemKey)) return; // already done
+    // Use functional update to check against latest set, avoiding stale closure
+    let alreadyDone = false;
+    setChapterCompletions(prev => {
+      if (prev.has(itemKey)) { alreadyDone = true; return prev; }
+      return new Set([...prev, itemKey]);
+    });
+    if (alreadyDone) return;
     try {
       await api.markItemComplete(chapterId, itemKey, itemType);
-      setChapterCompletions(prev => new Set([...prev, itemKey]));
       setBookChapterStats(prev => {
         const m = new Map(prev);
-        const s = m.get(chapterId) ?? { completed: 0, total: chapterProgressTotal };
-        m.set(chapterId, { ...s, completed: Math.min(s.completed + 1, s.total) });
+        const total = chapterProgressTotalRef.current;
+        const s = m.get(chapterId) ?? { completed: 0, total };
+        m.set(chapterId, { ...s, completed: Math.min(s.completed + 1, s.total > 0 ? s.total : total) });
         return m;
       });
     } catch (e) { console.error('[Progress] markComplete failed:', e); }
-  }, [progressEnabled, chapterId, chapterCompletions, chapterProgressTotal]);
+  }, [progressEnabled, chapterId]);
 
   const currentChapterIndex = useMemo(() => {
     return book?.chapters?.findIndex(c => c.id === chapterId) ?? -1;
@@ -547,6 +579,17 @@ export default function BookReader() {
             <h2 className="font-bold text-lg">{book.title}</h2>
             {book.subtitle && <p className="text-sm text-muted">{book.subtitle}</p>}
             <p className="text-sm text-muted mt-1">by {book.author?.display_name}</p>
+
+            {/* Dashboard button — author only */}
+            {isAuthor && (
+              <Link
+                to={`/edit/book/${bookId}/dashboard`}
+                className="mt-2 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme text-sm text-muted hover:bg-surface-hover hover:text-theme transition-colors"
+              >
+                <BarChart2 className="h-4 w-4 shrink-0" />
+                <span>Dashboard</span>
+              </Link>
+            )}
 
             {/* Progress button — shown when tracking is enabled */}
             {progressEnabled && (() => {

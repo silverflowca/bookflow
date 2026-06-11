@@ -9,6 +9,7 @@ interface FormProps {
   onSubmit: (data: Partial<InlineContent>) => void;
   onClose: () => void;
   isEditing?: boolean;
+  hideButtons?: boolean;
 }
 
 // Display mode selector component
@@ -76,14 +77,17 @@ function FormButtons({
   disabled = false,
   loading = false,
   loadingText = 'Processing...',
-  submitText = 'Add'
+  submitText = 'Add',
+  hidden = false,
 }: {
   onClose: () => void;
   disabled?: boolean;
   loading?: boolean;
   loadingText?: string;
   submitText?: string;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   return (
     <div className="flex gap-3 pt-4 border-t">
       <button
@@ -112,7 +116,7 @@ function FormButtons({
   );
 }
 
-export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: SelectData; initialDisplayMode?: InlineDisplayMode }) {
+export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: SelectData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [options, setOptions] = useState<{ id: string; text: string }[]>(
@@ -139,7 +143,7 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialD
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Label</label>
         <input
@@ -212,12 +216,12 @@ export function SelectForm({ onSubmit, onClose, initialData, isEditing, initialD
       <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
 
-export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: MultiselectData; initialDisplayMode?: InlineDisplayMode }) {
+export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: MultiselectData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [options, setOptions] = useState<{ id: string; text: string }[]>(
@@ -248,7 +252,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, ini
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Label</label>
         <input
@@ -346,7 +350,7 @@ export function MultiselectForm({ onSubmit, onClose, initialData, isEditing, ini
       <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
@@ -359,7 +363,7 @@ const WIDTH_OPTIONS = [
   { value: 'full', label: 'Full width' },
 ] as const;
 
-export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: TextboxData; initialDisplayMode?: InlineDisplayMode }) {
+export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: TextboxData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
@@ -386,7 +390,7 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Label</label>
         <input
@@ -459,12 +463,12 @@ export function TextboxForm({ onSubmit, onClose, initialData, isEditing, initial
       {showLabel && <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />}
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
 
-export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: TextareaData; initialDisplayMode?: InlineDisplayMode }) {
+export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: TextareaData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [placeholder, setPlaceholder] = useState(initialData?.placeholder || '');
   const [required, setRequired] = useState(initialData?.required || false);
@@ -495,7 +499,7 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Label</label>
         <input
@@ -596,12 +600,12 @@ export function TextareaForm({ onSubmit, onClose, initialData, isEditing, initia
       {showLabel && <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />}
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
 
-export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: RadioData; initialDisplayMode?: InlineDisplayMode }) {
+export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: RadioData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [options, setOptions] = useState<{ id: string; text: string; description?: string }[]>(
     initialData?.options || [{ id: 'opt_1', text: '' }]
@@ -628,7 +632,7 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDi
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Label</label>
         <input
@@ -715,12 +719,12 @@ export function RadioForm({ onSubmit, onClose, initialData, isEditing, initialDi
       <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
 
-export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: CheckboxData; initialDisplayMode?: InlineDisplayMode }) {
+export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: CheckboxData; initialDisplayMode?: InlineDisplayMode }) {
   const [label, setLabel] = useState(initialData?.label || '');
   const [options, setOptions] = useState<{ id: string; text: string; description?: string }[]>(
     initialData?.options || [{ id: 'opt_1', text: '' }]
@@ -751,7 +755,7 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initia
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Label</label>
         <input
@@ -863,12 +867,12 @@ export function CheckboxForm({ onSubmit, onClose, initialData, isEditing, initia
       <LabelPositionSelector value={labelPosition} onChange={setLabelPosition} />
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
 
-export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: CodeBlockData; initialDisplayMode?: InlineDisplayMode }) {
+export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: CodeBlockData; initialDisplayMode?: InlineDisplayMode }) {
   const [title, setTitle] = useState(initialData?.title || '');
   const [language, setLanguage] = useState(initialData?.language || 'javascript');
   const [code, setCode] = useState(initialData?.code || '');
@@ -912,7 +916,7 @@ export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing, initi
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Title (optional)</label>
         <input
@@ -971,12 +975,12 @@ export function CodeBlockForm({ onSubmit, onClose, initialData, isEditing, initi
 
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }
 
-export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode }: FormProps & { initialData?: ScriptureBlockData; initialDisplayMode?: InlineDisplayMode }) {
+export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing, initialDisplayMode, hideButtons }: FormProps & { initialData?: ScriptureBlockData; initialDisplayMode?: InlineDisplayMode }) {
   const [reference, setReference] = useState(initialData?.reference || '');
   const [version, setVersion] = useState(initialData?.version || 'KJV');
   const [text, setText] = useState(initialData?.text || '');
@@ -1012,7 +1016,7 @@ export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-1">Title (optional)</label>
         <input
@@ -1084,7 +1088,7 @@ export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing, 
 
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
 
-      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} />
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );
 }

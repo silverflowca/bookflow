@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2 } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
@@ -389,6 +389,11 @@ export default function BookEditor() {
                 {userRole === 'owner' && (
                   <Link to={`/edit/book/${bookId}/settings`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">
                     <Settings className="h-5 w-5" />
+                  </Link>
+                )}
+                {userRole === 'owner' && (
+                  <Link to={`/edit/book/${bookId}/dashboard`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded" title="Dashboard">
+                    <BarChart2 className="h-5 w-5" />
                   </Link>
                 )}
                 <Link to={`/book/${bookId}`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">

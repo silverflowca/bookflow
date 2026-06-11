@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio, ChevronDown, ChevronRight } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 
 export default function Layout() {
@@ -11,12 +11,14 @@ export default function Layout() {
   const navigate = useNavigate();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showMobileTheme, setShowMobileTheme] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
     setShowMobileMenu(false);
+    setShowMobileTheme(false);
   };
 
   // Close dropdown when clicking outside
@@ -34,46 +36,72 @@ export default function Layout() {
   const lightSchemes = Object.entries(colorSchemes).filter(([_, s]) => s.mode === 'light');
   const darkSchemes = Object.entries(colorSchemes).filter(([_, s]) => s.mode === 'dark');
 
+  const [showThemeSwatches, setShowThemeSwatches] = useState(false);
+
   const ThemeDropdownContent = () => (
     <div className="theme-modal rounded-lg overflow-hidden">
       <div className="px-4 py-3 border-b-2 border-theme flex items-center gap-2">
         <Palette className="h-4 w-4 text-accent" />
         <span className="font-semibold text-theme">Color Theme</span>
       </div>
-      <div className="p-3">
-        <div className="flex items-center gap-2 mb-2 text-xs font-medium text-muted uppercase tracking-wider">
-          <Sun className="h-3.5 w-3.5" /> Light Themes
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {lightSchemes.map(([key, scheme]) => (
-            <button key={key} onClick={() => { setColorScheme(key as ColorSchemeKey); setShowMobileMenu(false); }} className="group relative" title={scheme.name}>
-              <div className={`color-swatch ${colorScheme === key ? 'active' : ''}`} style={{ backgroundColor: scheme.accent }}>
-                {colorScheme === key && <Check className="h-4 w-4 text-white absolute inset-0 m-auto drop-shadow-md" />}
-              </div>
-              <span className="text-[10px] text-muted mt-1 block truncate">{scheme.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="p-3 border-t-2 border-theme">
-        <div className="flex items-center gap-2 mb-2 text-xs font-medium text-muted uppercase tracking-wider">
-          <Moon className="h-3.5 w-3.5" /> Dark Themes
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {darkSchemes.map(([key, scheme]) => (
-            <button key={key} onClick={() => { setColorScheme(key as ColorSchemeKey); setShowMobileMenu(false); }} className="group relative" title={scheme.name}>
-              <div className={`color-swatch ${colorScheme === key ? 'active' : ''}`} style={{ backgroundColor: scheme.accent }}>
-                {colorScheme === key && <Check className="h-4 w-4 text-white absolute inset-0 m-auto drop-shadow-md" />}
-              </div>
-              <span className="text-[10px] text-muted mt-1 block truncate">{scheme.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <Link to="/settings" onClick={() => { setShowThemeDropdown(false); setShowMobileMenu(false); }}
-        className="flex items-center gap-2 px-4 py-3 border-t-2 border-theme text-sm text-muted hover:text-theme hover:bg-surface-hover transition-colors">
-        <Settings className="h-4 w-4" /> More Settings...
+
+      {/* More Settings — prominent at top */}
+      <Link
+        to="/settings"
+        onClick={() => { setShowThemeDropdown(false); setShowMobileMenu(false); }}
+        className="flex items-center gap-3 px-4 py-3 border-b-2 border-theme text-sm font-semibold text-theme hover:bg-surface-hover transition-colors"
+      >
+        <Settings className="h-4 w-4 text-accent" />
+        <span>More Settings</span>
       </Link>
+
+      {/* Colour Themes — collapsible sub-section */}
+      <button
+        onClick={() => setShowThemeSwatches(v => !v)}
+        className="flex items-center justify-between w-full px-4 py-2.5 text-xs font-medium text-muted uppercase tracking-wider hover:bg-surface-hover transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Palette className="h-3.5 w-3.5" /> Colour Themes
+        </span>
+        {showThemeSwatches
+          ? <ChevronDown className="h-3.5 w-3.5" />
+          : <ChevronRight className="h-3.5 w-3.5" />}
+      </button>
+
+      {showThemeSwatches && (
+        <>
+          <div className="px-3 pb-3">
+            <div className="flex items-center gap-2 mb-2 text-xs font-medium text-muted uppercase tracking-wider">
+              <Sun className="h-3.5 w-3.5" /> Light
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {lightSchemes.map(([key, scheme]) => (
+                <button key={key} onClick={() => { setColorScheme(key as ColorSchemeKey); setShowMobileMenu(false); }} className="group relative" title={scheme.name}>
+                  <div className={`color-swatch ${colorScheme === key ? 'active' : ''}`} style={{ backgroundColor: scheme.accent }}>
+                    {colorScheme === key && <Check className="h-4 w-4 text-white absolute inset-0 m-auto drop-shadow-md" />}
+                  </div>
+                  <span className="text-[10px] text-muted mt-1 block truncate">{scheme.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="px-3 pb-3 border-t border-theme pt-3">
+            <div className="flex items-center gap-2 mb-2 text-xs font-medium text-muted uppercase tracking-wider">
+              <Moon className="h-3.5 w-3.5" /> Dark
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {darkSchemes.map(([key, scheme]) => (
+                <button key={key} onClick={() => { setColorScheme(key as ColorSchemeKey); setShowMobileMenu(false); }} className="group relative" title={scheme.name}>
+                  <div className={`color-swatch ${colorScheme === key ? 'active' : ''}`} style={{ backgroundColor: scheme.accent }}>
+                    {colorScheme === key && <Check className="h-4 w-4 text-white absolute inset-0 m-auto drop-shadow-md" />}
+                  </div>
+                  <span className="text-[10px] text-muted mt-1 block truncate">{scheme.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -180,7 +208,14 @@ export default function Layout() {
                   <Plus className="h-4 w-4" /> New Book
                 </Link>
                 <div className="border-t border-theme pt-3">
-                  <ThemeDropdownContent />
+                  <button
+                    onClick={() => setShowMobileTheme(v => !v)}
+                    className="flex items-center justify-between w-full py-2 text-sm font-medium text-theme"
+                  >
+                    <span className="flex items-center gap-2"><Palette className="h-4 w-4 text-accent" /> Colour Theme</span>
+                    {showMobileTheme ? <X className="h-4 w-4 text-muted" /> : <Settings className="h-4 w-4 text-muted" />}
+                  </button>
+                  {showMobileTheme && <ThemeDropdownContent />}
                 </div>
                 <button onClick={handleLogout} className="flex items-center gap-2 py-2 text-sm text-red-600 w-full">
                   <LogOut className="h-4 w-4" /> Sign Out

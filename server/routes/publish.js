@@ -35,7 +35,7 @@ async function uniqueSlug(base, bookId) {
 }
 
 // POST /api/books/:bookId/publish
-router.post('/', authenticate, requireRole(['owner']), async (req, res) => {
+router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res) => {
   const bookId = req.params.bookId;
 
   try {
@@ -79,7 +79,7 @@ router.post('/', authenticate, requireRole(['owner']), async (req, res) => {
 });
 
 // POST /api/books/:bookId/unpublish
-router.post('/unpublish', authenticate, requireRole(['owner']), async (req, res) => {
+router.post('/unpublish', authenticate, requireRole(['owner', 'author']), async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('books')

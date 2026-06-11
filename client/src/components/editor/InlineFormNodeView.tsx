@@ -1,10 +1,10 @@
 import { NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import type {
-  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData,
+  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData,
 } from '../../types/index';
 
-type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image';
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
@@ -163,6 +163,27 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         </span>
       );
     }
+    case 'poll': {
+      const d = contentData as PollData;
+      return (
+        <span className="block w-full mt-1" contentEditable={false}>
+          {d.question && (
+            <span className="block text-sm font-medium text-gray-800 mb-1">{d.question}</span>
+          )}
+          <span className="block space-y-0.5">
+            {(d.options || []).slice(0, 4).map(opt => (
+              <label key={opt.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-default">
+                <input type={d.allow_multiple ? 'checkbox' : 'radio'} readOnly tabIndex={-1} disabled className="pointer-events-none" />
+                <span>{opt.text}</span>
+              </label>
+            ))}
+            {(d.options || []).length > 4 && (
+              <span className="text-xs text-gray-400 pl-5">+{(d.options || []).length - 4} more</span>
+            )}
+          </span>
+        </span>
+      );
+    }
     default:
       return null;
   }
@@ -180,6 +201,7 @@ const TYPE_LABEL: Record<FormType, string> = {
   audio: 'Audio',
   video: 'Video',
   image: 'Image',
+  poll: 'Poll',
 };
 
 const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image']);
@@ -195,6 +217,7 @@ const TYPE_COLOR: Record<FormType, string> = {
   audio:       'bg-yellow-50 border-yellow-200 text-yellow-700',
   video:       'bg-red-50    border-red-200    text-red-700',
   image:       'bg-pink-50   border-pink-200   text-pink-700',
+  poll:        'bg-green-50  border-green-200  text-green-700',
 };
 
 // Location badge styles for non-inline placements
@@ -227,16 +250,28 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   const label = TYPE_LABEL[contentType] ?? contentType;
   const ringClass = selected ? ' ring-2 ring-offset-1 ring-blue-400' : '';
 
+  function handleDoubleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.dispatchEvent(new CustomEvent('inlineform:edit', {
+      bubbles: true,
+      detail: { contentId },
+    }));
+  }
+
   // ── Non-inline: compact location marker ──────────────────────────────────
   if (!isInline) {
     const meta = POSITION_META[position as Exclude<Position, 'inline'>];
     return (
       <NodeViewWrapper
         as="span"
-        className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${meta?.classes ?? 'bg-gray-50 border-gray-200 text-gray-600'}${ringClass}`}
+        className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${meta?.classes ?? 'bg-gray-50 border-gray-200 text-gray-600'}${ringClass} cursor-pointer`}
         data-content-id={contentId}
         data-content-type={contentType}
         data-testid="inline-form-node"
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to edit"
       >
         {/* Anchor text */}
         <span className="font-medium underline decoration-dotted underline-offset-2" data-testid="inline-form-anchor">
@@ -258,11 +293,13 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
     return (
       <NodeViewWrapper
         as="div"
-        className={`my-2 px-1.5 py-1.5 rounded border w-full ${colorClass}${ringClass}`}
+        className={`my-2 px-1.5 py-1.5 rounded border w-full ${colorClass}${ringClass} cursor-pointer`}
         style={{ display: 'block', boxSizing: 'border-box' }}
         data-content-id={contentId}
         data-content-type={contentType}
         data-testid="inline-form-node"
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to edit"
       >
         <span className="flex items-center gap-1.5 mb-1 text-xs font-medium opacity-70" contentEditable={false}>
           <span>{label}</span>
@@ -278,10 +315,12 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   return (
     <NodeViewWrapper
       as="span"
-      className={`${isFullWidth ? 'inline-flex w-full min-w-0' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass}`}
+      className={`${isFullWidth ? 'inline-flex w-full min-w-0' : 'inline-flex'} items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline ${colorClass}${ringClass} cursor-pointer`}
       data-content-id={contentId}
       data-content-type={contentType}
       data-testid="inline-form-node"
+      onDoubleClick={handleDoubleClick}
+      title="Double-click to edit"
     >
       {/* Anchor text */}
       <span className="font-medium underline decoration-dotted underline-offset-2" data-testid="inline-form-anchor">
