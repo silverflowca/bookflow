@@ -462,11 +462,24 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
       if (!inlineByChapter[ic.chapter_id]) inlineByChapter[ic.chapter_id] = [];
       inlineByChapter[ic.chapter_id].push(ic.id);
     }
-    // Form response counts per chapter (covers form_responses + poll_responses + question_answers)
+    // Form response counts per chapter (covers form_responses + poll_responses + question_answers + audio/video plays)
     const responsesByChapter = {};
     for (const fr of formResponses) {
       const ch = inlineIdToChapter[fr.inline_content_id];
       if (ch) responsesByChapter[ch] = (responsesByChapter[ch] || 0) + 1;
+    }
+    // Audio/video completions stored in chapter_item_completions with key "ic:{id}"
+    for (const c of completions) {
+      if (c.item_type === 'audio' || c.item_type === 'video') {
+        if (c.item_key?.startsWith('ic:')) {
+          const icId = c.item_key.slice(3);
+          const ch = inlineIdToChapter[icId] || c.chapter_id;
+          if (ch) responsesByChapter[ch] = (responsesByChapter[ch] || 0) + 1;
+        } else {
+          // TipTap-embedded media key "media:{chapterId}-{n}" — count against the chapter directly
+          responsesByChapter[c.chapter_id] = (responsesByChapter[c.chapter_id] || 0) + 1;
+        }
+      }
     }
 
     // Completion stats per chapter
@@ -512,7 +525,7 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
         completed_readers: completedReaders,
         avg_progress: avgProgress,
         total_components: inlineContent.length,
-        total_form_responses: formResponses.length, // includes poll votes + question answers + form responses
+        total_form_responses: formResponses.length + completions.filter(c => c.item_type === 'audio' || c.item_type === 'video').length, // form + poll + question + media plays
         total_comments: comments.length,
         open_comments: openComments,
         resolved_comments: resolvedComments,
