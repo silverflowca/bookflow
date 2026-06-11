@@ -151,13 +151,12 @@ router.get('/book/:bookId', authenticate, async (req, res) => {
   const { bookId } = req.params;
 
   try {
-    // Load all published chapters for the book
+    // Load all chapters for the book (include draft so authors see progress too)
     const { data: chapters, error: chErr } = await supabase
       .schema('bookflow')
       .from('chapters')
       .select('id, content')
       .eq('book_id', bookId)
-      .eq('status', 'published')
       .order('order_index');
 
     if (chErr) throw chErr;

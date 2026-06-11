@@ -385,9 +385,11 @@ export default function BookReader() {
 
   const progressEnabled = !!(user && book?.settings?.enable_progress_tracking);
 
-  // Load progress whenever chapterId or book settings become available
+  // Load progress when chapterId, bookId, or settings become available.
+  // Guard on book !== null so we don't clear stats before settings are known.
   useEffect(() => {
-    if (!progressEnabled || !chapterId || !bookId) {
+    if (!chapterId || !bookId || book === null) return;
+    if (!progressEnabled) {
       setChapterCompletions(new Set());
       setChapterProgressTotal(0);
       return;
@@ -403,7 +405,7 @@ export default function BookReader() {
       bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
       setBookChapterStats(statsMap);
     }).catch(e => console.error('[Progress] load failed:', e));
-  }, [progressEnabled, chapterId, bookId]);
+  }, [progressEnabled, chapterId, bookId, book]);
 
   const markComplete = useCallback(async (itemKey: string, itemType: string) => {
     if (!progressEnabled || !chapterId) return;
