@@ -377,12 +377,22 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
   const bookId = req.params.id;
   try {
     // Fetch all data in parallel
+    // Pre-fetch inline content IDs and chapter IDs (needed for sub-queries below)
+    const [inlineIdsRes, chapterIdsRes] = await Promise.all([
+      supabase.from('inline_content').select('id, content_type, chapter_id').eq('book_id', bookId).eq('is_author_content', true),
+      supabase.from('chapters').select('id').eq('book_id', bookId),
+    ]);
+    const inlineContent = inlineIdsRes.data || [];
+    const allInlineIds = inlineContent.map(r => r.id);
+    const allChapterIds = (chapterIdsRes.data || []).map(c => c.id);
+
     const [
       chaptersRes,
       readersRes,
       completedRes,
-      inlineRes,
       formResponsesRes,
+      pollResponsesRes,
+      questionAnswersRes,
       commentsRes,
       completionsRes,
     ] = await Promise.all([
@@ -392,24 +402,34 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
       supabase.from('reading_progress').select('user_id, percent_complete, last_read_at, completed_at').eq('book_id', bookId),
       // Completed readers
       supabase.from('reading_progress').select('user_id', { count: 'exact' }).eq('book_id', bookId).not('completed_at', 'is', null),
-      // Inline content breakdown by type
-      supabase.from('inline_content').select('id, content_type, chapter_id').eq('book_id', bookId).eq('is_author_content', true),
-      // Form responses total
-      supabase.from('form_responses').select('id, inline_content_id, created_at').in('inline_content_id',
-        (await supabase.from('inline_content').select('id').eq('book_id', bookId).eq('is_author_content', true)).data?.map(r => r.id) || []
-      ),
+      // Generic form responses (textbox, select, etc.)
+      allInlineIds.length
+        ? supabase.from('form_responses').select('id, inline_content_id').in('inline_content_id', allInlineIds)
+        : Promise.resolve({ data: [] }),
+      // Poll votes
+      allInlineIds.length
+        ? supabase.from('poll_responses').select('id, inline_content_id').in('inline_content_id', allInlineIds)
+        : Promise.resolve({ data: [] }),
+      // Question answers
+      allInlineIds.length
+        ? supabase.from('question_answers').select('id, inline_content_id').in('inline_content_id', allInlineIds)
+        : Promise.resolve({ data: [] }),
       // Comments total
       supabase.from('book_comments').select('id, status, created_at').eq('book_id', bookId),
       // Chapter item completions (for progress stats)
-      supabase.from('chapter_item_completions').select('user_id, chapter_id, item_type, completed_at').in('chapter_id',
-        (await supabase.from('chapters').select('id').eq('book_id', bookId)).data?.map(c => c.id) || []
-      ),
+      allChapterIds.length
+        ? supabase.from('chapter_item_completions').select('user_id, chapter_id, item_type, completed_at').in('chapter_id', allChapterIds)
+        : Promise.resolve({ data: [] }),
     ]);
 
     const chapters = chaptersRes.data || [];
     const readers = readersRes.data || [];
-    const inlineContent = inlineRes.data || [];
-    const formResponses = formResponsesRes.data || [];
+    // Combine all response types into one array for counting
+    const formResponses = [
+      ...(formResponsesRes.data || []),
+      ...(pollResponsesRes.data || []),
+      ...(questionAnswersRes.data || []),
+    ];
     const comments = commentsRes.data || [];
     const completions = completionsRes.data || [];
 
@@ -434,15 +454,18 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
       return acc;
     }, {});
 
-    // Form response counts per chapter
+    // Build fast id → chapter_id lookup
+    const inlineIdToChapter = {};
     const inlineByChapter = {};
     for (const ic of inlineContent) {
+      inlineIdToChapter[ic.id] = ic.chapter_id;
       if (!inlineByChapter[ic.chapter_id]) inlineByChapter[ic.chapter_id] = [];
       inlineByChapter[ic.chapter_id].push(ic.id);
     }
+    // Form response counts per chapter (covers form_responses + poll_responses + question_answers)
     const responsesByChapter = {};
     for (const fr of formResponses) {
-      const ch = inlineContent.find(ic => ic.id === fr.inline_content_id)?.chapter_id;
+      const ch = inlineIdToChapter[fr.inline_content_id];
       if (ch) responsesByChapter[ch] = (responsesByChapter[ch] || 0) + 1;
     }
 
@@ -489,7 +512,7 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
         completed_readers: completedReaders,
         avg_progress: avgProgress,
         total_components: inlineContent.length,
-        total_form_responses: formResponses.length,
+        total_form_responses: formResponses.length, // includes poll votes + question answers + form responses
         total_comments: comments.length,
         open_comments: openComments,
         resolved_comments: resolvedComments,

@@ -242,6 +242,10 @@ class ApiClient {
     });
   }
 
+  async getMyQuestionAnswer(questionId: string): Promise<{ answer_text?: string; selected_options?: string[]; is_correct?: boolean | null } | null> {
+    return this.request(`/questions/${questionId}/my-answer`);
+  }
+
   // Form Responses
   async submitFormResponse(contentId: string, responseData: any): Promise<FormResponse> {
     return this.request(`/form-responses/${contentId}`, {

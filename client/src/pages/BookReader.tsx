@@ -1535,25 +1535,48 @@ function QuestionBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as QuestionData;
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [existingAnswer, setExistingAnswer] = useState<string | null>(null);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+
+  // Load existing answer on mount so returning readers see their previous response
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyQuestionAnswer(content.id)
+      .then(r => {
+        if (r?.answer_text) {
+          setExistingAnswer(r.answer_text);
+          setAnswer(r.answer_text);
+          setSubmitted(true);
+        }
+      })
+      .catch(() => {});
+  }, [content.id]);
 
   const handleSubmit = async () => {
     try {
       await api.answerQuestion(content.id, { answer_text: answer });
       setSubmitted(true);
+      markComplete(itemKey, 'question');
     } catch (err) {
       console.error('Failed to submit answer:', err);
     }
   };
 
+  const isDone = progressEnabled && (completions.has(itemKey) || submitted);
+
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="h-5 w-5 text-blue-600" />
-        <span className="font-medium text-blue-800">Question</span>
+    <div className={`bg-blue-50 border rounded-lg p-4 ${isDone ? 'border-green-400' : 'border-blue-200'}${progressEnabled ? ` progress-item${isDone ? ' progress-item--done' : ''}` : ''}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-blue-600" />
+          <span className="font-medium text-blue-800">Question</span>
+        </div>
+        {isDone && <Check className="h-4 w-4 text-green-500 shrink-0" />}
       </div>
       <p className="text-theme mb-4">{data.question}</p>
 
-      {data.type === 'open' && !submitted && (
+      {data.type === 'open' && !isDone && (
         <>
           <textarea
             value={answer}
@@ -1571,8 +1594,13 @@ function QuestionBlock({ content }: { content: InlineContent }) {
         </>
       )}
 
-      {submitted && (
-        <p className="text-green-600 font-medium">Thanks for your answer!</p>
+      {isDone && (
+        <div>
+          {existingAnswer && (
+            <p className="text-sm text-muted mb-1 italic">Your answer: {existingAnswer}</p>
+          )}
+          <p className="text-green-600 font-medium">Thanks for your answer!</p>
+        </div>
       )}
     </div>
   );
@@ -2017,6 +2045,8 @@ function PollBlock({ content }: { content: InlineContent }) {
   const [results, setResults] = useState<Record<string, number>>({});
   const [totalVotes, setTotalVotes] = useState(0);
   const [voted, setVoted] = useState(false);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     loadResults();
@@ -2043,16 +2073,22 @@ function PollBlock({ content }: { content: InlineContent }) {
       setResults(res.results);
       setTotalVotes(res.total_votes);
       setVoted(true);
+      markComplete(itemKey, 'poll');
     } catch (err) {
       console.error('Failed to vote:', err);
     }
   }
 
+  const isDone = progressEnabled && (completions.has(itemKey) || voted);
+
   return (
-    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <BarChart2 className="h-5 w-5 text-green-600" />
-        <span className="font-medium text-green-800">Poll</span>
+    <div className={`bg-green-50 border rounded-lg p-4 ${isDone ? 'border-green-400' : 'border-green-200'}${progressEnabled ? ` progress-item${isDone ? ' progress-item--done' : ''}` : ''}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <BarChart2 className="h-5 w-5 text-green-600" />
+          <span className="font-medium text-green-800">Poll</span>
+        </div>
+        {isDone && <Check className="h-4 w-4 text-green-500 shrink-0" />}
       </div>
       <p className="text-theme mb-4">{data.question}</p>
 

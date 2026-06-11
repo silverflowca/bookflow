@@ -449,6 +449,22 @@ router.post('/questions/:id/answer', authenticate, async (req, res) => {
   }
 });
 
+// Get current user's answer for a single question
+router.get('/questions/:id/my-answer', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('question_answers')
+      .select('answer_text, selected_options, is_correct')
+      .eq('inline_content_id', req.params.id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (error) throw error;
+    res.json(data || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get user's answers for a book
 router.get('/books/:bookId/my-answers', authenticate, async (req, res) => {
   try {
