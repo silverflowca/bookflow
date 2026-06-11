@@ -131,7 +131,8 @@ CREATE TABLE IF NOT EXISTS bookflow.question_answers (
     selected_options JSONB, -- For multiple choice questions
     is_correct BOOLEAN, -- For quiz-style questions
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(inline_content_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_question_answers_content ON bookflow.question_answers(inline_content_id);

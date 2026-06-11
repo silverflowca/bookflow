@@ -435,7 +435,8 @@ router.post('/questions/:id/answer', authenticate, async (req, res) => {
         user_id: req.user.id,
         answer_text,
         selected_options,
-        is_correct
+        is_correct,
+        updated_at: new Date().toISOString(),
       }, { onConflict: 'inline_content_id,user_id' })
       .select()
       .single();
