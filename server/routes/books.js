@@ -16,7 +16,6 @@ router.get('/', optionalAuth, async (req, res) => {
         *,
         author:profiles!books_author_id_fkey(id, display_name, avatar_url),
         chapters:chapters(count),
-        ratings:book_ratings(rating),
         settings:book_settings(show_ratings)
       `, { count: 'exact' });
 
@@ -38,16 +37,38 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (error) throw error;
 
-    // Compute rating aggregate inline so BookCard can display stars without extra requests
-    const enriched = (data || []).map(book => {
-      const rawRatings = book.ratings || [];
-      const ratingCount = rawRatings.length;
-      const ratingAverage = ratingCount > 0
-        ? Math.round((rawRatings.reduce((s, r) => s + r.rating, 0) / ratingCount) * 10) / 10
-        : 0;
-      const { ratings: _r, ...rest } = book;
-      return { ...rest, rating_average: ratingAverage, rating_count: ratingCount };
-    });
+    const books = data || [];
+
+    // Fetch rating aggregates for all returned books in one query
+    let ratingsMap = {};
+    if (books.length > 0) {
+      const bookIds = books.map(b => b.id);
+      const { data: allRatings } = await supabase
+        .from('book_ratings')
+        .select('book_id, rating')
+        .in('book_id', bookIds);
+
+      if (allRatings) {
+        const grouped = {};
+        for (const r of allRatings) {
+          if (!grouped[r.book_id]) grouped[r.book_id] = [];
+          grouped[r.book_id].push(r.rating);
+        }
+        for (const [bookId, ratings] of Object.entries(grouped)) {
+          const ratingCount = ratings.length;
+          const ratingAverage = ratingCount > 0
+            ? Math.round((ratings.reduce((s, r) => s + r, 0) / ratingCount) * 10) / 10
+            : 0;
+          ratingsMap[bookId] = { rating_average: ratingAverage, rating_count: ratingCount };
+        }
+      }
+    }
+
+    const enriched = books.map(book => ({
+      ...book,
+      rating_average: ratingsMap[book.id]?.rating_average ?? 0,
+      rating_count: ratingsMap[book.id]?.rating_count ?? 0,
+    }));
 
     res.json({ data: enriched, count });
   } catch (err) {
@@ -115,8 +136,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         *,
         author:profiles!books_author_id_fkey(id, display_name, avatar_url, bio),
         chapters:chapters(id, title, order_index, status, word_count, estimated_read_time_minutes),
-        settings:book_settings(*),
-        ratings:book_ratings(rating)
+        settings:book_settings(*)
       `)
       .eq('id', req.params.id)
       .single();
@@ -171,13 +191,16 @@ router.get('/:id', optionalAuth, async (req, res) => {
     // Sort chapters by order
     book.chapters = book.chapters.sort((a, b) => a.order_index - b.order_index);
 
-    // Compute rating aggregate
-    const rawRatings = book.ratings || [];
+    // Fetch rating aggregate separately
+    const { data: ratingRows } = await supabase
+      .from('book_ratings')
+      .select('rating')
+      .eq('book_id', req.params.id);
+    const rawRatings = ratingRows || [];
     book.rating_count = rawRatings.length;
     book.rating_average = book.rating_count > 0
       ? Math.round((rawRatings.reduce((s, r) => s + r.rating, 0) / book.rating_count) * 10) / 10
       : 0;
-    delete book.ratings;
 
     res.json(book);
   } catch (err) {
