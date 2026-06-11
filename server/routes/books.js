@@ -15,7 +15,9 @@ router.get('/', optionalAuth, async (req, res) => {
       .select(`
         *,
         author:profiles!books_author_id_fkey(id, display_name, avatar_url),
-        chapters:chapters(count)
+        chapters:chapters(count),
+        ratings:book_ratings(rating),
+        settings:book_settings(show_ratings)
       `, { count: 'exact' });
 
     // Filter by visibility
@@ -36,7 +38,18 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (error) throw error;
 
-    res.json({ data, count });
+    // Compute rating aggregate inline so BookCard can display stars without extra requests
+    const enriched = (data || []).map(book => {
+      const rawRatings = book.ratings || [];
+      const ratingCount = rawRatings.length;
+      const ratingAverage = ratingCount > 0
+        ? Math.round((rawRatings.reduce((s, r) => s + r.rating, 0) / ratingCount) * 10) / 10
+        : 0;
+      const { ratings: _r, ...rest } = book;
+      return { ...rest, rating_average: ratingAverage, rating_count: ratingCount };
+    });
+
+    res.json({ data: enriched, count });
   } catch (err) {
     console.error('Get books error:', err);
     res.status(500).json({ error: err.message });
@@ -102,7 +115,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
         *,
         author:profiles!books_author_id_fkey(id, display_name, avatar_url, bio),
         chapters:chapters(id, title, order_index, status, word_count, estimated_read_time_minutes),
-        settings:book_settings(*)
+        settings:book_settings(*),
+        ratings:book_ratings(rating)
       `)
       .eq('id', req.params.id)
       .single();
@@ -156,6 +170,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     // Sort chapters by order
     book.chapters = book.chapters.sort((a, b) => a.order_index - b.order_index);
+
+    // Compute rating aggregate
+    const rawRatings = book.ratings || [];
+    book.rating_count = rawRatings.length;
+    book.rating_average = book.rating_count > 0
+      ? Math.round((rawRatings.reduce((s, r) => s + r.rating, 0) / book.rating_count) * 10) / 10
+      : 0;
+    delete book.ratings;
 
     res.json(book);
   } catch (err) {
@@ -252,6 +274,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     show_inline_form_preview,
     allow_public_tts,
     enable_progress_tracking,
+    show_ratings,
   } = req.body;
 
   try {
@@ -267,6 +290,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         show_inline_form_preview,
         allow_public_tts,
         enable_progress_tracking,
+        show_ratings,
       })
       .eq('book_id', req.params.id)
       .select()

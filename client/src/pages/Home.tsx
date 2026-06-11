@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Users, MessageSquare, Sparkles } from 'lucide-react';
+import { BookOpen, Users, MessageSquare, Sparkles, Star } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 
@@ -148,8 +148,21 @@ function BookCard({ book }: { book: Book }) {
         <p className="text-sm text-muted">
           by {book.author?.display_name || 'Unknown Author'}
         </p>
+        {book.settings?.show_ratings !== false && book.rating_count! > 0 && (
+          <div className="flex items-center gap-1 mt-2">
+            {[1, 2, 3, 4, 5].map(s => (
+              <Star
+                key={s}
+                className={`h-3.5 w-3.5 ${s <= Math.round(book.rating_average!) ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-muted'}`}
+              />
+            ))}
+            <span className="text-xs text-muted ml-0.5">
+              {book.rating_average?.toFixed(1)} ({book.rating_count})
+            </span>
+          </div>
+        )}
         {book.chapters && (
-          <p className="text-xs text-muted mt-2">
+          <p className="text-xs text-muted mt-1">
             {book.chapters.length} chapters
           </p>
         )}

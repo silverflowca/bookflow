@@ -38,6 +38,8 @@ export interface Book {
   chapters?: Chapter[];
   settings?: BookSettings;
   collaborators?: BookCollaborator[];
+  rating_average?: number;
+  rating_count?: number;
 }
 
 export interface BookSettings {
@@ -59,6 +61,7 @@ export interface BookSettings {
   show_inline_form_preview?: boolean;
   allow_public_tts?: boolean;
   enable_progress_tracking?: boolean;
+  show_ratings?: boolean;
 }
 
 // Chapter types

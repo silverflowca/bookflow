@@ -29,6 +29,7 @@ import clubChatRoutes from './routes/club-chat.js';
 import activityRoutes from './routes/activity.js';
 import formResponsesRoutes from './routes/form-responses.js';
 import progressRoutes from './routes/progress.js';
+import ratingsRoutes from './routes/ratings.js';
 import liveRoutes from './routes/live.js';
 import profileRoutes from './routes/profile.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
@@ -97,6 +98,7 @@ app.use('/api/clubs/chat', clubChatRoutes);  // for /unread-all (no clubId)
 app.use('/api/books/:bookId/activity', activityRoutes);
 app.use('/api', formResponsesRoutes);
 app.use('/api/progress', progressRoutes);
+app.use('/api', ratingsRoutes);
 app.use('/api/live', liveRoutes);
 app.use('/api/profile', profileRoutes);
 

@@ -246,6 +246,22 @@ class ApiClient {
     return this.request(`/questions/${questionId}/my-answer`);
   }
 
+  // Ratings
+  async getRatings(bookId: string): Promise<{ average: number; count: number; distribution: Record<number, number>; user_rating: number | null }> {
+    return this.request(`/books/${bookId}/ratings`);
+  }
+
+  async submitRating(bookId: string, rating: number): Promise<{ rating: any; aggregate: { average: number; count: number } }> {
+    return this.request(`/books/${bookId}/rating`, {
+      method: 'POST',
+      body: JSON.stringify({ rating }),
+    });
+  }
+
+  async deleteRating(bookId: string): Promise<{ aggregate: { average: number; count: number } }> {
+    return this.request(`/books/${bookId}/rating`, { method: 'DELETE' });
+  }
+
   // Form Responses
   async submitFormResponse(contentId: string, responseData: any): Promise<FormResponse> {
     return this.request(`/form-responses/${contentId}`, {
@@ -809,6 +825,14 @@ class ApiClient {
 
   async approveClubInvite(clubId: string, memberId: string): Promise<{ success: boolean }> {
     return this.request(`/clubs/${clubId}/members/${memberId}/approve`, { method: 'POST' });
+  }
+
+  async requestToJoinClub(clubId: string, message?: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/request-join`, { method: 'POST', body: JSON.stringify({ message }) });
+  }
+
+  async declineClubRequest(clubId: string, memberId: string): Promise<{ success: boolean }> {
+    return this.request(`/clubs/${clubId}/members/${memberId}/decline-request`, { method: 'POST' });
   }
 
   async removeClubMember(clubId: string, memberId: string): Promise<void> {

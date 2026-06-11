@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
-  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2
+  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star
 } from 'lucide-react';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
@@ -607,6 +607,19 @@ export default function BookReader() {
                 </button>
               );
             })()}
+
+            {/* Star rating — shown to readers when author has enabled it */}
+            {book.settings?.show_ratings !== false && !isAuthor && (
+              <SidebarRating bookId={bookId!} />
+            )}
+            {/* Show aggregate to author even without interaction */}
+            {book.settings?.show_ratings !== false && isAuthor && book.rating_count! > 0 && (
+              <div className="mt-3 flex items-center gap-1.5 text-sm text-muted">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-medium text-theme">{book.rating_average?.toFixed(1)}</span>
+                <span>({book.rating_count})</span>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -1314,7 +1327,14 @@ function TipTapNode({
         const markerClass = getInlineContentClass(ic.content_type);
         const icon = getInlineContentIcon(ic.content_type);
 
-        if (isFormType && position === 'inline') {
+        if (isMediaType && position !== 'start_of_chapter' && position !== 'end_of_chapter') {
+          // Audio/video always renders as a player inline — suppress anchor text (it's just the selection range)
+          segments.push(
+            <span key={`media-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-3 w-full">
+              <InlineMediaPlayer content={ic} />
+            </span>
+          );
+        } else if (isFormType && position === 'inline') {
           const isFullW2 = (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
           segments.push(
             isFullW2 ? (
@@ -1328,14 +1348,6 @@ function TipTapNode({
                 <InlineFormElement content={ic} />
               </span>
             )
-          );
-        } else if (isMediaType && position === 'inline') {
-          // Render the media player inline in the text flow
-          segments.push(
-            <span key={`media-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex flex-col gap-1 my-1 w-full">
-              {segText && <mark className={`${markerClass} px-0.5 rounded text-sm`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
-              <InlineMediaPlayer content={ic} />
-            </span>
           );
         } else if ((isFormType || isMediaType) && (position === 'start_of_chapter' || position === 'end_of_chapter')) {
           // Anchor text becomes a jump-link to the block at start/end
@@ -1536,73 +1548,65 @@ function InlineContentBlock({ content, isAuthor = false, userId }: { content: In
 function QuestionBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as QuestionData;
   const [answer, setAnswer] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [existingAnswer, setExistingAnswer] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load existing answer on mount so returning readers see their previous response
+  // Load existing answer on mount
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyQuestionAnswer(content.id)
-      .then(r => {
-        if (r?.answer_text) {
-          setExistingAnswer(r.answer_text);
-          setAnswer(r.answer_text);
-          setSubmitted(true);
-        }
-      })
+      .then(r => { if (r?.answer_text) setAnswer(r.answer_text); })
       .catch(() => {});
   }, [content.id]);
 
-  const handleSubmit = async () => {
+  const save = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    setSaveStatus('saving');
     try {
-      await api.answerQuestion(content.id, { answer_text: answer });
-      setSubmitted(true);
+      await api.answerQuestion(content.id, { answer_text: text });
+      setSaveStatus('saved');
       markComplete(itemKey, 'question');
-    } catch (err) {
-      console.error('Failed to submit answer:', err);
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch {
+      setSaveStatus('error');
     }
+  }, [content.id, itemKey, markComplete]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setAnswer(val);
+    setSaveStatus('idle');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => save(val), 1000);
   };
 
-  const isDone = progressEnabled && (completions.has(itemKey) || submitted);
+  const isDone = progressEnabled && completions.has(itemKey);
 
   return (
-    <div className={`bg-blue-50 border rounded-lg p-4 ${isDone ? 'border-green-400' : 'border-blue-200'}${progressEnabled ? ` progress-item${isDone ? ' progress-item--done' : ''}` : ''}`}>
-      <div className="flex items-center justify-between mb-3">
+    <div className={`border rounded-lg p-4${isDone ? ' border-green-400' : ' border-blue-200'}${progressEnabled ? ` progress-item${isDone ? ' progress-item--done' : ''}` : ''}`}
+      style={{ background: 'var(--color-surface)' }}>
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-blue-600" />
-          <span className="font-medium text-blue-800">Question</span>
+          <MessageSquare className="h-4 w-4 text-blue-500" />
+          <span className="text-xs font-semibold uppercase tracking-wide text-blue-500">Reflection Question</span>
         </div>
-        {isDone && <Check className="h-4 w-4 text-green-500 shrink-0" />}
+        <span className="text-xs text-muted">
+          {saveStatus === 'saving' && 'Saving…'}
+          {saveStatus === 'saved' && <span className="text-green-500 flex items-center gap-1"><Check className="h-3 w-3" /> Saved</span>}
+          {saveStatus === 'error' && <span className="text-red-500">Error saving</span>}
+        </span>
       </div>
-      <p className="text-theme mb-4">{data.question}</p>
-
-      {data.type === 'open' && !isDone && (
-        <>
-          <textarea
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            className="w-full p-3 theme-input rounded-lg resize-none focus:ring-2 focus:ring-blue-500"
-            rows={3}
-            placeholder="Type your answer..."
-          />
-          <button
-            onClick={handleSubmit}
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Submit Answer
-          </button>
-        </>
-      )}
-
-      {isDone && (
-        <div>
-          {existingAnswer && (
-            <p className="text-sm text-muted mb-1 italic">Your answer: {existingAnswer}</p>
-          )}
-          <p className="text-green-600 font-medium">Thanks for your answer!</p>
-        </div>
+      <p className="text-theme font-medium mb-3">{data.question}</p>
+      {data.type === 'open' && (
+        <textarea
+          value={answer}
+          onChange={handleChange}
+          rows={4}
+          placeholder="Write your response…"
+          className="w-full p-3 theme-input rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
       )}
     </div>
   );
@@ -2041,6 +2045,82 @@ function HighlightBlock({ content }: { content: InlineContent }) {
   );
 }
 
+// ── Sidebar star-rating widget ────────────────────────────────────────────────
+function SidebarRating({ bookId }: { bookId: string }) {
+  const [aggregate, setAggregate] = useState<{ average: number; count: number } | null>(null);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const token = api.getToken();
+
+  useEffect(() => {
+    api.getRatings(bookId)
+      .then(r => {
+        setAggregate({ average: r.average, count: r.count });
+        setUserRating(r.user_rating);
+      })
+      .catch(() => {});
+  }, [bookId]);
+
+  async function handleRate(stars: number) {
+    if (!token || submitting) return;
+    setSubmitting(true);
+    try {
+      if (userRating === stars) {
+        // Toggle off
+        const res = await api.deleteRating(bookId);
+        setUserRating(null);
+        setAggregate(res.aggregate);
+      } else {
+        const res = await api.submitRating(bookId, stars);
+        setUserRating(stars);
+        setAggregate(res.aggregate);
+      }
+    } catch (e) {
+      console.error('Rating error:', e);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const display = hover ?? userRating ?? 0;
+
+  return (
+    <div className="mt-3">
+      <p className="text-xs text-muted mb-1">{token ? 'Rate this book' : 'Reader rating'}</p>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(star => (
+          <button
+            key={star}
+            disabled={!token || submitting}
+            onClick={() => handleRate(star)}
+            onMouseEnter={() => token && setHover(star)}
+            onMouseLeave={() => setHover(null)}
+            className="p-0.5 disabled:cursor-default"
+            aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+          >
+            <Star
+              className={`h-5 w-5 transition-colors ${
+                star <= display
+                  ? 'fill-yellow-400 text-yellow-400'
+                  : 'fill-none text-muted'
+              }`}
+            />
+          </button>
+        ))}
+        {aggregate && aggregate.count > 0 && (
+          <span className="ml-1 text-xs text-muted">
+            {aggregate.average.toFixed(1)} ({aggregate.count})
+          </span>
+        )}
+      </div>
+      {!token && (
+        <p className="text-xs text-muted mt-0.5">Sign in to rate</p>
+      )}
+    </div>
+  );
+}
+
 function PollBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as PollData;
   const [selected, setSelected] = useState<string | null>(null);
@@ -2251,7 +2331,9 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
 
   useEffect(() => {
     if (!userId) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setValue(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value) { setValue(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
@@ -2306,7 +2388,9 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
 
   useEffect(() => {
     if (!userId) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
@@ -2502,7 +2586,19 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
 
   useEffect(() => {
     if (!userId) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id)
+      .then(r => {
+        if (r?.response_data?.value) {
+          setSelected(r.response_data.value);
+          markComplete(itemKey, 'form');
+        } else if (data.default_value && data.options?.length === 1) {
+          // Single option pre-selected — auto-save and mark complete
+          api.submitFormResponse(content.id, { value: data.default_value })
+            .then(() => markComplete(itemKey, 'form'))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
@@ -2568,7 +2664,9 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
 
   useEffect(() => {
     if (!userId) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
@@ -2726,12 +2824,31 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
   const { requestPlay, clearPlay } = useContext(MediaContext);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+  const completedRef = useRef(false);
   const mediaId = `inline:${content.id}`;
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  const handleTimeUpdate = useCallback(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    setCurrentTime(el.currentTime);
+    if (completedRef.current) return;
+    if (el.duration && el.currentTime / el.duration >= 0.8) {
+      completedRef.current = true;
+      markComplete(itemKey, isAudio ? 'audio' : 'video');
+    }
+  }, [isAudio, itemKey, markComplete]);
+
+  // Mark complete on load if already completed in a previous session
+  useEffect(() => {
+    if (completions.has(itemKey)) completedRef.current = true;
+  }, [completions, itemKey]);
 
   const getEmbedUrl = (url: string): string | null => {
     const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -2793,7 +2910,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
             preload="metadata"
             className="w-full block rounded-lg"
             style={{ maxHeight: '320px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }}
-            onTimeUpdate={() => { setCurrentTime(mediaRef.current?.currentTime || 0); }}
+            onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -2813,7 +2930,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
           ref={mediaRef as React.RefObject<HTMLAudioElement>}
           src={data.url}
           preload="metadata"
-          onTimeUpdate={() => setCurrentTime(mediaRef.current?.currentTime || 0)}
+          onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
@@ -2923,7 +3040,9 @@ function InlineMultiselect({ content }: { content: InlineContent }) {
 
   useEffect(() => {
     if (!api.getToken()) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
   }, [content.id]);
 
   const toggleOption = (id: string) => {
@@ -2970,7 +3089,9 @@ function InlineTextbox({ content }: { content: InlineContent }) {
 
   useEffect(() => {
     if (!api.getToken()) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value !== undefined) { setValue(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
   }, [content.id]);
 
   const handleChange = (newValue: string) => {
@@ -3035,7 +3156,9 @@ function InlineTextarea({ content }: { content: InlineContent }) {
 
   useEffect(() => {
     if (!api.getToken()) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value !== undefined) { setValue(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
   }, [content.id]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -3112,7 +3235,9 @@ function InlineRadio({ content }: { content: InlineContent }) {
 
   useEffect(() => {
     if (!api.getToken()) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
   }, [content.id]);
 
   const handleChange = (optId: string) => {
@@ -3151,7 +3276,9 @@ function InlineCheckbox({ content }: { content: InlineContent }) {
 
   useEffect(() => {
     if (!api.getToken()) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+    }).catch(() => {});
   }, [content.id]);
 
   const toggleOption = (id: string) => {

@@ -488,6 +488,23 @@ export default function BookSettings() {
           </div>
         </div>
 
+        {/* Ratings */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Ratings</h2>
+          <p className="text-sm text-muted mb-4">
+            Allow readers to rate your book 1–5 stars and display the aggregate rating on the book card.
+          </p>
+
+          <div className="space-y-4">
+            <ToggleSetting
+              label="Show star ratings"
+              description="Display a star rating widget in the reader sidebar and show the average rating on the public book listing."
+              checked={settings.show_ratings ?? true}
+              onChange={(v) => updateSetting('show_ratings', v)}
+            />
+          </div>
+        </div>
+
         {/* Author Content Options */}
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-4 text-theme">Author Content Options</h2>
