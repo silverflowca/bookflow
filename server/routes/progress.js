@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 
 // Trackable inline content types
-const TRACKABLE_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'question'];
+const TRACKABLE_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'question', 'audio', 'video'];
 
 /**
  * Recursively count audio/video nodes in TipTap JSON content.
