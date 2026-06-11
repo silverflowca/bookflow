@@ -2877,12 +2877,27 @@ function InlineFormElement({ content }: { content: InlineContent }) {
 function InlineSelect({ content }: { content: InlineContent }) {
   const data = content.content_data as SelectData;
   const [value, setValue] = useState(data.default_value || '');
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setValue(r.response_data.value); }).catch(() => {});
+  }, [content.id]);
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    if (!api.getToken()) return;
+    api.submitFormResponse(content.id, { value: newValue })
+      .then(() => markComplete(itemKey, 'form'))
+      .catch(() => {});
+  };
 
   return (
-    <span className="inline-flex items-center gap-1 mx-1">
+    <span className={`inline-flex items-center gap-1 mx-1${progressEnabled && completions.has(itemKey) ? ' opacity-70' : ''}`}>
       <select
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         className="inline-block px-2 py-0.5 text-sm border border-indigo-300 rounded bg-indigo-50 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer"
         style={{ minWidth: '120px' }}
       >
@@ -2892,6 +2907,7 @@ function InlineSelect({ content }: { content: InlineContent }) {
         ))}
       </select>
       {data.required && <span className="text-red-500 text-xs">*</span>}
+      {progressEnabled && completions.has(itemKey) && <Check className="h-3 w-3 text-green-500 shrink-0" />}
     </span>
   );
 }
@@ -2900,11 +2916,21 @@ function InlineSelect({ content }: { content: InlineContent }) {
 function InlineMultiselect({ content }: { content: InlineContent }) {
   const data = content.content_data as MultiselectData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+  }, [content.id]);
 
   const toggleOption = (id: string) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+    setSelected(newSelected);
+    if (!api.getToken()) return;
+    api.submitFormResponse(content.id, { value: newSelected })
+      .then(() => markComplete(itemKey, 'form'))
+      .catch(() => {});
   };
 
   return (
@@ -2920,6 +2946,7 @@ function InlineMultiselect({ content }: { content: InlineContent }) {
           <span className="text-theme">{opt.text}</span>
         </label>
       ))}
+      {progressEnabled && completions.has(itemKey) && <Check className="h-3 w-3 text-green-500 shrink-0 ml-1" />}
     </span>
   );
 }
@@ -2935,19 +2962,43 @@ const FIELD_WIDTH_STYLE: Record<string, React.CSSProperties> = {
 function InlineTextbox({ content }: { content: InlineContent }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+  }, [content.id]);
+
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    if (!api.getToken()) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.submitFormResponse(content.id, { value: newValue })
+        .then(() => markComplete(itemKey, 'form'))
+        .catch(() => {});
+    }, 600);
+  };
+
   const isFull = (data.width ?? 'md') === 'full';
+  const isDone = progressEnabled && completions.has(itemKey);
 
   if (isFull) {
     return (
       <span className="block my-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={data.placeholder || 'Type here...'}
-          maxLength={data.max_length}
-          className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
-        />
+        <span className="flex items-center gap-1">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder={data.placeholder || 'Type here...'}
+            maxLength={data.max_length}
+            className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
+          />
+          {isDone && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+        </span>
         {data.required && <span className="text-red-500 text-xs mt-0.5 block">Required</span>}
       </span>
     );
@@ -2958,13 +3009,14 @@ function InlineTextbox({ content }: { content: InlineContent }) {
       <input
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={data.placeholder || 'Type here...'}
         maxLength={data.max_length}
         className="px-2 py-0.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none"
         style={FIELD_WIDTH_STYLE[data.width ?? 'md']}
       />
       {data.required && <span className="text-red-500 text-xs">*</span>}
+      {isDone && <Check className="h-3 w-3 text-green-500 shrink-0" />}
     </span>
   );
 }
@@ -2973,16 +3025,32 @@ function InlineTextbox({ content }: { content: InlineContent }) {
 function InlineTextarea({ content }: { content: InlineContent }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
   const isFull = (data.width ?? 'full') === 'full';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+  }, [content.id]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(e.target.value);
+    const newValue = e.target.value;
+    setValue(newValue);
     if (data.auto_expand && e.target) {
       e.target.style.height = 'auto';
       e.target.style.height = e.target.scrollHeight + 'px';
     }
-  }, [data.auto_expand]);
+    if (!api.getToken()) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.submitFormResponse(content.id, { value: newValue })
+        .then(() => markComplete(itemKey, 'form'))
+        .catch(() => {});
+    }, 600);
+  }, [data.auto_expand, content.id, itemKey, markComplete]);
 
   // Set initial height when auto_expand is on
   useEffect(() => {
@@ -2992,19 +3060,24 @@ function InlineTextarea({ content }: { content: InlineContent }) {
     }
   }, [data.auto_expand]);
 
+  const isDone = progressEnabled && completions.has(itemKey);
+
   if (isFull) {
     return (
       <span className="block my-2">
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={handleChange}
-          placeholder={data.placeholder || 'Enter your response...'}
-          rows={data.rows || 2}
-          maxLength={data.max_length}
-          className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
-          style={data.auto_expand ? { overflow: 'hidden' } : undefined}
-        />
+        <span className="flex items-start gap-1">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            placeholder={data.placeholder || 'Enter your response...'}
+            rows={data.rows || 2}
+            maxLength={data.max_length}
+            className="block w-full px-3 py-1.5 text-sm border border-theme rounded bg-surface focus:ring-1 focus:ring-gray-500 focus:outline-none resize-none"
+            style={data.auto_expand ? { overflow: 'hidden' } : undefined}
+          />
+          {isDone && <Check className="h-3.5 w-3.5 text-green-500 shrink-0 mt-1" />}
+        </span>
         {data.max_length && <span className="text-xs text-muted">{value.length}/{data.max_length}</span>}
       </span>
     );
@@ -3023,6 +3096,7 @@ function InlineTextarea({ content }: { content: InlineContent }) {
         style={data.auto_expand ? { overflow: 'hidden' } : undefined}
       />
       {data.max_length && <span className="text-xs text-muted">{value.length}/{data.max_length}</span>}
+      {isDone && <Check className="h-3 w-3 text-green-500 shrink-0" />}
     </span>
   );
 }
@@ -3031,6 +3105,21 @@ function InlineTextarea({ content }: { content: InlineContent }) {
 function InlineRadio({ content }: { content: InlineContent }) {
   const data = content.content_data as RadioData;
   const [selected, setSelected] = useState(data.default_value || '');
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+  }, [content.id]);
+
+  const handleChange = (optId: string) => {
+    setSelected(optId);
+    if (!api.getToken()) return;
+    api.submitFormResponse(content.id, { value: optId })
+      .then(() => markComplete(itemKey, 'form'))
+      .catch(() => {});
+  };
 
   return (
     <span className="inline-flex flex-wrap items-center gap-3 mx-1 py-1 px-2 bg-orange-50 border border-orange-200 rounded">
@@ -3040,12 +3129,13 @@ function InlineRadio({ content }: { content: InlineContent }) {
             type="radio"
             name={`inline-radio-${content.id}`}
             checked={selected === opt.id}
-            onChange={() => setSelected(opt.id)}
+            onChange={() => handleChange(opt.id)}
             className="w-3.5 h-3.5 border-orange-400 text-orange-600 focus:ring-orange-500"
           />
           <span className="text-theme">{opt.text}</span>
         </label>
       ))}
+      {progressEnabled && completions.has(itemKey) && <Check className="h-3 w-3 text-green-500 shrink-0 ml-1" />}
     </span>
   );
 }
@@ -3054,11 +3144,21 @@ function InlineRadio({ content }: { content: InlineContent }) {
 function InlineCheckbox({ content }: { content: InlineContent }) {
   const data = content.content_data as CheckboxData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
+  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value) setSelected(r.response_data.value); }).catch(() => {});
+  }, [content.id]);
 
   const toggleOption = (id: string) => {
-    setSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+    setSelected(newSelected);
+    if (!api.getToken()) return;
+    api.submitFormResponse(content.id, { value: newSelected })
+      .then(() => markComplete(itemKey, 'form'))
+      .catch(() => {});
   };
 
   return (
@@ -3074,6 +3174,7 @@ function InlineCheckbox({ content }: { content: InlineContent }) {
           <span className="text-theme">{opt.text}</span>
         </label>
       ))}
+      {progressEnabled && completions.has(itemKey) && <Check className="h-3 w-3 text-green-500 shrink-0 ml-1" />}
     </span>
   );
 }
