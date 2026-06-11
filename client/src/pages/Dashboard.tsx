@@ -3,51 +3,32 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
-
-// Each segment width ∝ chapter's share of total items; fill ∝ % items complete in that chapter
-function SegmentedBar({ breakdown }: { breakdown: { completed: number; total: number }[] }) {
-  if (!breakdown.length) return null;
-  const grandTotal = breakdown.reduce((s, b) => s + (b.total || 1), 0);
-  return (
-    <div className="flex gap-px w-full h-2 rounded-full overflow-hidden">
-      {breakdown.map((seg, i) => {
-        const widthPct = ((seg.total || 1) / grandTotal) * 100;
-        const fillPct = seg.total > 0 ? Math.min(100, (seg.completed / seg.total) * 100) : 0;
-        const done = seg.total > 0 && seg.completed >= seg.total;
-        const started = fillPct > 0 && !done;
-        return (
-          <div key={i} style={{ width: `${widthPct}%` }} className="relative h-full bg-surface-hover rounded-sm overflow-hidden flex-shrink-0">
-            <div
-              className={`absolute inset-y-0 left-0 transition-all duration-300 ${done ? 'bg-green-500' : started ? 'bg-amber-400' : ''}`}
-              style={{ width: `${fillPct}%` }}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import { useTheme } from '../contexts/ThemeContext';
+import type { CoverSize } from '../contexts/ThemeContext';
 
 // Lazy-loads progress for a single book and renders a reading card
 function ReadingProgressCard({ bookId, bookTitle, coverUrl, clubId, clubName }: {
   bookId: string; bookTitle: string; coverUrl?: string | null;
   clubId?: string; clubName?: string;
 }) {
-  const [breakdown, setBreakdown] = useState<{ completed: number; total: number }[]>([]);
+  const [percent, setPercent] = useState<number | null>(null);
+  const [chapterCount, setChapterCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    api.getBookProgress(bookId)
-      .then(stats => setBreakdown(stats.map(s => ({ completed: s.completed, total: s.total }))))
-      .catch(() => {})
-      .finally(() => setLoaded(true));
+    Promise.all([
+      api.getReadingProgress(bookId).catch(() => null),
+      api.getBookProgress(bookId).catch(() => [] as any[]),
+    ]).then(([rp, chStats]) => {
+      setPercent((rp as any)?.percent_complete ?? 0);
+      setChapterCount((chStats as any[]).length);
+    }).finally(() => setLoaded(true));
   }, [bookId]);
 
-  const totalDone = breakdown.filter(b => b.total > 0 && b.completed >= b.total).length;
-  const total = breakdown.length;
-  const hasProgress = breakdown.some(b => b.completed > 0);
+  if (loaded && !percent) return null;
 
-  if (loaded && !hasProgress) return null;
+  const pct = percent ?? 0;
+  const done = pct >= 100;
 
   return (
     <Link
@@ -65,12 +46,21 @@ function ReadingProgressCard({ bookId, bookTitle, coverUrl, clubId, clubName }: 
         {clubName && <p className="text-xs text-muted truncate">{clubName}</p>}
         <div className="mt-2">
           {loaded
-            ? <SegmentedBar breakdown={breakdown} />
+            ? (
+              <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${done ? 'bg-green-500' : 'bg-amber-400'}`}
+                  style={{ width: `${Math.min(100, pct)}%` }}
+                />
+              </div>
+            )
             : <div className="h-2 bg-surface-hover rounded-full animate-pulse" />
           }
         </div>
-        {loaded && total > 0 && (
-          <p className="text-xs text-muted mt-1">{totalDone}/{total} chapters</p>
+        {loaded && (
+          <p className="text-xs text-muted mt-1">
+            {pct}%{chapterCount > 0 ? ` · ${chapterCount} chapters` : ''}
+          </p>
         )}
       </div>
     </Link>
@@ -95,6 +85,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showNewBookModal, setShowNewBookModal] = useState(false);
   const navigate = useNavigate();
+  const { coverSize } = useTheme();
+
+  // Grid columns by cover size
+  const gridClass: Record<CoverSize, string> = {
+    small: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+    medium: 'md:grid-cols-2 lg:grid-cols-3',
+    large: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+  };
 
   useEffect(() => {
     loadAll();
@@ -176,11 +174,12 @@ export default function Dashboard() {
           </button>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`grid gap-4 ${gridClass[coverSize]}`}>
           {books.map((book) => (
             <BookCard
               key={book.id}
               book={book}
+              coverSize={coverSize}
               onDelete={() => handleDeleteBook(book.id)}
               onCoverUpdate={handleCoverUpdate}
               onUpdate={handleBookUpdate}
@@ -196,7 +195,7 @@ export default function Dashboard() {
             <Users className="h-5 w-5 text-accent" />
             <h2 className="text-lg font-semibold text-theme">Collaborating On</h2>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`grid gap-4 ${gridClass[coverSize]}`}>
             {collaboratingBooks.map((book) => (
               <div key={book.id} className="theme-section rounded-xl p-4 flex gap-4">
                 {book.cover_image_url ? (
@@ -334,7 +333,7 @@ export default function Dashboard() {
   );
 }
 
-function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onDelete: () => void; onCoverUpdate: (bookId: string, coverUrl: string) => void; onUpdate: (book: Book) => void }) {
+function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdate }: { book: Book; coverSize?: CoverSize; onDelete: () => void; onCoverUpdate: (bookId: string, coverUrl: string) => void; onUpdate: (book: Book) => void }) {
   const [showMenu, setShowMenu] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showCoverUpload, setShowCoverUpload] = useState(false);
@@ -406,144 +405,147 @@ function BookCard({ book, onDelete, onCoverUpdate, onUpdate }: { book: Book; onD
     }
   }
 
+  const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
+
+  const coverLabel = (
+    <label
+      className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block overflow-hidden"
+      style={{ borderRadius: coverSize === 'small' ? undefined : undefined }}
+      onMouseEnter={() => setShowCoverUpload(true)}
+      onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
+    >
+      <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+      {book.cover_image_url
+        ? <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+        : <BookOpen className={coverSize === 'large' ? 'h-16 w-16 text-accent opacity-30' : 'h-8 w-8 text-accent opacity-30'} />
+      }
+      {(showCoverUpload || uploadingCover) && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+          {uploadingCover ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white opacity-80" />}
+        </div>
+      )}
+    </label>
+  );
+
+  const menuDropdown = showMenu && (
+    <div className="absolute right-0 mt-1 w-48 theme-modal rounded-xl shadow-lg z-50 overflow-hidden py-1">
+      <Link to={`/edit/book/${book.id}/dashboard`} onClick={() => setShowMenu(false)} className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover">
+        <LayoutDashboard className="h-3.5 w-3.5" /> Stats
+      </Link>
+      <Link to={`/edit/book/${book.id}/settings`} onClick={() => setShowMenu(false)} className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover">
+        <Settings className="h-3.5 w-3.5" /> Settings
+      </Link>
+      {book.visibility === 'public' && (
+        <button onClick={() => { setShowMenu(false); handleCopyUrl(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover">
+          {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? 'Copied!' : 'Copy Link'}
+        </button>
+      )}
+      <div className="my-1 border-t border-[var(--color-border)]" />
+      <button onClick={() => { setShowMenu(false); onDelete(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50">
+        <Trash2 className="h-3.5 w-3.5" /> Delete
+      </button>
+    </div>
+  );
+
+  const visibilityBtn = (
+    <button onClick={handleToggleVisibility} disabled={togglingVisibility} className={`flex items-center gap-1 text-xs font-medium transition-colors ${book.visibility === 'public' ? 'text-green-600' : 'text-muted'}`}>
+      {togglingVisibility ? <Loader2 className="h-3 w-3 animate-spin" /> : book.visibility === 'public' ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+      {book.visibility === 'public' ? 'Public' : 'Private'}
+    </button>
+  );
+
+  const actionButtons = (
+    <div className="flex gap-1.5">
+      <Link to={`/edit/book/${book.id}`} className="flex-1 text-center py-1.5 theme-button-primary rounded-lg font-medium text-sm">Edit</Link>
+      <Link to={`/book/${book.id}`} className="flex-1 text-center py-1.5 theme-button-secondary rounded-lg font-medium text-sm">View</Link>
+      <Link to={`/edit/book/${book.id}/dashboard`} className="flex items-center justify-center px-2 py-1.5 theme-button-secondary rounded-lg" title="Stats">
+        <LayoutDashboard className="h-4 w-4" />
+      </Link>
+    </div>
+  );
+
+  // ── SMALL: horizontal compact row ───────────────────────────────────────────
+  if (coverSize === 'small') {
+    return (
+      <div className="theme-card rounded-xl flex gap-3 p-2.5 items-center">
+        <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0">
+          {coverLabel}
+        </div>
+        <div className="flex-1 min-w-0">
+          <Link to={`/edit/book/${book.id}`}>
+            <p className="font-semibold text-sm text-theme truncate leading-tight">{book.title}</p>
+            {book.subtitle && <p className="text-[11px] text-muted truncate">{book.subtitle}</p>}
+          </Link>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-muted">{chapterCount}</span>
+            {visibilityBtn}
+          </div>
+        </div>
+        <div className="relative flex-shrink-0" ref={menuRef}>
+          <button onClick={() => setShowMenu(!showMenu)} className="p-1 text-muted hover:text-theme rounded-lg transition-colors">
+            <MoreVertical className="h-4 w-4" />
+          </button>
+          {menuDropdown}
+        </div>
+      </div>
+    );
+  }
+
+  // ── LARGE: tall portrait cover, title prominent below ────────────────────────
+  if (coverSize === 'large') {
+    return (
+      <div className="theme-card rounded-xl">
+        <div className="aspect-[2/3] rounded-t-xl overflow-hidden">
+          {coverLabel}
+        </div>
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <Link to={`/edit/book/${book.id}`} className="flex-1 min-w-0">
+              <h3 className="font-bold text-lg leading-snug text-theme">{book.title}</h3>
+              {book.subtitle && <p className="text-sm text-muted mt-0.5 line-clamp-2">{book.subtitle}</p>}
+            </Link>
+            <div className="relative shrink-0" ref={menuRef}>
+              <button onClick={() => setShowMenu(!showMenu)} className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors">
+                <MoreVertical className="h-4 w-4" />
+              </button>
+              {menuDropdown}
+            </div>
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-muted">{chapterCount}</span>
+            {visibilityBtn}
+          </div>
+          {actionButtons}
+        </div>
+      </div>
+    );
+  }
+
+  // ── MEDIUM (default): landscape cover, standard card ────────────────────────
   return (
     <div className="theme-card rounded-xl">
-      {/* Cover — label contains the file input so click always opens picker */}
-      <label
-        className="aspect-[3/2] bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block rounded-t-xl overflow-hidden"
-        onMouseEnter={() => setShowCoverUpload(true)}
-        onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
-      >
-        <input
-          ref={coverInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleCoverUpload}
-          className="hidden"
-        />
-        {book.cover_image_url ? (
-          <img
-            src={book.cover_image_url}
-            alt={book.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <BookOpen className="h-12 w-12 text-accent opacity-30" />
-        )}
-        {(showCoverUpload || uploadingCover) && (
-          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center">
-            {uploadingCover ? (
-              <Loader2 className="h-6 w-6 text-white animate-spin" />
-            ) : (
-              <Upload className="h-6 w-6 text-white opacity-80" />
-            )}
-          </div>
-        )}
-      </label>
-
-      {/* Content */}
+      <div className="aspect-[3/2] rounded-t-xl overflow-hidden">
+        {coverLabel}
+      </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <Link to={`/edit/book/${book.id}`} className="flex-1 min-w-0">
             <h3 className="font-semibold text-base truncate text-theme">{book.title}</h3>
-            {book.subtitle && (
-              <p className="text-xs text-muted truncate mt-0.5">{book.subtitle}</p>
-            )}
+            {book.subtitle && <p className="text-xs text-muted truncate mt-0.5">{book.subtitle}</p>}
           </Link>
-
-          {/* Three-dots menu */}
           <div className="relative shrink-0" ref={menuRef}>
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors"
-            >
+            <button onClick={() => setShowMenu(!showMenu)} className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors">
               <MoreVertical className="h-4 w-4" />
             </button>
-            {showMenu && (
-              <div className="absolute right-0 mt-1 w-48 theme-modal rounded-xl shadow-lg z-50 overflow-hidden py-1">
-                <Link
-                  to={`/edit/book/${book.id}/dashboard`}
-                  onClick={() => setShowMenu(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover"
-                >
-                  <LayoutDashboard className="h-3.5 w-3.5" />
-                  Stats
-                </Link>
-                <Link
-                  to={`/edit/book/${book.id}/settings`}
-                  onClick={() => setShowMenu(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  Settings
-                </Link>
-                {book.visibility === 'public' && (
-                  <button
-                    onClick={() => { setShowMenu(false); handleCopyUrl(); }}
-                    className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover"
-                  >
-                    {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? 'Copied!' : 'Copy Link'}
-                  </button>
-                )}
-                <div className="my-1 border-t border-[var(--color-border)]" />
-                <button
-                  onClick={() => { setShowMenu(false); onDelete(); }}
-                  className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </button>
-              </div>
-            )}
+            {menuDropdown}
           </div>
         </div>
-
-        {/* Meta row */}
         <div className="flex items-center justify-between mt-2 mb-3">
-          <span className="text-xs text-muted">
-            {(() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })()}
-          </span>
-          <button
-            onClick={handleToggleVisibility}
-            disabled={togglingVisibility}
-            className={`flex items-center gap-1 text-xs font-medium transition-colors ${
-              book.visibility === 'public' ? 'text-green-600' : 'text-muted'
-            }`}
-          >
-            {togglingVisibility ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : book.visibility === 'public' ? (
-              <Globe className="h-3 w-3" />
-            ) : (
-              <Lock className="h-3 w-3" />
-            )}
-            {book.visibility === 'public' ? 'Public' : 'Private'}
-          </button>
+          <span className="text-xs text-muted">{chapterCount}</span>
+          {visibilityBtn}
         </div>
-
-        {/* Edit / View / Dashboard buttons */}
-        <div className="flex gap-2">
-          <Link
-            to={`/edit/book/${book.id}`}
-            className="flex-1 text-center py-1.5 theme-button-primary rounded-lg font-medium text-sm"
-          >
-            Edit
-          </Link>
-          <Link
-            to={`/book/${book.id}`}
-            className="flex-1 text-center py-1.5 theme-button-secondary rounded-lg font-medium text-sm"
-          >
-            View
-          </Link>
-          <Link
-            to={`/edit/book/${book.id}/dashboard`}
-            className="flex items-center justify-center px-2.5 py-1.5 theme-button-secondary rounded-lg"
-            title="Dashboard"
-          >
-            <LayoutDashboard className="h-4 w-4" />
-          </Link>
-        </div>
+        {actionButtons}
       </div>
     </div>
   );
