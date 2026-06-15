@@ -126,7 +126,7 @@ WHERE email = 'admin.steen2@silverflow.ca';
 -- Uses a FIXED book ID so this is safe to skip if already seeded.
 DO $$
 DECLARE
-  v_author_id   uuid := '55914126-5a8a-4b86-a7c6-33eb3c201a36';
+  v_author_id   uuid;
   v_book_id     uuid := 'f0c66a4a-ced2-4b75-ab42-84dafba9cd3d';
   v_ch1_id      uuid;
   v_ch2_id      uuid;
@@ -137,6 +137,12 @@ BEGIN
   IF EXISTS (SELECT 1 FROM bookflow.books WHERE id = v_book_id) THEN
     RAISE NOTICE 'Tutorial book already exists — skipping seed.';
     RETURN;
+  END IF;
+
+  -- Look up author dynamically (user must have signed up first)
+  SELECT id INTO v_author_id FROM bookflow.profiles WHERE email = 'admin.steen2@silverflow.ca';
+  IF v_author_id IS NULL THEN
+    RAISE EXCEPTION 'User admin.steen2@silverflow.ca not found in profiles — sign up on the app first, then re-run this migration.';
   END IF;
 
   v_ch1_id := gen_random_uuid();
