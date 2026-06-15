@@ -66,7 +66,7 @@ CREATE POLICY "Super admins can view all club members"
     )
   );
 
--- 7. Assign super_admin to admin.steen2@silverflow.ca
+-- 7. Assign super_admin to platform admins
 UPDATE bookflow.profiles
 SET system_role = 'super_admin'
-WHERE email = 'admin.steen2@silverflow.ca';
+WHERE email IN ('admin.steen2@silverflow.ca', 'damion.steen@silverflow.ca');

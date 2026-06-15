@@ -112,12 +112,11 @@ CREATE POLICY "Super admins can view all club members"
     )
   );
 
--- Assign super_admin to the platform admin
--- NOTE: This UPDATE is safe to re-run — it's idempotent.
--- On production the user must already exist (signed up first).
+-- Assign super_admin to platform admins
+-- NOTE: Safe to re-run — idempotent.
 UPDATE bookflow.profiles
 SET system_role = 'super_admin'
-WHERE email = 'admin.steen2@silverflow.ca';
+WHERE email IN ('admin.steen2@silverflow.ca', 'damion.steen@silverflow.ca');
 
 
 -- ── Tutorial Book Seed ────────────────────────────────────────────────────────
