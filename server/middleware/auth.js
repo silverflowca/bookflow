@@ -1,6 +1,19 @@
 import supabase from '../config/supabase.js';
 
 /**
+ * Check if a user ID belongs to a super_admin.
+ * Uses service-role client so it always bypasses RLS.
+ */
+async function isSuperAdmin(userId) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('system_role')
+    .eq('id', userId)
+    .single();
+  return data?.system_role === 'super_admin';
+}
+
+/**
  * Authentication middleware - requires valid Supabase auth token
  */
 export async function authenticate(req, res, next) {
@@ -61,8 +74,27 @@ export async function requireAuthor(req, res, next) {
 }
 
 /**
+ * Super-admin guard — requires the authenticated user to have system_role = 'super_admin'.
+ */
+export async function requireSuperAdmin(req, res, next) {
+  try {
+    if (await isSuperAdmin(req.user.id)) {
+      req.userRole = 'super_admin';
+      return next();
+    }
+    return res.status(403).json({ error: 'Super admin access required' });
+  } catch (err) {
+    console.error('Super admin check error:', err);
+    return res.status(500).json({ error: 'Authorization check failed' });
+  }
+}
+
+/**
  * Role-based middleware factory — requires user to be book owner OR a collaborator
  * with one of the specified roles.
+ *
+ * Super admins automatically bypass all book-level role checks and receive
+ * req.userRole = 'super_admin'.
  *
  * Usage:  requireRole(['owner', 'author', 'editor'])
  *
@@ -77,6 +109,18 @@ export function requireRole(allowedRoles) {
     }
 
     try {
+      // Super admins bypass all book-level role checks
+      if (await isSuperAdmin(req.user.id)) {
+        const { data: book } = await supabase
+          .from('books')
+          .select('id, author_id, status, visibility, slug, share_token, review_status')
+          .eq('id', bookId)
+          .single();
+        req.book = book;
+        req.userRole = 'super_admin';
+        return next();
+      }
+
       const { data: book, error } = await supabase
         .from('books')
         .select('id, author_id, status, visibility, slug, share_token, review_status')
@@ -123,4 +167,4 @@ export function requireRole(allowedRoles) {
   };
 }
 
-export default { authenticate, optionalAuth, requireAuthor, requireRole };
+export default { authenticate, optionalAuth, requireAuthor, requireRole, requireSuperAdmin };

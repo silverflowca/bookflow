@@ -406,6 +406,25 @@ body {
   margin-bottom: 1rem;
 }
 
+/* TTS active — pointer cursor signals click-to-seek */
+.reader-content.tts-active {
+  cursor: pointer;
+}
+
+/* TTS sentence highlight */
+mark.tts-highlight {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  transition: background 0.15s ease;
+}
+:root.dark mark.tts-highlight,
+[data-theme] mark.tts-highlight {
+  background: #92400e;
+  color: #fef3c7;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

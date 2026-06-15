@@ -884,7 +884,7 @@ export default function ChapterEditor() {
           })()}
 
           {/* Toolbar */}
-          <div className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap sticky top-12 z-20 shadow-sm">
+          <div id="bf-editor-toolbar" className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap sticky top-12 z-20 shadow-sm">
             <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBold().run()}
               active={editor?.isActive('bold')}
@@ -1082,7 +1082,7 @@ export default function ChapterEditor() {
           </div>
 
           {/* Editor Content */}
-          <div className="bg-surface border border-theme rounded-b-lg">
+          <div id="bf-editor-content" className="bg-surface border border-theme rounded-b-lg">
             <EditorContent
               editor={editor}
               className="prose max-w-none p-6 min-h-[500px] focus:outline-none"
@@ -1113,7 +1113,7 @@ export default function ChapterEditor() {
         </div>
 
         {/* Right Panel — tabbed: Comments / Inline Content */}
-        <div className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 h-[calc(100vh-6rem)]">
+        <div id="bf-editor-panel" className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 h-[calc(100vh-6rem)]">
           {/* Tab bar */}
           <div className="flex border-2 border-theme rounded-t-lg overflow-hidden bg-surface flex-shrink-0">
             <button

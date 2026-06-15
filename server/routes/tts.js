@@ -14,6 +14,33 @@ async function getDeepgramKey(userId) {
   return (data?.deepgram_api_key) || process.env.DEEPGRAM_API_KEY || '';
 }
 
+const DEEPGRAM_CHUNK_SIZE = 1900; // safely under 2000-char limit
+
+/**
+ * Split text into chunks of at most DEEPGRAM_CHUNK_SIZE characters,
+ * breaking only at sentence boundaries (. ! ?) or, failing that, at spaces.
+ */
+function splitIntoChunks(text) {
+  const chunks = [];
+  let remaining = text.trim();
+  while (remaining.length > DEEPGRAM_CHUNK_SIZE) {
+    // Try to break at the last sentence-end within the window
+    const window = remaining.slice(0, DEEPGRAM_CHUNK_SIZE);
+    const sentenceEnd = Math.max(
+      window.lastIndexOf('. '),
+      window.lastIndexOf('! '),
+      window.lastIndexOf('? '),
+      window.lastIndexOf('.\n'),
+    );
+    const breakAt = sentenceEnd > 0 ? sentenceEnd + 1 : window.lastIndexOf(' ');
+    const cut = breakAt > 0 ? breakAt : DEEPGRAM_CHUNK_SIZE;
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining.length > 0) chunks.push(remaining);
+  return chunks;
+}
+
 // Generate TTS audio from text
 router.post('/generate', optionalAuth, async (req, res) => {
   const { text, voice = 'aura-asteria-en' } = req.body;
@@ -28,40 +55,33 @@ router.post('/generate', optionalAuth, async (req, res) => {
     return res.status(400).json({ error: 'Deepgram API key not configured.' });
   }
 
-  // Limit text length to prevent abuse (Deepgram has limits)
-  const maxLength = 10000;
-  const truncatedText = text.slice(0, maxLength);
+  const chunks = splitIntoChunks(text);
 
   try {
-    const response = await fetch('https://api.deepgram.com/v1/speak', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: truncatedText,
-      }),
-    });
+    const audioBuffers = [];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Deepgram API error:', response.status, errorText);
-      return res.status(response.status).json({
-        error: 'Failed to generate audio',
-        details: errorText
+    for (const chunk of chunks) {
+      const response = await fetch(`https://api.deepgram.com/v1/speak?model=${encodeURIComponent(voice)}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: chunk }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Deepgram API error:', response.status, errorText);
+        return res.status(response.status).json({ error: 'Failed to generate audio', details: errorText });
+      }
+
+      audioBuffers.push(Buffer.from(await response.arrayBuffer()));
     }
 
-    // Get the audio buffer
-    const audioBuffer = await response.arrayBuffer();
-
-    // Return as audio/mpeg
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': audioBuffer.byteLength,
-    });
-    res.send(Buffer.from(audioBuffer));
+    const combined = Buffer.concat(audioBuffers);
+    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': combined.byteLength });
+    res.send(combined);
   } catch (err) {
     console.error('TTS generation error:', err);
     res.status(500).json({ error: err.message });

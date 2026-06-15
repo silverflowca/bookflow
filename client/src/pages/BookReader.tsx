@@ -11,9 +11,10 @@ import {
 interface ProgressCtx {
   completions: Set<string>;
   markComplete: (itemKey: string, itemType: string) => void;
+  markIncomplete: (itemKey: string) => void;
   enabled: boolean;
 }
-const ProgressContext = createContext<ProgressCtx>({ completions: new Set(), markComplete: () => {}, enabled: false });
+const ProgressContext = createContext<ProgressCtx>({ completions: new Set(), markComplete: () => {}, markIncomplete: () => {}, enabled: false });
 
 // Context for coordinating media playback — enforces one playing + one PiP at a time
 interface MediaCtx {
@@ -48,6 +49,7 @@ export default function BookReader() {
   const highlightApplied = useRef(false);
   const [inlineContent, setInlineContent] = useState<InlineContent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chapterLoading, setChapterLoading] = useState(false);
   const [showToc, setShowToc] = useState(false);
   const [showComponentBar, setShowComponentBar] = useState(false);
   const [activeContent, setActiveContent] = useState<InlineContent | null>(null);
@@ -64,14 +66,16 @@ export default function BookReader() {
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [ttsAudio, setTtsAudio] = useState<HTMLAudioElement | null>(null);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsSegmentsRef = useRef<{ text: string; charStart: number; charEnd: number; timeStart: number; timeEnd: number }[]>([]);
+  const ttsHighlightRef = useRef<HTMLElement | null>(null);
 
   // Progress tracking
   const [chapterCompletions, setChapterCompletions] = useState<Set<string>>(new Set());
-  const [chapterProgressTotal, setChapterProgressTotal] = useState(0);
+  const chapterCompletionsRef = useRef<Set<string>>(new Set()); // sync ref for stale-closure-safe checks
   const chapterProgressTotalRef = useRef(0);
   const [bookChapterStats, setBookChapterStats] = useState<Map<string, { completed: number; total: number }>>(new Map());
   const [showProgressPanel, setShowProgressPanel] = useState(false);
-
   // Live episode banner
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string; guest_invite_url?: string; live_shows?: { guest_invite_url?: string } } | null>(null);
   const [liveBannerDismissed, setLiveBannerDismissed] = useState(false);
@@ -85,6 +89,24 @@ export default function BookReader() {
     playingId: mediaPlayingId,
     pipId: mediaPipId,
     requestPlay: (id, pause) => {
+      // Stop TTS if it's playing
+      const ttsEl = ttsAudioRef.current;
+      if (ttsEl && !ttsEl.paused) {
+        ttsEl.pause();
+        ttsEl.currentTime = 0;
+        setTtsPlaying(false);
+        setTtsAudio(null);
+        ttsAudioRef.current = null;
+        ttsSegmentsRef.current = [];
+        if (ttsHighlightRef.current) {
+          const mark = ttsHighlightRef.current;
+          if (mark.parentNode) {
+            while (mark.firstChild) mark.parentNode.insertBefore(mark.firstChild, mark);
+            mark.parentNode.removeChild(mark);
+          }
+          ttsHighlightRef.current = null;
+        }
+      }
       mediaPauseCallbacks.current.set(id, pause);
       setMediaPlayingId(prev => {
         if (prev && prev !== id) mediaPauseCallbacks.current.get(prev)?.();
@@ -191,6 +213,17 @@ export default function BookReader() {
     }
   };
 
+  // Open sidebar when the Layout-level tutorial overlay steps into a sidebar-targeting step
+  useEffect(() => {
+    const SIDEBAR_TARGETS = new Set(['#bf-toc-sidebar', '#bf-chapter-list', '#bf-progress-btn', '#bf-book-meta']);
+    const handler = (e: Event) => {
+      const step = (e as CustomEvent).detail;
+      if (step?.target && SIDEBAR_TARGETS.has(step.target)) setShowToc(true);
+    };
+    window.addEventListener('bf-tutorial-step', handler);
+    return () => window.removeEventListener('bf-tutorial-step', handler);
+  }, []);
+
   // Listen for mouseup events to detect text selection
   useEffect(() => {
     document.addEventListener('mouseup', handleTextSelection);
@@ -232,11 +265,20 @@ export default function BookReader() {
     if (chapterId) {
       loadChapter();
       highlightApplied.current = false;
+      // Reset completions ref so the new chapter starts clean (server data will repopulate)
+      chapterCompletionsRef.current = new Set();
       // Stop TTS when chapter changes
       if (ttsAudio) {
         ttsAudio.pause();
         ttsAudio.currentTime = 0;
         setTtsPlaying(false);
+        const mark = ttsHighlightRef.current;
+        if (mark?.parentNode) {
+          while (mark.firstChild) mark.parentNode.insertBefore(mark.firstChild, mark);
+          mark.parentNode.removeChild(mark);
+        }
+        ttsHighlightRef.current = null;
+        ttsSegmentsRef.current = [];
       }
       // Record that this reader visited this chapter
       if (book) saveReadingProgress(chapterId);
@@ -350,6 +392,7 @@ export default function BookReader() {
   }
 
   async function loadChapter() {
+    setChapterLoading(true);
     try {
       const [chapterData, contentData] = await Promise.all([
         api.getChapter(chapterId!),
@@ -359,6 +402,8 @@ export default function BookReader() {
       setInlineContent(contentData);
     } catch (err) {
       console.error('Failed to load chapter:', err);
+    } finally {
+      setChapterLoading(false);
     }
   }
 
@@ -390,16 +435,18 @@ export default function BookReader() {
   useEffect(() => {
     if (!chapterId || !bookId || book === null) return;
     if (!progressEnabled) {
+      chapterCompletionsRef.current = new Set();
       setChapterCompletions(new Set());
-      setChapterProgressTotal(0);
+      chapterProgressTotalRef.current = 0;
       return;
     }
     Promise.all([
       api.getChapterProgress(chapterId),
       api.getBookProgress(bookId),
     ]).then(([chapProg, bookProg]) => {
-      setChapterCompletions(new Set(chapProg.completions));
-      setChapterProgressTotal(chapProg.total);
+      const freshSet = new Set<string>(chapProg.completions);
+      chapterCompletionsRef.current = freshSet;
+      setChapterCompletions(freshSet);
       chapterProgressTotalRef.current = chapProg.total;
       const statsMap = new Map<string, { completed: number; total: number }>();
       bookProg.forEach(s => statsMap.set(s.chapter_id, { completed: s.completed, total: s.total }));
@@ -409,15 +456,13 @@ export default function BookReader() {
 
   const markComplete = useCallback(async (itemKey: string, itemType: string) => {
     if (!progressEnabled || !chapterId) return;
-    // Use functional update to check against latest set, avoiding stale closure
-    let alreadyDone = false;
-    setChapterCompletions(prev => {
-      if (prev.has(itemKey)) { alreadyDone = true; return prev; }
-      return new Set([...prev, itemKey]);
-    });
-    if (alreadyDone) return;
+    // Synchronous guard via ref — avoids the stale-closure problem with functional setState
+    if (chapterCompletionsRef.current.has(itemKey)) return;
+    chapterCompletionsRef.current = new Set([...chapterCompletionsRef.current, itemKey]);
+    setChapterCompletions(new Set(chapterCompletionsRef.current));
     try {
       await api.markItemComplete(chapterId, itemKey, itemType);
+      // Increment the chapter's completed count in the book stats map
       setBookChapterStats(prev => {
         const m = new Map(prev);
         const total = chapterProgressTotalRef.current;
@@ -426,6 +471,22 @@ export default function BookReader() {
         return m;
       });
     } catch (e) { console.error('[Progress] markComplete failed:', e); }
+  }, [progressEnabled, chapterId]);
+
+  const markIncomplete = useCallback((itemKey: string) => {
+    if (!progressEnabled || !chapterId) return;
+    const wasComplete = chapterCompletionsRef.current.has(itemKey);
+    chapterCompletionsRef.current = new Set([...chapterCompletionsRef.current].filter(k => k !== itemKey));
+    setChapterCompletions(new Set(chapterCompletionsRef.current));
+    if (wasComplete) {
+      setBookChapterStats(prev => {
+        const m = new Map(prev);
+        const s = m.get(chapterId);
+        if (s) m.set(chapterId, { ...s, completed: Math.max(0, s.completed - 1) });
+        return m;
+      });
+    }
+    api.markItemIncomplete(chapterId, itemKey).catch(e => console.error('[Progress] markIncomplete failed:', e));
   }, [progressEnabled, chapterId]);
 
   const currentChapterIndex = useMemo(() => {
@@ -442,6 +503,14 @@ export default function BookReader() {
       ttsAudio.pause();
       ttsAudio.currentTime = 0;
       setTtsPlaying(false);
+      // Clear highlight
+      const mark = ttsHighlightRef.current;
+      if (mark?.parentNode) {
+        while (mark.firstChild) mark.parentNode.insertBefore(mark.firstChild, mark);
+        mark.parentNode.removeChild(mark);
+      }
+      ttsHighlightRef.current = null;
+      ttsSegmentsRef.current = [];
       return;
     }
 
@@ -504,18 +573,137 @@ export default function BookReader() {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
 
+      // Build sentence segments once duration is known
+      audio.addEventListener('loadedmetadata', () => {
+        const duration = audio.duration || 1;
+        // Split into sentences — break on '. ', '! ', '? ', or '\n'
+        const sentenceRe = /[^.!?\n]+[.!?\n]*/g;
+        const sentences: { text: string; charStart: number; charEnd: number }[] = [];
+        let match;
+        while ((match = sentenceRe.exec(text)) !== null) {
+          const t = match[0].trim();
+          if (t.length > 0) sentences.push({ text: t, charStart: match.index, charEnd: match.index + match[0].length });
+        }
+        if (sentences.length === 0) sentences.push({ text, charStart: 0, charEnd: text.length });
+
+        const totalChars = text.length;
+        ttsSegmentsRef.current = sentences.map(s => ({
+          ...s,
+          timeStart: (s.charStart / totalChars) * duration,
+          timeEnd: (s.charEnd / totalChars) * duration,
+        }));
+      });
+
+      // Clear any existing highlight
+      function clearHighlight() {
+        if (ttsHighlightRef.current) {
+          const mark = ttsHighlightRef.current;
+          const parent = mark.parentNode;
+          if (parent) {
+            while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+            parent.removeChild(mark);
+          }
+          ttsHighlightRef.current = null;
+        }
+      }
+
+      // Highlight the sentence whose time window contains currentTime
+      audio.addEventListener('timeupdate', () => {
+        const t = audio.currentTime;
+        const segs = ttsSegmentsRef.current;
+        if (!segs.length) return;
+        const seg = segs.find(s => t >= s.timeStart && t < s.timeEnd) ?? null;
+        if (!seg) return;
+
+        // Find text nodes in .reader-content that contain this sentence
+        const container = document.querySelector('.reader-content');
+        if (!container) return;
+
+        // Walk all text nodes and find where the sentence text starts
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        let node: Text | null;
+        let accumulated = '';
+        let found = false;
+
+        // Build a flat list of text nodes + their cumulative char offsets
+        const textNodes: { node: Text; start: number; end: number }[] = [];
+        while ((node = walker.nextNode() as Text | null)) {
+          const start = accumulated.length;
+          accumulated += node.textContent ?? '';
+          textNodes.push({ node, start, end: accumulated.length });
+        }
+
+        // The sentence charStart/charEnd are relative to `text` (extracted).
+        // The DOM accumulated text may differ (extra whitespace, etc).
+        // Use a fuzzy search: find the first node where the sentence text appears.
+        const segText = seg.text.replace(/\s+/g, ' ').trim();
+        const accNorm = accumulated.replace(/\s+/g, ' ');
+        const pos = accNorm.indexOf(segText, Math.max(0, seg.charStart - 50));
+        if (pos === -1) return; // can't locate — skip highlight
+
+        const segEnd = pos + segText.length;
+
+        // Find start node + offset
+        let startNode: Text | null = null, startOffset = 0;
+        let endNode: Text | null = null, endOffset = 0;
+
+        // Re-walk with normalized offsets (map from accNorm pos to actual node)
+        // Rebuild with normalised lengths per node
+        let normAcc = 0;
+        for (const tn of textNodes) {
+          const nodeText = (tn.node.textContent ?? '').replace(/\s+/g, ' ');
+          const nodeStart = normAcc;
+          const nodeEnd = normAcc + nodeText.length;
+
+          if (!startNode && pos < nodeEnd) {
+            startNode = tn.node;
+            startOffset = Math.min(pos - nodeStart, (tn.node.textContent ?? '').length);
+          }
+          if (!endNode && segEnd <= nodeEnd) {
+            endNode = tn.node;
+            endOffset = Math.min(segEnd - nodeStart, (tn.node.textContent ?? '').length);
+            found = true;
+          }
+          normAcc = nodeEnd;
+          if (found) break;
+        }
+
+        if (!startNode || !endNode) return;
+
+        clearHighlight();
+        try {
+          const range = document.createRange();
+          range.setStart(startNode, startOffset);
+          range.setEnd(endNode, endOffset);
+
+          const mark = document.createElement('mark');
+          mark.className = 'tts-highlight';
+          range.surroundContents(mark);
+          ttsHighlightRef.current = mark;
+          // Scroll into view if needed
+          mark.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch {
+          // Range may span multiple nodes — skip highlighting this segment
+        }
+      });
+
       audio.onended = () => {
+        clearHighlight();
+        ttsSegmentsRef.current = [];
+        ttsAudioRef.current = null;
         setTtsPlaying(false);
         URL.revokeObjectURL(audioUrl);
       };
 
       audio.onerror = () => {
+        clearHighlight();
         setTtsPlaying(false);
         URL.revokeObjectURL(audioUrl);
         alert('Failed to play audio');
       };
 
       setTtsAudio(audio);
+      ttsAudioRef.current = audio;
       await audio.play();
       setTtsPlaying(true);
     } catch (err) {
@@ -549,7 +737,7 @@ export default function BookReader() {
   return (
     <div className="min-h-screen bg-surface-hover flex">
       {/* Table of Contents Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 w-72 bg-surface border-r border-theme transform transition-transform z-20 ${
+      <aside id="bf-toc-sidebar" className={`fixed inset-y-0 left-0 w-72 bg-surface border-r border-theme transform transition-transform z-20 ${
         showToc ? 'translate-x-0' : '-translate-x-full'
       } lg:relative lg:translate-x-0`}>
         <div className="h-full flex flex-col">
@@ -577,7 +765,7 @@ export default function BookReader() {
             </div>
           </div>
 
-          <div className="p-4">
+          <div id="bf-book-meta" className="p-4">
             <h2 className="font-bold text-lg">{book.title}</h2>
             {book.subtitle && <p className="text-sm text-muted">{book.subtitle}</p>}
             <p className="text-sm text-muted mt-1">by {book.author?.display_name}</p>
@@ -597,14 +785,34 @@ export default function BookReader() {
             {progressEnabled && (() => {
               const totalDone = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.completed, 0);
               const totalItems = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.total, 0);
+              const chapterStat = chapterId ? bookChapterStats.get(chapterId) : undefined;
+              const chapterAllDone = chapterStat && chapterStat.total > 0 && chapterStat.completed >= chapterStat.total;
               return (
-                <button
-                  onClick={() => setShowProgressPanel(true)}
-                  className="mt-3 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme text-sm text-muted hover:bg-surface-hover hover:text-theme transition-colors"
-                >
-                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                  <span>Progress — {totalDone}/{totalItems}</span>
-                </button>
+                <div className="mt-3">
+                  <button
+                    id="bf-progress-btn"
+                    onClick={() => setShowProgressPanel(v => !v)}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      chapterAllDone
+                        ? 'border-2 border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-semibold hover:bg-green-100 dark:hover:bg-green-900'
+                        : 'border border-theme text-muted hover:bg-surface-hover hover:text-theme'
+                    }`}
+                  >
+                    <CheckCircle className={`h-4 w-4 shrink-0 ${chapterAllDone ? 'text-green-600' : 'text-green-500'}`} />
+                    <span className="flex-1 text-left">Progress</span>
+                    <span className={`text-xs font-semibold ${chapterAllDone ? 'text-green-600' : 'text-blue-500'}`}>
+                      {totalItems > 0 ? `${Math.round((totalDone / totalItems) * 100)}%` : '—'}
+                    </span>
+                  </button>
+                  {totalItems > 0 && (
+                    <div className="mt-1.5 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${chapterAllDone ? 'bg-green-500' : 'bg-blue-500'}`}
+                        style={{ width: `${Math.round((totalDone / totalItems) * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })()}
 
@@ -623,28 +831,44 @@ export default function BookReader() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <nav className="px-2">
+            <nav id="bf-chapter-list" className="px-2">
               {book.chapters?.map((ch, index) => {
                 const stat = progressEnabled ? bookChapterStats.get(ch.id) : null;
                 const chDone = stat && stat.total > 0 && stat.completed >= stat.total;
+                const pct = stat && stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0;
                 return (
-                  <Link
-                    key={ch.id}
-                    to={`/book/${bookId}/chapter/${ch.id}`}
-                    onClick={() => setShowToc(false)}
-                    className={`flex items-center px-3 py-2 rounded text-sm ${
-                      ch.id === chapterId
-                        ? 'bg-primary-100 text-primary-700 font-medium'
-                        : 'text-theme hover:bg-surface-hover'
-                    }`}
-                  >
-                    <span className="flex-1 min-w-0 truncate">{index + 1}. {ch.title}</span>
-                    {stat && stat.total > 0 && (
-                      <span className={`ml-2 shrink-0 text-xs font-medium ${chDone ? 'text-green-500' : 'text-muted'}`}>
-                        {chDone ? '✓' : `${stat.completed}/${stat.total}`}
-                      </span>
+                  <div key={ch.id}>
+                    <Link
+                      to={`/book/${bookId}/chapter/${ch.id}`}
+                      onClick={() => setShowToc(false)}
+                      className={`flex items-center px-3 py-2 rounded text-sm ${
+                        ch.id === chapterId
+                          ? 'bg-primary-100 text-primary-700 font-medium'
+                          : 'text-theme hover:bg-surface-hover'
+                      }`}
+                    >
+                      <span className="flex-1 min-w-0 truncate">{index + 1}. {ch.title}</span>
+                      {stat && stat.total > 0 && (
+                        <span className={`ml-2 shrink-0 text-xs font-medium ${chDone ? 'text-green-500' : 'text-muted'}`}>
+                          {chDone ? '✓' : `${stat.completed}/${stat.total}`}
+                        </span>
+                      )}
+                    </Link>
+                    {showProgressPanel && stat && stat.total > 0 && (
+                      <div className="mx-3 mb-2 mt-0.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted">{stat.completed}/{stat.total} items</span>
+                          <span className={`text-xs font-semibold ${chDone ? 'text-green-500' : 'text-blue-500'}`}>{pct}%</span>
+                        </div>
+                        <div className="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${chDone ? 'bg-green-500' : 'bg-blue-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
                     )}
-                  </Link>
+                  </div>
                 );
               })}
             </nav>
@@ -700,7 +924,9 @@ export default function BookReader() {
               </p>
             </div>
             {/* TTS Button — shown to logged-in users always, or to public readers only if author enabled it */}
-            {(user || settings?.allow_public_tts) && <button
+            <button
+              id="bf-tts-btn"
+              style={{ display: (user || settings?.allow_public_tts) ? undefined : 'none' }}
               onClick={handlePlayTTS}
               disabled={ttsLoading || !chapter}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -726,7 +952,7 @@ export default function BookReader() {
                   <span className="hidden sm:inline">Listen</span>
                 </>
               )}
-            </button>}
+            </button>
             {/* Edit button — visible to book author only */}
             {isAuthor && chapterId && (
               <Link
@@ -751,16 +977,99 @@ export default function BookReader() {
         />
 
         {/* Chapter Content */}
-        {chapter ? (
+        {chapterLoading ? (
+          <article className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
+            <div className="h-9 bg-gray-200 dark:bg-gray-700 rounded-lg w-2/3 mb-8" />
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-11/12" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/5" />
+            </div>
+            <div className="mt-6 space-y-3">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-11/12" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6" />
+            </div>
+            <div className="mt-6 space-y-3">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-10/12" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+            </div>
+          </article>
+        ) : chapter ? (
           <MediaContext.Provider value={mediaCtx}>
-          <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, enabled: progressEnabled }}>
+          <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
             <h1 className="text-3xl font-bold mb-6">{chapter.title}</h1>
 
             {/* Start of Chapter Content */}
             <StartOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} />
 
-            <div className="reader-content text-lg text-theme leading-relaxed">
+            <div
+              className={`reader-content text-lg text-theme leading-relaxed${ttsPlaying ? ' tts-active' : ''}`}
+              onClick={ttsPlaying ? (e) => {
+                const segs = ttsSegmentsRef.current;
+                const audio = ttsAudio;
+                if (!segs.length || !audio) return;
+
+                // Find the text node + offset at the click point
+                let clickedNode: Text | null = null;
+                let clickedOffset = 0;
+                const pt = { x: e.clientX, y: e.clientY };
+
+                // Standard (Chrome/Safari)
+                if (document.caretRangeFromPoint) {
+                  const r = document.caretRangeFromPoint(pt.x, pt.y);
+                  if (r?.startContainer.nodeType === Node.TEXT_NODE) {
+                    clickedNode = r.startContainer as Text;
+                    clickedOffset = r.startOffset;
+                  }
+                // Firefox
+                } else if ((document as any).caretPositionFromPoint) {
+                  const cp = (document as any).caretPositionFromPoint(pt.x, pt.y);
+                  if (cp?.offsetNode?.nodeType === Node.TEXT_NODE) {
+                    clickedNode = cp.offsetNode as Text;
+                    clickedOffset = cp.offset;
+                  }
+                }
+
+                if (!clickedNode) return;
+
+                // Walk all text nodes in reader-content to find the global char offset
+                const container = document.querySelector('.reader-content');
+                if (!container) return;
+                const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+                let globalOffset = 0;
+                let node: Text | null;
+                while ((node = walker.nextNode() as Text | null)) {
+                  if (node === clickedNode) {
+                    globalOffset += clickedOffset;
+                    break;
+                  }
+                  globalOffset += (node.textContent ?? '').length;
+                }
+
+                // Find the segment whose char range contains this offset
+                // Normalise: segments use charStart/charEnd from extracted text;
+                // globalOffset is from the DOM text which may have more whitespace.
+                // Use ratio: globalOffset / totalDomChars → proportion → seek
+                const totalDomChars = (() => {
+                  let n = 0;
+                  const w2 = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+                  let nd: Text | null;
+                  while ((nd = w2.nextNode() as Text | null)) n += (nd.textContent ?? '').length;
+                  return n || 1;
+                })();
+                const ratio = Math.min(1, globalOffset / totalDomChars);
+                const targetTime = ratio * (audio.duration || 1);
+
+                audio.currentTime = targetTime;
+                if (audio.paused) audio.play();
+              } : undefined}
+            >
               <ChapterContent
                 content={chapter.content}
                 contentText={chapter.content_text}
@@ -814,58 +1123,19 @@ export default function BookReader() {
         )}
       </main>
 
-      {/* Progress Panel slide-over */}
-      {showProgressPanel && (
-        <div className="fixed inset-0 z-30 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowProgressPanel(false)} />
-          <div className="relative ml-auto w-80 h-full bg-surface shadow-xl flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-theme">
-              <h3 className="font-semibold text-theme">My Progress</h3>
-              <button onClick={() => setShowProgressPanel(false)} className="text-muted hover:text-theme">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {book.chapters?.map((ch, index) => {
-                const stat = bookChapterStats.get(ch.id);
-                const done = stat ? stat.completed : 0;
-                const total = stat ? stat.total : 0;
-                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                const isComplete = total > 0 && done >= total;
-                return (
-                  <div key={ch.id} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className={`flex-1 min-w-0 truncate ${ch.id === chapterId ? 'font-semibold text-accent' : 'text-theme'}`}>
-                        {index + 1}. {ch.title}
-                      </span>
-                      <span className={`ml-2 shrink-0 text-xs font-medium ${isComplete ? 'text-green-500' : 'text-muted'}`}>
-                        {total === 0 ? '—' : isComplete ? '✓ Done' : `${done}/${total}`}
-                      </span>
-                    </div>
-                    {total > 0 && (
-                      <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${isComplete ? 'bg-green-500' : 'bg-accent'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Inline Content Panel */}
       {activeContent && (
-        <InlineContentPanel
-          content={activeContent}
-          onClose={() => setActiveContent(null)}
-          isAuthor={isAuthor}
-          userId={user?.id}
-        />
+        <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
+          <MediaContext.Provider value={mediaCtx}>
+            <InlineContentPanel
+              content={activeContent}
+              onClose={() => setActiveContent(null)}
+              isAuthor={isAuthor}
+              userId={user?.id}
+            />
+          </MediaContext.Provider>
+        </ProgressContext.Provider>
       )}
 
       {/* Reader Text Selection Toolbar */}
@@ -912,6 +1182,7 @@ export default function BookReader() {
           isAuthor={isAuthor}
         />
       )}
+
     </div>
   );
 }
@@ -1549,36 +1820,44 @@ function QuestionBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as QuestionData;
   const [answer, setAnswer] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markCompleteRef = useRef(markComplete);
+  markCompleteRef.current = markComplete;
+  const markIncompleteRef = useRef(markIncomplete);
+  markIncompleteRef.current = markIncomplete;
 
   // Load existing answer on mount
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyQuestionAnswer(content.id)
-      .then(r => { if (r?.answer_text) setAnswer(r.answer_text); })
+      .then(r => {
+        const text = r?.answer_text ?? '';
+        setAnswer(text);
+      })
       .catch(() => {});
   }, [content.id]);
 
   const save = useCallback(async (text: string) => {
-    if (!text.trim()) return;
     setSaveStatus('saving');
     try {
       await api.answerQuestion(content.id, { answer_text: text });
       setSaveStatus('saved');
-      markComplete(itemKey, 'question');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch {
       setSaveStatus('error');
     }
-  }, [content.id, itemKey, markComplete]);
+  }, [content.id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setAnswer(val);
     setSaveStatus('idle');
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    // Update progress immediately — don't wait for debounced save
+    if (val.trim()) markComplete(itemKey, 'question');
+    else markIncomplete(itemKey);
     saveTimer.current = setTimeout(() => save(val), 1000);
   };
 
@@ -1615,7 +1894,7 @@ function QuestionBlock({ content }: { content: InlineContent }) {
 function MediaBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const { requestPlay, requestPip, clearPlay, clearPip } = useContext(MediaContext);
   const mediaId = `media:${content.id}`;
   const itemKey = `ic:${content.id}`;
@@ -1726,15 +2005,42 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
         {/* Embed (YouTube/Vimeo) */}
         {!isAudio && embedUrl && (
-          <div className="aspect-video w-full">
-            <iframe
-              src={embedUrl}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={data.title || 'Video'}
-            />
-          </div>
+          <>
+            <div className="aspect-video w-full">
+              <iframe
+                src={embedUrl}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={data.title || 'Video'}
+              />
+            </div>
+            {/* Manual completion for embeds — iframes can't report playback position */}
+            {progressEnabled && (
+              <div className="flex items-center justify-end px-3 py-2 border-t border-[var(--color-border)]">
+                {completions.has(itemKey) ? (
+                  <button
+                    onClick={() => { markIncomplete(itemKey); }}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 hover:bg-red-50 dark:bg-green-950 dark:hover:bg-red-950 text-green-600 hover:text-red-600 dark:text-green-400 dark:hover:text-red-400 transition-colors group"
+                    title="Click to mark as not watched"
+                  >
+                    <svg className="h-3.5 w-3.5 group-hover:hidden" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                    <svg className="h-3.5 w-3.5 hidden group-hover:block" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/></svg>
+                    <span className="group-hover:hidden">Watched</span>
+                    <span className="hidden group-hover:inline">Mark as not watched</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { markComplete(itemKey, 'video'); }}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-400 transition-colors"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                    Mark as watched
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {/* Native video with custom controls */}
@@ -2332,7 +2638,7 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
   useEffect(() => {
     if (!userId) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value) { setValue(r.response_data.value); markComplete(itemKey, 'form'); }
+      if (r?.response_data?.value) { setValue(r.response_data.value); }
     }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
@@ -2340,9 +2646,10 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
   const handleChange = (newValue: string) => {
     setValue(newValue);
     if (!userId) return;
+    if (newValue) markComplete(itemKey, 'form');
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
 
@@ -2383,13 +2690,14 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+      const val = r?.response_data?.value;
+      if (val?.length > 0) { setSelected(val); }
     }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
@@ -2398,9 +2706,11 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
     const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     setSelected(newSelected);
     if (!userId) return;
+    // Update progress immediately
+    if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newSelected })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
 
@@ -2451,21 +2761,26 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      const val = r?.response_data?.value ?? '';
+      setValue(val);
+    }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
   const handleChange = (newValue: string) => {
     setValue(newValue);
     if (!userId) return;
+    // Update progress immediately
+    if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
 
@@ -2509,12 +2824,15 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
-    api.getMyFormResponse(content.id).then(r => { if (r?.response_data?.value !== undefined) setValue(r.response_data.value); }).catch(() => {});
+    api.getMyFormResponse(content.id).then(r => {
+      const val = r?.response_data?.value ?? '';
+      setValue(val);
+    }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
 
@@ -2533,9 +2851,11 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
       e.target.style.height = e.target.scrollHeight + 'px';
     }
     if (!userId) return;
+    // Update progress immediately
+    if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newValue })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
 
@@ -2590,12 +2910,9 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
       .then(r => {
         if (r?.response_data?.value) {
           setSelected(r.response_data.value);
-          markComplete(itemKey, 'form');
         } else if (data.default_value && data.options?.length === 1) {
-          // Single option pre-selected — auto-save and mark complete
-          api.submitFormResponse(content.id, { value: data.default_value })
-            .then(() => markComplete(itemKey, 'form'))
-            .catch(() => {});
+          // Single option pre-selected — auto-save
+          api.submitFormResponse(content.id, { value: data.default_value }).catch(() => {});
         }
       })
       .catch(() => {});
@@ -2605,9 +2922,10 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
   const handleChange = (optId: string) => {
     setSelected(optId);
     if (!userId) return;
+    markComplete(itemKey, 'form');
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: optId })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
 
@@ -2659,13 +2977,14 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [allResponses, setAllResponses] = useState<AllFormResponsesResult | null>(null);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!userId) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+      const val = r?.response_data?.value;
+      if (val?.length > 0) { setSelected(val); }
     }).catch(() => {});
     if (isAuthor) api.getAllFormResponses(content.id).then(setAllResponses).catch(() => {});
   }, [content.id, userId, isAuthor]);
@@ -2674,9 +2993,11 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
     const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     setSelected(newSelected);
     if (!userId) return;
+    // Update progress immediately
+    if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
     api.submitFormResponse(content.id, { value: newSelected })
-      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); markComplete(itemKey, 'form'); })
+      .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
 
@@ -2824,7 +3145,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
   const { requestPlay, clearPlay } = useContext(MediaContext);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
   const mediaId = `inline:${content.id}`;
@@ -2891,7 +3212,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
     return (
       <span className="block w-full rounded-xl overflow-hidden border border-[var(--color-border)] my-1">
         <span className="block aspect-video bg-[var(--color-surface-hover)]">
-          <iframe src={embedUrl} className="w-full h-full"
+          <iframe src={embedUrl} className="w-full h-full rounded-xl"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen title={data.title || 'Video'} />
         </span>
@@ -2903,13 +3224,13 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   return (
     <span className="block w-full rounded-xl overflow-hidden my-1 border border-[var(--color-border)] bg-[var(--color-surface)]">
       {!isAudio && (
-        <span className="block relative group bg-[var(--color-surface-hover)] p-2">
+        <span className="block relative group bg-black">
           <video
             ref={mediaRef as React.RefObject<HTMLVideoElement>}
             src={data.url}
             preload="metadata"
-            className="w-full block rounded-lg"
-            style={{ maxHeight: '320px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)' }}
+            className="w-full block"
+            style={{ maxHeight: '320px', objectFit: 'contain', display: 'block', background: '#000' }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
             onPlay={() => setPlaying(true)}
@@ -3006,10 +3327,9 @@ function InlineSelect({ content }: { content: InlineContent }) {
 
   const handleChange = (newValue: string) => {
     setValue(newValue);
+    if (newValue) markComplete(itemKey, 'form');
     if (!api.getToken()) return;
-    api.submitFormResponse(content.id, { value: newValue })
-      .then(() => markComplete(itemKey, 'form'))
-      .catch(() => {});
+    api.submitFormResponse(content.id, { value: newValue }).catch(() => {});
   };
 
   return (
@@ -3035,23 +3355,22 @@ function InlineSelect({ content }: { content: InlineContent }) {
 function InlineMultiselect({ content }: { content: InlineContent }) {
   const data = content.content_data as MultiselectData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+      if (r?.response_data?.value) { setSelected(r.response_data.value); }
     }).catch(() => {});
   }, [content.id]);
 
   const toggleOption = (id: string) => {
     const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     setSelected(newSelected);
+    if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     if (!api.getToken()) return;
-    api.submitFormResponse(content.id, { value: newSelected })
-      .then(() => markComplete(itemKey, 'form'))
-      .catch(() => {});
+    api.submitFormResponse(content.id, { value: newSelected }).catch(() => {});
   };
 
   return (
@@ -3083,25 +3402,25 @@ const FIELD_WIDTH_STYLE: Record<string, React.CSSProperties> = {
 function InlineTextbox({ content }: { content: InlineContent }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value !== undefined) { setValue(r.response_data.value); markComplete(itemKey, 'form'); }
+      const val = r?.response_data?.value ?? '';
+      setValue(val);
     }).catch(() => {});
   }, [content.id]);
 
   const handleChange = (newValue: string) => {
     setValue(newValue);
+    if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     if (!api.getToken()) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      api.submitFormResponse(content.id, { value: newValue })
-        .then(() => markComplete(itemKey, 'form'))
-        .catch(() => {});
+      api.submitFormResponse(content.id, { value: newValue }).catch(() => {});
     }, 600);
   };
 
@@ -3148,7 +3467,7 @@ function InlineTextbox({ content }: { content: InlineContent }) {
 function InlineTextarea({ content }: { content: InlineContent }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
   const isFull = (data.width ?? 'full') === 'full';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -3157,7 +3476,8 @@ function InlineTextarea({ content }: { content: InlineContent }) {
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value !== undefined) { setValue(r.response_data.value); markComplete(itemKey, 'form'); }
+      const val = r?.response_data?.value ?? '';
+      setValue(val);
     }).catch(() => {});
   }, [content.id]);
 
@@ -3168,14 +3488,13 @@ function InlineTextarea({ content }: { content: InlineContent }) {
       e.target.style.height = 'auto';
       e.target.style.height = e.target.scrollHeight + 'px';
     }
+    if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     if (!api.getToken()) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      api.submitFormResponse(content.id, { value: newValue })
-        .then(() => markComplete(itemKey, 'form'))
-        .catch(() => {});
+      api.submitFormResponse(content.id, { value: newValue }).catch(() => {});
     }, 600);
-  }, [data.auto_expand, content.id, itemKey, markComplete]);
+  }, [data.auto_expand, content.id, itemKey, markComplete, markIncomplete]);
 
   // Set initial height when auto_expand is on
   useEffect(() => {
@@ -3236,16 +3555,15 @@ function InlineRadio({ content }: { content: InlineContent }) {
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+      if (r?.response_data?.value) { setSelected(r.response_data.value); }
     }).catch(() => {});
   }, [content.id]);
 
   const handleChange = (optId: string) => {
     setSelected(optId);
+    markComplete(itemKey, 'form');
     if (!api.getToken()) return;
-    api.submitFormResponse(content.id, { value: optId })
-      .then(() => markComplete(itemKey, 'form'))
-      .catch(() => {});
+    api.submitFormResponse(content.id, { value: optId }).catch(() => {});
   };
 
   return (
@@ -3271,23 +3589,22 @@ function InlineRadio({ content }: { content: InlineContent }) {
 function InlineCheckbox({ content }: { content: InlineContent }) {
   const data = content.content_data as CheckboxData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
-  const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
     if (!api.getToken()) return;
     api.getMyFormResponse(content.id).then(r => {
-      if (r?.response_data?.value) { setSelected(r.response_data.value); markComplete(itemKey, 'form'); }
+      if (r?.response_data?.value) { setSelected(r.response_data.value); }
     }).catch(() => {});
   }, [content.id]);
 
   const toggleOption = (id: string) => {
     const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     setSelected(newSelected);
+    if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     if (!api.getToken()) return;
-    api.submitFormResponse(content.id, { value: newSelected })
-      .then(() => markComplete(itemKey, 'form'))
-      .catch(() => {});
+    api.submitFormResponse(content.id, { value: newSelected }).catch(() => {});
   };
 
   return (

@@ -376,11 +376,14 @@ export const colorSchemes = {
 } as const;
 
 export type ColorSchemeKey = keyof typeof colorSchemes;
+export type CoverSize = 'small' | 'medium' | 'large';
 
 interface ThemeContextType {
   colorScheme: ColorSchemeKey;
   setColorScheme: (scheme: ColorSchemeKey) => void;
   isDark: boolean;
+  coverSize: CoverSize;
+  setCoverSize: (size: CoverSize) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -391,9 +394,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return (saved as ColorSchemeKey) || 'light-purple';
   });
 
+  const [coverSize, setCoverSizeState] = useState<CoverSize>(() => {
+    return (localStorage.getItem('bookflow-cover-size') as CoverSize) || 'medium';
+  });
+
   const setColorScheme = (scheme: ColorSchemeKey) => {
     setColorSchemeState(scheme);
     localStorage.setItem('bookflow-color-scheme', scheme);
+  };
+
+  const setCoverSize = (size: CoverSize) => {
+    setCoverSizeState(size);
+    localStorage.setItem('bookflow-cover-size', size);
   };
 
   // Apply theme CSS variables
@@ -425,7 +437,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const isDark = colorSchemes[colorScheme].mode === 'dark';
 
   return (
-    <ThemeContext.Provider value={{ colorScheme, setColorScheme, isDark }}>
+    <ThemeContext.Provider value={{ colorScheme, setColorScheme, isDark, coverSize, setCoverSize }}>
       {children}
     </ThemeContext.Provider>
   );

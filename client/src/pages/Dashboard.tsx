@@ -141,12 +141,13 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+      <div id="bf-dash-header" className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-theme theme-title">My Books</h1>
           <p className="text-muted mt-1">Create and manage your interactive books</p>
         </div>
         <button
+          id="bf-new-book-btn"
           onClick={() => setShowNewBookModal(true)}
           className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium self-start sm:self-auto"
         >
@@ -161,7 +162,7 @@ export default function Dashboard() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong"></div>
         </div>
       ) : books.length === 0 ? (
-        <div className="text-center py-12 theme-section border-dashed">
+        <div id="bf-dash-empty" className="text-center py-12 theme-section border-dashed">
           <BookOpen className="h-12 w-12 text-muted mx-auto mb-4" />
           <h3 className="text-lg font-medium text-theme mb-2">No books yet</h3>
           <p className="text-muted mb-4">Get started by creating your first book</p>
@@ -174,7 +175,7 @@ export default function Dashboard() {
           </button>
         </div>
       ) : (
-        <div className={`grid gap-4 ${gridClass[coverSize]}`}>
+        <div id="bf-dash-books-grid" className={`grid gap-4 ${gridClass[coverSize]}`}>
           {books.map((book) => (
             <BookCard
               key={book.id}
@@ -190,7 +191,7 @@ export default function Dashboard() {
 
       {/* Collaborating Books */}
       {collaboratingBooks.length > 0 && (
-        <div className="mt-10">
+        <div id="bf-dash-collab" className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-5 w-5 text-accent" />
             <h2 className="text-lg font-semibold text-theme">Collaborating On</h2>
@@ -257,7 +258,7 @@ export default function Dashboard() {
       )}
 
       {/* Book Clubs */}
-      <div className="mt-10">
+      <div id="bf-dash-clubs" className="mt-10">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-accent" />

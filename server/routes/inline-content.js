@@ -329,6 +329,7 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
     }
 
     const { data, error } = await supabase
+      .schema('bookflow')
       .from('poll_responses')
       .upsert({
         inline_content_id: req.params.id,
@@ -342,6 +343,7 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
 
     // Get poll results
     const { data: results } = await supabase
+      .schema('bookflow')
       .from('poll_responses')
       .select('selected_option')
       .eq('inline_content_id', req.params.id);
@@ -366,6 +368,7 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
 router.get('/polls/:id/results', optionalAuth, async (req, res) => {
   try {
     const { data: results } = await supabase
+      .schema('bookflow')
       .from('poll_responses')
       .select('selected_option')
       .eq('inline_content_id', req.params.id);
@@ -379,6 +382,7 @@ router.get('/polls/:id/results', optionalAuth, async (req, res) => {
     let userVote = null;
     if (req.user) {
       const { data: vote } = await supabase
+        .schema('bookflow')
         .from('poll_responses')
         .select('selected_option')
         .eq('inline_content_id', req.params.id)
@@ -405,6 +409,7 @@ router.post('/questions/:id/answer', authenticate, async (req, res) => {
   try {
     // Verify this is a question
     const { data: content, error: contentError } = await supabase
+      .schema('bookflow')
       .from('inline_content')
       .select('content_type, content_data')
       .eq('id', req.params.id)
@@ -429,6 +434,7 @@ router.post('/questions/:id/answer', authenticate, async (req, res) => {
     }
 
     const { data, error } = await supabase
+      .schema('bookflow')
       .from('question_answers')
       .upsert({
         inline_content_id: req.params.id,
@@ -454,6 +460,7 @@ router.post('/questions/:id/answer', authenticate, async (req, res) => {
 router.get('/questions/:id/my-answer', authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
+      .schema('bookflow')
       .from('question_answers')
       .select('answer_text, selected_options, is_correct')
       .eq('inline_content_id', req.params.id)
@@ -470,6 +477,7 @@ router.get('/questions/:id/my-answer', authenticate, async (req, res) => {
 router.get('/books/:bookId/my-answers', authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
+      .schema('bookflow')
       .from('question_answers')
       .select(`
         *,

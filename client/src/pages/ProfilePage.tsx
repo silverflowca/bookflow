@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   User, BookOpen, Users, BarChart2, MapPin, Globe,
   Lock, Eye, EyeOff, Edit2, Save, X, Check,
-  BookMarked, CheckCircle2
+  BookMarked, CheckCircle2, Mail, AtSign
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
@@ -12,6 +12,7 @@ interface ProfileData {
   profile: {
     id: string;
     display_name: string;
+    email?: string;
     avatar_url: string | null;
     bio: string | null;
     is_author: boolean;
@@ -163,6 +164,20 @@ export default function ProfilePage() {
               />
             ) : (
               <h1 className="text-2xl font-bold text-theme mb-1">{p.display_name}</h1>
+            )}
+
+            {/* Username + email (own profile only) */}
+            {isOwnProfile && !editing && (
+              <div className="flex flex-wrap items-center gap-3 mb-2 text-xs text-muted">
+                <span className="flex items-center gap-1">
+                  <AtSign className="h-3 w-3" />{p.display_name}
+                </span>
+                {p.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail className="h-3 w-3" />{p.email}
+                  </span>
+                )}
+              </div>
             )}
 
             {p.is_author && !editing && (

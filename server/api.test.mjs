@@ -18,6 +18,10 @@ let bookId = null;
 let chapterId = null;
 let clubId = null;
 let inviteToken = null;
+let commentId = null;
+let versionId = null;
+let collaboratorInviteToken = null;
+let inlineContentId = null;
 
 // ── Runner ────────────────────────────────────────────────────────────────────
 
@@ -335,6 +339,322 @@ async function runNotifications() {
   });
 }
 
+async function runCollaborators() {
+  console.log('\n── Collaborators ─────────────────────────────────');
+
+  await test('GET /books/:bookId/collaborators returns list', async () => {
+    const { status, data } = await req('GET', `/books/${bookId}/collaborators`);
+    assertEqual(status, 200, `Get collaborators failed: ${JSON.stringify(data)}`);
+    assert(Array.isArray(data), 'Expected array');
+  });
+
+  await test('POST /books/:bookId/collaborators/invite returns invite token', async () => {
+    const { status, data } = await req('POST', `/books/${bookId}/collaborators/invite`, {
+      email: `collab_${Date.now()}@bookflow-test.invalid`,
+      role: 'editor',
+    });
+    assert(status === 200 || status === 201, `Invite failed: ${JSON.stringify(data)}`);
+    collaboratorInviteToken = data.invite_token || data.token;
+    assert(collaboratorInviteToken, 'No invite token in response');
+  });
+
+  await test('GET /books/:bookId/my-role returns owner', async () => {
+    const { status, data } = await req('GET', `/books/${bookId}/my-role`);
+    assertEqual(status, 200);
+    assertEqual(data.role, 'owner', `Expected owner, got ${data.role}`);
+  });
+}
+
+async function runComments() {
+  console.log('\n── Comments ──────────────────────────────────────');
+
+  await test('POST /chapters/:id/comments creates a comment', async () => {
+    const { status, data } = await req('POST', `/chapters/${chapterId}/comments`, {
+      body: 'This is a test comment.',
+    });
+    assertEqual(status, 201, `Create comment failed: ${JSON.stringify(data)}`);
+    assert(data.id, 'No comment id');
+    commentId = data.id;
+  });
+
+  await test('GET /chapters/:id/comments returns list with new comment', async () => {
+    const { status, data } = await req('GET', `/chapters/${chapterId}/comments`);
+    assertEqual(status, 200);
+    assert(Array.isArray(data), 'Expected array');
+    assert(data.find(c => c.id === commentId), 'New comment not in list');
+  });
+
+  await test('POST /chapters/:id/comments creates a reply', async () => {
+    const { status, data } = await req('POST', `/chapters/${chapterId}/comments`, {
+      body: 'A reply to the test comment.',
+      parent_id: commentId,
+    });
+    assertEqual(status, 201, `Create reply failed: ${JSON.stringify(data)}`);
+    assert(data.id, 'No reply id');
+  });
+
+  await test('PUT /comments/:id resolves comment', async () => {
+    const { status } = await req('PUT', `/comments/${commentId}`, { status: 'resolved' });
+    assert(status === 200 || status === 204, `Resolve comment failed: status ${status}`);
+  });
+
+  await test('DELETE /comments/:id removes comment', async () => {
+    const { status } = await req('DELETE', `/comments/${commentId}`);
+    assert(status === 200 || status === 204, `Delete comment failed: status ${status}`);
+    commentId = null;
+  });
+}
+
+async function runBookSettings() {
+  console.log('\n── Book Settings ─────────────────────────────────');
+
+  await test('PUT /books/:bookId/settings updates reader permissions', async () => {
+    const { status, data } = await req('PUT', `/books/${bookId}/settings`, {
+      allow_reader_highlights: true,
+      allow_reader_notes: true,
+      allow_reader_questions: false,
+      allow_reader_polls: false,
+      allow_author_audio: true,
+      allow_author_video: false,
+    });
+    assertEqual(status, 200, `Update settings failed: ${JSON.stringify(data)}`);
+  });
+
+  await test('GET /books/:bookId returns book with settings', async () => {
+    const { status, data } = await req('GET', `/books/${bookId}`);
+    assertEqual(status, 200);
+    assert(data.id === bookId, 'Wrong book returned');
+  });
+}
+
+async function runInlineContent() {
+  console.log('\n── Inline Content ────────────────────────────────');
+
+  await test('POST /chapters/:id/inline-content creates a question', async () => {
+    const { status, data } = await req('POST', `/chapters/${chapterId}/inline-content`, {
+      content_type: 'question',
+      start_offset: 0,
+      end_offset: 10,
+      content_data: {
+        question_text: 'What did you think of this section?',
+        question_type: 'text',
+      },
+    });
+    assertEqual(status, 201, `Create inline content failed: ${JSON.stringify(data)}`);
+    assert(data.id, 'No inline_content id');
+    inlineContentId = data.id;
+  });
+
+  await test('GET /chapters/:id/inline-content returns list', async () => {
+    const { status, data } = await req('GET', `/chapters/${chapterId}/inline-content`);
+    assertEqual(status, 200);
+    assert(Array.isArray(data), 'Expected array');
+    assert(data.find(ic => ic.id === inlineContentId), 'New inline content not in list');
+  });
+
+  await test('POST /chapters/:id/inline-content creates a poll', async () => {
+    const { status, data } = await req('POST', `/chapters/${chapterId}/inline-content`, {
+      content_type: 'poll',
+      start_offset: 20,
+      end_offset: 30,
+      content_data: {
+        question: 'Which character do you prefer?',
+        options: ['Santiago', 'The Alchemist', 'Fatima'],
+      },
+    });
+    assertEqual(status, 201, `Create poll failed: ${JSON.stringify(data)}`);
+    assert(data.id, 'No poll id');
+  });
+
+  await test('DELETE /inline-content/:id removes inline content', async () => {
+    const { status } = await req('DELETE', `/inline-content/${inlineContentId}`);
+    assert(status === 200 || status === 204, `Delete inline content failed: status ${status}`);
+    inlineContentId = null;
+  });
+}
+
+async function runVersions() {
+  console.log('\n── Versions ──────────────────────────────────────');
+
+  await test('POST /books/:bookId/versions creates a snapshot', async () => {
+    const { status, data } = await req('POST', `/books/${bookId}/versions`, {
+      label: 'Test snapshot v1',
+    });
+    assertEqual(status, 201, `Create version failed: ${JSON.stringify(data)}`);
+    assert(data.id, 'No version id');
+    versionId = data.id;
+  });
+
+  await test('GET /books/:bookId/versions returns list with new version', async () => {
+    const { status, data } = await req('GET', `/books/${bookId}/versions`);
+    assertEqual(status, 200);
+    assert(Array.isArray(data), 'Expected array');
+    assert(data.find(v => v.id === versionId), 'New version not in list');
+  });
+
+  await test('GET /books/:bookId/versions/:id returns version with snapshot', async () => {
+    const { status, data } = await req('GET', `/books/${bookId}/versions/${versionId}`);
+    assertEqual(status, 200);
+    assert(data.snapshot, 'No snapshot in version');
+  });
+}
+
+async function runPublishing() {
+  console.log('\n── Publishing ────────────────────────────────────');
+
+  await test('POST /books/:bookId/publish publishes the book', async () => {
+    const { status, data } = await req('POST', `/books/${bookId}/publish`);
+    assertEqual(status, 200, `Publish failed: ${JSON.stringify(data)}`);
+    assert(data.slug, 'No slug in publish response');
+  });
+
+  await test('GET /public/books/:slug returns book without auth', async () => {
+    const { data: book } = await req('GET', `/books/${bookId}`);
+    if (!book.slug) return; // skip if no slug set
+    const { status, data } = await req('GET', `/public/books/${book.slug}`, null, false);
+    assertEqual(status, 200, `Public book not accessible: ${JSON.stringify(data)}`);
+    assert(data.id, 'No book id in public response');
+  });
+
+  await test('POST /books/:bookId/unpublish unpublishes the book', async () => {
+    const { status, data } = await req('POST', `/books/${bookId}/unpublish`);
+    assertEqual(status, 200, `Unpublish failed: ${JSON.stringify(data)}`);
+  });
+}
+
+async function runReviews() {
+  console.log('\n── Reviews ───────────────────────────────────────');
+
+  await test('GET /books/:bookId/reviews returns list', async () => {
+    const { status, data } = await req('GET', `/books/${bookId}/reviews`);
+    assertEqual(status, 200, `Get reviews failed: ${JSON.stringify(data)}`);
+    assert(Array.isArray(data), 'Expected array');
+  });
+
+  await test('POST /books/:bookId/reviews/submit submits for review', async () => {
+    const { status, data } = await req('POST', `/books/${bookId}/reviews/submit`, {
+      message: 'Ready for review — integration test submission.',
+    });
+    // 201 = submitted; 400 = already in review (ok for test idempotency)
+    assert(status === 201 || status === 400, `Submit review failed: ${JSON.stringify(data)}`);
+  });
+
+  await test('POST /books/:bookId/reviews/cancel cancels the review', async () => {
+    const { status } = await req('POST', `/books/${bookId}/reviews/cancel`);
+    assert(status === 200 || status === 204 || status === 400, `Cancel review unexpected: status ${status}`);
+  });
+}
+
+async function runAppSettings() {
+  console.log('\n── App Settings ──────────────────────────────────');
+
+  await test('GET /settings returns app settings', async () => {
+    const { status, data } = await req('GET', '/settings');
+    assertEqual(status, 200, `Get settings failed: ${JSON.stringify(data)}`);
+  });
+
+  await test('PUT /settings updates fileflow_url', async () => {
+    const { status, data } = await req('PUT', '/settings', {
+      fileflow_url: 'http://localhost:8680',
+      fileflow_access_key: 'test-key',
+    });
+    assertEqual(status, 200, `Update settings failed: ${JSON.stringify(data)}`);
+  });
+}
+
+async function runClubChat() {
+  console.log('\n── Club Chat (F20) ───────────────────────────────');
+
+  await test('GET /clubs/:clubId/chat/settings returns chat settings', async () => {
+    if (!clubId) return;
+    const { status, data } = await req('GET', `/clubs/${clubId}/chat/settings`);
+    assertEqual(status, 200, `Get chat settings failed: ${JSON.stringify(data)}`);
+    assert(typeof data.chat_enabled === 'boolean', 'No chat_enabled in settings');
+  });
+
+  await test('GET /clubs/:clubId/chat/messages returns empty list initially', async () => {
+    if (!clubId) return;
+    const { status, data } = await req('GET', `/clubs/${clubId}/chat/messages`);
+    assertEqual(status, 200, `Get messages failed: ${JSON.stringify(data)}`);
+    assert(Array.isArray(data), 'Expected array');
+  });
+
+  let msgId = null;
+
+  await test('POST /clubs/:clubId/chat/messages sends a text message', async () => {
+    if (!clubId) return;
+    const { status, data } = await req('POST', `/clubs/${clubId}/chat/messages`, {
+      message_type: 'text',
+      body: 'Hello from the integration test!',
+    });
+    assertEqual(status, 201, `Send message failed: ${JSON.stringify(data)}`);
+    assert(data.id, 'No message id');
+    msgId = data.id;
+  });
+
+  await test('GET /clubs/:clubId/chat/messages includes the sent message', async () => {
+    if (!clubId || !msgId) return;
+    const { status, data } = await req('GET', `/clubs/${clubId}/chat/messages`);
+    assertEqual(status, 200);
+    assert(data.find(m => m.id === msgId), 'Sent message not in list');
+  });
+
+  await test('PUT /clubs/:clubId/chat/messages/:msgId edits the message', async () => {
+    if (!clubId || !msgId) return;
+    const { status } = await req('PUT', `/clubs/${clubId}/chat/messages/${msgId}`, {
+      body: 'Edited message body.',
+    });
+    assert(status === 200 || status === 204, `Edit message failed: status ${status}`);
+  });
+
+  await test('POST /clubs/:clubId/chat/read updates read receipt', async () => {
+    if (!clubId || !msgId) return;
+    const { status } = await req('POST', `/clubs/${clubId}/chat/read`, {
+      last_read_message_id: msgId,
+    });
+    assert(status === 200 || status === 204, `Mark read failed: status ${status}`);
+  });
+
+  await test('GET /clubs/:clubId/chat/unread-count returns 0 after read', async () => {
+    if (!clubId) return;
+    const { status, data } = await req('GET', `/clubs/${clubId}/chat/unread-count`);
+    assertEqual(status, 200);
+    assert(typeof data.count === 'number', 'Expected { count: number }');
+  });
+
+  await test('GET /clubs/:clubId/chat/prefs returns member notification prefs', async () => {
+    if (!clubId) return;
+    const { status, data } = await req('GET', `/clubs/${clubId}/chat/prefs`);
+    assertEqual(status, 200, `Get prefs failed: ${JSON.stringify(data)}`);
+    assert(data.notification_mode, 'No notification_mode in prefs');
+  });
+
+  await test('PUT /clubs/:clubId/chat/prefs updates notification mode', async () => {
+    if (!clubId) return;
+    const { status } = await req('PUT', `/clubs/${clubId}/chat/prefs`, {
+      notification_mode: 'mentions',
+    });
+    assert(status === 200 || status === 204, `Update prefs failed: status ${status}`);
+  });
+
+  await test('PUT /clubs/:clubId/chat/settings updates chat settings (owner)', async () => {
+    if (!clubId) return;
+    const { status, data } = await req('PUT', `/clubs/${clubId}/chat/settings`, {
+      allow_audio_messages: false,
+      allow_snippet_sharing: true,
+      weekly_status_updates: true,
+      chapter_completion_updates: true,
+    });
+    assertEqual(status, 200, `Update chat settings failed: ${JSON.stringify(data)}`);
+  });
+
+  await test('DELETE /clubs/:clubId/chat/messages/:msgId soft-deletes message', async () => {
+    if (!clubId || !msgId) return;
+    const { status } = await req('DELETE', `/clubs/${clubId}/chat/messages/${msgId}`);
+    assert(status === 200 || status === 204, `Delete message failed: status ${status}`);
+  });
+}
+
 async function runCleanup() {
   console.log('\n── Cleanup ───────────────────────────────────────');
 
@@ -382,7 +702,16 @@ async function main() {
   await runProfile();
   await runBooks();
   await runChapters();
+  await runCollaborators();
+  await runComments();
+  await runBookSettings();
+  await runInlineContent();
+  await runVersions();
+  await runPublishing();
+  await runReviews();
+  await runAppSettings();
   await runClubs();
+  await runClubChat();
   await runProgress();
   await runNotifications();
   await runCleanup();

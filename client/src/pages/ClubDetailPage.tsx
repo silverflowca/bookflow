@@ -4,7 +4,7 @@ import {
   Users, BookOpen, MessageSquare, Settings, Plus, Trash2,
   Crown, Shield, UserMinus, ChevronRight, Loader2, Send,
   Globe, Lock, Star, ArrowLeft,
-  X, Check, Mail, Search, Copy, CheckCircle,
+  X, Check, Mail, Search, Copy, CheckCircle, UserPlus, MessageCircle,
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,6 +20,8 @@ interface Member {
   invited_email?: string;
   invite_token?: string;
   invite_accepted_at?: string;
+  is_join_request?: boolean;
+  join_request_message?: string;
   joined_at: string;
   profile?: { id: string; display_name: string; avatar_url?: string; email?: string };
 }
@@ -49,6 +51,7 @@ interface ClubSettings {
   show_member_highlights: boolean;
   show_member_media: boolean;
   enable_progress_tracking?: boolean;
+  allow_join_requests?: boolean;
 }
 
 interface ClubProgressEntry {
@@ -100,6 +103,7 @@ interface Club {
   member_count?: number;
   creator?: { id: string; display_name: string };
   members?: Member[];
+  pending_invites?: Member[];
   books?: ClubBook[];
   settings?: ClubSettings;
 }
@@ -622,6 +626,139 @@ function PendingInviteRow({
   );
 }
 
+// ── Join Request Row ──────────────────────────────────────────────────────────
+
+function JoinRequestRow({
+  member,
+  clubId,
+  onApproved,
+  onDeclined,
+}: {
+  member: Member;
+  clubId: string;
+  onApproved: (memberId: string) => void;
+  onDeclined: (memberId: string) => void;
+}) {
+  const [approving, setApproving] = useState(false);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [declining, setDeclining] = useState(false);
+
+  const name = member.profile?.display_name ?? member.profile?.email ?? 'Unknown';
+
+  async function handleApprove() {
+    setApproving(true);
+    setShowApproveConfirm(false);
+    try {
+      await api.approveClubInvite(clubId, member.id);
+      onApproved(member.id);
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve');
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleDecline() {
+    setDeclining(true);
+    try {
+      await api.declineClubRequest(clubId, member.id);
+      setShowDeclineModal(false);
+      onDeclined(member.id);
+    } catch (err: any) {
+      alert(err.message || 'Failed to decline');
+    } finally {
+      setDeclining(false);
+    }
+  }
+
+  return (
+    <>
+      {/* Approve confirm */}
+      {showApproveConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="theme-modal rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="font-semibold text-theme mb-2">Approve join request?</h3>
+            <p className="text-sm text-muted mb-4">
+              <span className="font-medium text-theme">{name}</span> will be added as a club member immediately.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowApproveConfirm(false)} className="flex-1 px-3 py-2 theme-button-secondary rounded-lg text-sm">Cancel</button>
+              <button onClick={handleApprove} disabled={approving} className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                {approving ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : 'Approve'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decline modal — graceful */}
+      {showDeclineModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="theme-modal rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-theme">Decline request</h3>
+              <button onClick={() => setShowDeclineModal(false)} className="text-muted hover:text-theme"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="text-sm text-muted mb-4">
+              A kind message will be sent to <span className="font-medium text-theme">{name}</span> letting them know their request wasn't accepted at this time.
+            </p>
+            <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-xs text-muted italic mb-4">
+              "Thank you for your interest in our book club! Unfortunately, we're unable to add new members at this time. We appreciate your enthusiasm for reading and hope you'll find a great fit in another club."
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeclineModal(false)} className="flex-1 px-3 py-2 theme-button-secondary rounded-lg text-sm">Cancel</button>
+              <button
+                onClick={handleDecline}
+                disabled={declining}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {declining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Send & Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
+        <Avatar profile={member.profile} size="md" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-theme">{name}</span>
+            <span className="text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+              <UserPlus className="h-2.5 w-2.5" /> Join Request
+            </span>
+          </div>
+          {member.join_request_message && (
+            <div className="mt-1.5 flex items-start gap-1 text-xs text-muted">
+              <MessageCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-2 italic">"{member.join_request_message}"</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowApproveConfirm(true)}
+            disabled={approving}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+          >
+            {approving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+            Approve
+          </button>
+          <button
+            onClick={() => setShowDeclineModal(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs theme-button-secondary rounded-lg text-red-400 hover:bg-red-500/10"
+          >
+            <X className="h-3 w-3" />
+            Decline
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 type PanelTab = 'overview' | 'members' | 'books' | 'discussions' | 'chat' | 'settings' | 'progress';
@@ -755,6 +892,10 @@ export default function ClubDetailPage() {
     }
   }
 
+  function handleRequestDeclined(memberId: string) {
+    setClub(prev => prev ? { ...prev, members: prev.members?.filter(m => m.id !== memberId) } : prev);
+  }
+
   async function handleSetCurrentBook(clubBookId: string) {
     try {
       await api.setCurrentClubBook(clubId!, clubBookId);
@@ -832,15 +973,17 @@ export default function ClubDetailPage() {
     );
   }
 
-  // Server already filters to accepted-only in the members array
+  // Server already filters to accepted-only in the members array; pending_invites is a separate field
   const acceptedMembers = club.members ?? [];
   const memberCount = club.member_count ?? acceptedMembers.length;
-  const pendingInvites = club.members?.filter(m => !m.invite_accepted_at) ?? [];
+  const allPending = club.pending_invites ?? [];
+  const joinRequests = allPending.filter(m => m.is_join_request);
+  const pendingInvites = allPending.filter(m => !m.is_join_request);
   const currentBook = club.books?.find(b => b.is_current);
 
   const tabs: { key: PanelTab; label: string; icon: React.ReactNode }[] = [
     { key: 'overview', label: 'Overview', icon: <BookOpen className="h-4 w-4" /> },
-    { key: 'members', label: `Members (${memberCount})`, icon: <Users className="h-4 w-4" /> },
+    { key: 'members', label: `Members (${memberCount})${isAdmin && allPending.length > 0 ? ` · ${allPending.length} pending` : ''}`, icon: <Users className="h-4 w-4" /> },
     { key: 'books', label: `Books (${club.books?.length ?? 0})`, icon: <BookOpen className="h-4 w-4" /> },
     { key: 'discussions', label: 'Discussions', icon: <MessageSquare className="h-4 w-4" /> },
     {
@@ -1005,35 +1148,76 @@ export default function ClubDetailPage() {
             </div>
           </div>
 
-          {pendingInvites.length > 0 && (
+          {allPending.length > 0 && (
             <div className="theme-section rounded-xl p-4">
-              <h3 className="font-semibold text-theme text-sm mb-4">Pending Invites ({pendingInvites.length})</h3>
-              <div className="space-y-3">
-                {pendingInvites.map(m => (
-                  <PendingInviteRow
-                    key={m.id}
-                    member={m}
-                    clubId={club.id}
-                    isAdmin={isAdmin}
-                    onTokenRefreshed={(memberId, newToken) => {
-                      setClub(prev => prev ? {
-                        ...prev,
-                        members: prev.members?.map(mm =>
-                          mm.id === memberId ? { ...mm, invite_token: newToken } : mm
-                        )
-                      } : prev);
-                    }}
-                    onApproved={(memberId) => {
-                      setClub(prev => prev ? {
-                        ...prev,
-                        members: prev.members?.map(mm =>
-                          mm.id === memberId ? { ...mm, invite_accepted_at: new Date().toISOString() } : mm
-                        )
-                      } : prev);
-                    }}
-                  />
-                ))}
-              </div>
+              <h3 className="font-semibold text-theme text-sm mb-4">
+                Pending New Members &amp; Invites ({allPending.length})
+              </h3>
+
+              {joinRequests.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-muted uppercase tracking-wide mb-3">Join Requests</p>
+                  <div className="space-y-4">
+                    {joinRequests.map(m => (
+                      <JoinRequestRow
+                        key={m.id}
+                        member={m}
+                        clubId={club.id}
+                        onApproved={(memberId) => {
+                          setClub(prev => {
+                            if (!prev) return prev;
+                            const approved = prev.pending_invites?.find(mm => mm.id === memberId);
+                            return {
+                              ...prev,
+                              pending_invites: prev.pending_invites?.filter(mm => mm.id !== memberId),
+                              members: approved ? [...(prev.members ?? []), { ...approved, invite_accepted_at: new Date().toISOString() }] : prev.members,
+                              member_count: (prev.member_count ?? 0) + 1,
+                            };
+                          });
+                        }}
+                        onDeclined={handleRequestDeclined}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {pendingInvites.length > 0 && (
+                <div>
+                  {joinRequests.length > 0 && <div className="border-t border-white/10 mb-3" />}
+                  <p className="text-xs text-muted uppercase tracking-wide mb-3">Email Invites</p>
+                  <div className="space-y-3">
+                    {pendingInvites.map(m => (
+                      <PendingInviteRow
+                        key={m.id}
+                        member={m}
+                        clubId={club.id}
+                        isAdmin={isAdmin}
+                        onTokenRefreshed={(memberId, newToken) => {
+                          setClub(prev => prev ? {
+                            ...prev,
+                            pending_invites: prev.pending_invites?.map(mm =>
+                              mm.id === memberId ? { ...mm, invite_token: newToken } : mm
+                            )
+                          } : prev);
+                        }}
+                        onApproved={(memberId) => {
+                          setClub(prev => {
+                            if (!prev) return prev;
+                            const approved = prev.pending_invites?.find(mm => mm.id === memberId);
+                            return {
+                              ...prev,
+                              pending_invites: prev.pending_invites?.filter(mm => mm.id !== memberId),
+                              members: approved ? [...(prev.members ?? []), { ...approved, invite_accepted_at: new Date().toISOString() }] : prev.members,
+                              member_count: (prev.member_count ?? 0) + 1,
+                            };
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1352,7 +1536,7 @@ export default function ClubDetailPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => { setEditingSettings(true); setSettingsDraft(club.settings ?? { show_member_reading_progress: true, show_member_answers: false, show_member_highlights: true, show_member_media: true, enable_progress_tracking: false }); }}
+                  onClick={() => { setEditingSettings(true); setSettingsDraft(club.settings ?? { show_member_reading_progress: true, show_member_answers: false, show_member_highlights: true, show_member_media: true, enable_progress_tracking: false, allow_join_requests: false }); }}
                   className="text-sm theme-button-secondary px-3 py-1.5 rounded-lg"
                 >
                   Edit
@@ -1360,13 +1544,14 @@ export default function ClubDetailPage() {
               )}
             </div>
 
-            {[
+            {([
+              { key: 'allow_join_requests' as const, label: 'Allow Join Requests', desc: 'Let anyone browsing the Discover tab request to join this club — you approve or decline each request', publicOnly: true },
               { key: 'enable_progress_tracking' as const, label: 'Enable Progress Tracking', desc: 'Track member completion of forms, audio, and video in chapters — shows a Progress tab' },
               { key: 'show_member_reading_progress' as const, label: 'Show Reading Progress Dashboard', desc: 'Allow all members to see each other\'s progress (admins always see it)' },
               { key: 'show_member_answers' as const, label: 'Q&A Answers', desc: 'Reveal other members\' answers to in-book questions' },
               { key: 'show_member_highlights' as const, label: 'Highlights', desc: 'Members can see each other\'s highlights' },
               { key: 'show_member_media' as const, label: 'Audio / Video', desc: 'Show inline media content from other members' },
-            ].map(({ key, label, desc }) => {
+            ] as { key: keyof ClubSettings; label: string; desc: string; publicOnly?: boolean }[]).filter(({ publicOnly }) => !publicOnly || club.visibility === 'public').map(({ key, label, desc }) => {
               const current = editingSettings ? (settingsDraft?.[key] ?? false) : (club.settings?.[key] ?? false);
               return (
                 <div key={key} className="flex items-center justify-between py-3 border-b border-white/10 last:border-0">

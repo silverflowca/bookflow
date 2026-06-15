@@ -189,15 +189,20 @@ router.get('/:clubId', authenticate, async (req, res) => {
       .not('invite_accepted_at', 'is', null)
       .order('joined_at', { ascending: true, nullsFirst: false });
 
-    // Pending invites (only visible to admins)
+    // Pending invites + join requests (only visible to admins)
     let pendingInvites = [];
     if (role === 'owner' || role === 'admin') {
       const { data: pending } = await supabase
         .from('club_members')
-        .select('id, invited_email, invited_by, joined_at, invite_token')
+        .select(`
+          id, user_id, invited_email, invited_by, joined_at, invite_token,
+          is_join_request, join_request_message,
+          profile:profiles!club_members_user_id_fkey(id, display_name, avatar_url, email)
+        `)
         .eq('club_id', req.params.clubId)
         .is('invite_accepted_at', null);
-      pendingInvites = pending || [];
+      const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+      pendingInvites = (pending || []).map(p => ({ ...p, profile: norm(p.profile) }));
     }
 
     // Books in club
@@ -268,7 +273,7 @@ router.put('/:clubId/settings', authenticate, async (req, res) => {
     return res.status(403).json({ error: 'Only owners/admins can change settings' });
   }
 
-  const { show_member_reading_progress, show_member_answers, show_member_highlights, show_member_media, enable_progress_tracking } = req.body;
+  const { show_member_reading_progress, show_member_answers, show_member_highlights, show_member_media, enable_progress_tracking, allow_join_requests } = req.body;
   try {
     const { data, error } = await supabase
       .from('club_settings')
@@ -279,6 +284,7 @@ router.put('/:clubId/settings', authenticate, async (req, res) => {
         show_member_highlights,
         show_member_media,
         enable_progress_tracking,
+        allow_join_requests,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'club_id' })
       .select()
@@ -410,6 +416,148 @@ router.post('/:clubId/members/:memberId/resend-invite', authenticate, async (req
     }
 
     res.json({ invite_token: newToken, invited_email: member.invited_email });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/clubs/:clubId/request-join — request to join a public club ─────
+router.post('/:clubId/request-join', authenticate, async (req, res) => {
+  const { message } = req.body;
+  try {
+    // Fetch club + settings
+    const { data: club } = await supabase
+      .from('book_clubs')
+      .select('id, name, visibility, max_members, created_by, settings:club_settings(allow_join_requests)')
+      .eq('id', req.params.clubId)
+      .single();
+
+    if (!club) return res.status(404).json({ error: 'Club not found' });
+    if (club.visibility !== 'public') return res.status(403).json({ error: 'This club is invite-only' });
+
+    const settings = Array.isArray(club.settings) ? club.settings[0] : club.settings;
+    if (!settings?.allow_join_requests) {
+      return res.status(403).json({ error: 'This club is not accepting join requests at this time' });
+    }
+
+    // Check member count
+    const { count: memberCount } = await supabase
+      .from('club_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', req.params.clubId)
+      .not('invite_accepted_at', 'is', null);
+
+    if (memberCount >= club.max_members) {
+      return res.status(409).json({ error: 'This club has reached its maximum member limit' });
+    }
+
+    // Check if already a member or already has a pending request
+    const { data: existing } = await supabase
+      .from('club_members')
+      .select('id, invite_accepted_at, is_join_request')
+      .eq('club_id', req.params.clubId)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (existing?.invite_accepted_at) {
+      return res.status(409).json({ error: 'You are already a member of this club' });
+    }
+    if (existing) {
+      return res.status(409).json({ error: existing.is_join_request ? 'You already have a pending join request' : 'You already have a pending invite' });
+    }
+
+    // Insert join request row
+    const { data: member, error } = await supabase
+      .from('club_members')
+      .insert({
+        club_id: req.params.clubId,
+        user_id: req.user.id,
+        role: 'member',
+        is_join_request: true,
+        join_request_message: message?.trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Notify club admins
+    const { data: admins } = await supabase
+      .from('club_members')
+      .select('user_id')
+      .eq('club_id', req.params.clubId)
+      .in('role', ['owner', 'admin'])
+      .not('invite_accepted_at', 'is', null);
+
+    const { data: requesterProfile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', req.user.id)
+      .single();
+
+    const requesterName = requesterProfile?.display_name ?? 'Someone';
+    for (const admin of (admins || [])) {
+      if (admin.user_id !== req.user.id) {
+        await notify(admin.user_id, 'club_join_request',
+          `New join request for "${club.name}"`,
+          `${requesterName} has requested to join your book club "${club.name}".`,
+          { club_id: club.id }
+        );
+      }
+    }
+    // Also notify the club owner if not already in admins list
+    if (club.created_by && club.created_by !== req.user.id && !(admins || []).find(a => a.user_id === club.created_by)) {
+      await notify(club.created_by, 'club_join_request',
+        `New join request for "${club.name}"`,
+        `${requesterName} has requested to join your book club "${club.name}".`,
+        { club_id: club.id }
+      );
+    }
+
+    res.status(201).json(member);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/clubs/:clubId/members/:memberId/decline-request — decline gracefully ─
+router.post('/:clubId/members/:memberId/decline-request', authenticate, async (req, res) => {
+  const myRole = await getClubRole(req.params.clubId, req.user.id);
+  if (!myRole || !['owner', 'admin'].includes(myRole)) {
+    return res.status(403).json({ error: 'Only owners/admins can decline requests' });
+  }
+
+  try {
+    const { data: member } = await supabase
+      .from('club_members')
+      .select('id, user_id, is_join_request, invite_accepted_at')
+      .eq('id', req.params.memberId)
+      .eq('club_id', req.params.clubId)
+      .single();
+
+    if (!member) return res.status(404).json({ error: 'Request not found' });
+    if (member.invite_accepted_at) return res.status(409).json({ error: 'Member has already been accepted' });
+
+    // Get club name for notification
+    const { data: club } = await supabase.from('book_clubs').select('name').eq('id', req.params.clubId).single();
+
+    // Delete the pending row
+    const { error } = await supabase.from('club_members').delete().eq('id', member.id);
+    if (error) throw error;
+
+    // Send kind in-app notification to the requester
+    if (member.user_id) {
+      const isRequest = member.is_join_request;
+      await notify(member.user_id,
+        isRequest ? 'club_request_declined' : 'club_invite_cancelled',
+        isRequest ? `Your request to join "${club?.name}"` : `Invite update for "${club?.name}"`,
+        isRequest
+          ? `Thank you for your interest in "${club?.name}"! Unfortunately, we're unable to add new members at this time. We appreciate your enthusiasm for reading and hope you'll find a great fit in another club.`
+          : `Your pending invite to "${club?.name}" has been cancelled. Please reach out to the club admin if you have any questions.`,
+        { club_id: req.params.clubId }
+      );
+    }
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

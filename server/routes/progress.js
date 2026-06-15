@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Trackable inline content types
+// Trackable inline content types (all stored as inline_content rows, keyed as ic:{id})
 const TRACKABLE_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'question', 'audio', 'video'];
 
 /**
@@ -25,6 +25,33 @@ function extractMediaKeys(content, chapterId, counter = { n: 0 }) {
   }
   return keys;
 }
+
+/**
+ * POST /api/progress/incomplete
+ * Remove a completion record for the authenticated user (item was cleared/blanked).
+ * Body: { chapter_id, item_key }
+ */
+router.post('/incomplete', authenticate, async (req, res) => {
+  const { chapter_id, item_key } = req.body;
+  if (!chapter_id || !item_key) {
+    return res.status(400).json({ error: 'chapter_id and item_key are required' });
+  }
+  try {
+    const { error } = await supabase
+      .schema('bookflow')
+      .from('chapter_item_completions')
+      .delete()
+      .eq('user_id', req.user.id)
+      .eq('chapter_id', chapter_id)
+      .eq('item_key', item_key);
+    if (error) throw error;
+    console.log('[Progress] markIncomplete:', { user_id: req.user.id, chapter_id, item_key });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Mark incomplete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * POST /api/progress/complete
@@ -114,16 +141,11 @@ router.get('/chapter/:chapterId', authenticate, async (req, res) => {
     if (chErr || !chapter) return res.status(404).json({ error: 'Chapter not found' });
     if (icErr) throw icErr;
 
-    // Completable items from inline_content
-    const formItems = (inlineRows || []).map(r => ({ key: `ic:${r.id}`, type: 'form' }));
+    const formItems = (inlineRows || []);
+    const total = formItems.length;
+    const icIds = formItems.map(r => r.id);
 
-    // Completable media nodes from TipTap JSON
-    const contentNodes = chapter.content?.content || [];
-    const mediaItems = extractMediaKeys(contentNodes, chapterId);
-
-    const total = formItems.length + mediaItems.length;
-
-    // Fetch user's completions for this chapter
+    // Fetch existing completion records
     const { data: completions, error: compErr } = await supabase
       .schema('bookflow')
       .from('chapter_item_completions')
@@ -133,8 +155,105 @@ router.get('/chapter/:chapterId', authenticate, async (req, res) => {
 
     if (compErr) throw compErr;
 
+    const completedKeys = new Set((completions || []).map(c => c.item_key));
+
+    // Find items that have actual responses but are missing a completion record
+    // (can happen when completion write failed or predates this system)
+    const missingIds = icIds.filter(id => !completedKeys.has(`ic:${id}`));
+
+    if (missingIds.length > 0) {
+      const [{ data: qAnswers }, { data: pollVotes }, { data: formResps }] = await Promise.all([
+        supabase.schema('bookflow').from('question_answers')
+          .select('inline_content_id, answer_text, selected_options')
+          .in('inline_content_id', missingIds)
+          .eq('user_id', req.user.id),
+        supabase.schema('bookflow').from('poll_responses')
+          .select('inline_content_id, selected_option')
+          .in('inline_content_id', missingIds)
+          .eq('user_id', req.user.id),
+        supabase.schema('bookflow').from('form_responses')
+          .select('inline_content_id, response_data')
+          .in('inline_content_id', missingIds)
+          .eq('user_id', req.user.id),
+      ]);
+
+      // Only count non-empty responses
+      const answeredIds = new Set([
+        ...(qAnswers || []).filter(r => r.answer_text?.trim() || r.selected_options?.length).map(r => r.inline_content_id),
+        ...(pollVotes || []).filter(r => r.selected_option).map(r => r.inline_content_id),
+        ...(formResps || []).filter(r => {
+          const v = r.response_data?.value;
+          return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+        }).map(r => r.inline_content_id),
+      ]);
+
+      if (answeredIds.size > 0) {
+        const toInsert = [...answeredIds].map(id => {
+          const ic = formItems.find(r => r.id === id);
+          return {
+            user_id: req.user.id,
+            chapter_id: chapterId,
+            item_key: `ic:${id}`,
+            item_type: ic?.content_type || 'form',
+            completed_at: new Date().toISOString(),
+          };
+        });
+        await supabase.schema('bookflow').from('chapter_item_completions')
+          .upsert(toInsert, { onConflict: 'user_id,chapter_id,item_key' });
+
+        for (const id of answeredIds) completedKeys.add(`ic:${id}`);
+      }
+    }
+
+    // Also remove completion records for items whose response has been cleared
+    // Check icIds that DO have a completion record but may now have an empty response
+    const toValidate = icIds.filter(id => completedKeys.has(`ic:${id}`));
+    if (toValidate.length > 0) {
+      const [{ data: qAnswers2 }, { data: pollVotes2 }, { data: formResps2 }] = await Promise.all([
+        supabase.schema('bookflow').from('question_answers')
+          .select('inline_content_id, answer_text, selected_options')
+          .in('inline_content_id', toValidate)
+          .eq('user_id', req.user.id),
+        supabase.schema('bookflow').from('poll_responses')
+          .select('inline_content_id, selected_option')
+          .in('inline_content_id', toValidate)
+          .eq('user_id', req.user.id),
+        supabase.schema('bookflow').from('form_responses')
+          .select('inline_content_id, response_data')
+          .in('inline_content_id', toValidate)
+          .eq('user_id', req.user.id),
+      ]);
+
+      // Build a set of IDs that still have valid non-empty responses
+      const stillAnswered = new Set([
+        ...(qAnswers2 || []).filter(r => r.answer_text?.trim() || r.selected_options?.length).map(r => r.inline_content_id),
+        ...(pollVotes2 || []).filter(r => r.selected_option).map(r => r.inline_content_id),
+        ...(formResps2 || []).filter(r => {
+          const v = r.response_data?.value;
+          return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+        }).map(r => r.inline_content_id),
+      ]);
+
+      // media items (audio/video) have no response table — always keep their completions
+      const mediaTypes = new Set(['audio', 'video']);
+      const keysToRemove = toValidate.filter(id => {
+        const ic = formItems.find(r => r.id === id);
+        return !mediaTypes.has(ic?.content_type) && !stillAnswered.has(id);
+      });
+
+      if (keysToRemove.length > 0) {
+        await supabase.schema('bookflow').from('chapter_item_completions')
+          .delete()
+          .eq('user_id', req.user.id)
+          .eq('chapter_id', chapterId)
+          .in('item_key', keysToRemove.map(id => `ic:${id}`));
+
+        for (const id of keysToRemove) completedKeys.delete(`ic:${id}`);
+      }
+    }
+
     res.json({
-      completions: (completions || []).map(c => c.item_key),
+      completions: [...completedKeys],
       total,
     });
   } catch (err) {
@@ -155,7 +274,7 @@ router.get('/book/:bookId', authenticate, async (req, res) => {
     const { data: chapters, error: chErr } = await supabase
       .schema('bookflow')
       .from('chapters')
-      .select('id, content')
+      .select('id')
       .eq('book_id', bookId)
       .order('order_index');
 
@@ -196,13 +315,84 @@ router.get('/book/:bookId', authenticate, async (req, res) => {
       completedByChapter[comp.chapter_id].add(comp.item_key);
     }
 
+    // Find inline items missing a completion record — check actual response tables
+    const allIcIds = (allInline || []).map(ic => ic.id);
+    const completedIcIds = new Set(
+      (allCompletions || []).map(c => c.item_key.startsWith('ic:') ? c.item_key.slice(3) : null).filter(Boolean)
+    );
+    const missingIds = allIcIds.filter(id => !completedIcIds.has(id));
+
+    // All IDs to validate against response tables (missing + already-completed non-media)
+    const mediaTypes = new Set(['audio', 'video']);
+    const nonMediaIcIds = (allInline || []).filter(ic => !mediaTypes.has(ic.content_type)).map(ic => ic.id);
+    const allValidateIds = [...new Set([...missingIds, ...nonMediaIcIds.filter(id => completedIcIds.has(id))])];
+
+    if (allValidateIds.length > 0) {
+      const [{ data: qAnswers }, { data: pollVotes }, { data: formResps }] = await Promise.all([
+        supabase.schema('bookflow').from('question_answers')
+          .select('inline_content_id, answer_text, selected_options')
+          .in('inline_content_id', allValidateIds)
+          .eq('user_id', req.user.id),
+        supabase.schema('bookflow').from('poll_responses')
+          .select('inline_content_id, selected_option')
+          .in('inline_content_id', allValidateIds)
+          .eq('user_id', req.user.id),
+        supabase.schema('bookflow').from('form_responses')
+          .select('inline_content_id, response_data')
+          .in('inline_content_id', allValidateIds)
+          .eq('user_id', req.user.id),
+      ]);
+
+      const hasValidResponse = (id) => {
+        const q = (qAnswers || []).find(r => r.inline_content_id === id);
+        if (q) return !!(q.answer_text?.trim() || q.selected_options?.length);
+        const p = (pollVotes || []).find(r => r.inline_content_id === id);
+        if (p) return !!p.selected_option;
+        const f = (formResps || []).find(r => r.inline_content_id === id);
+        if (f) {
+          const v = f.response_data?.value;
+          return v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+        }
+        return false;
+      };
+
+      // Back-fill missing completions that have valid responses
+      const toInsert = missingIds.filter(hasValidResponse).map(id => {
+        const ic = (allInline || []).find(r => r.id === id);
+        return { user_id: req.user.id, chapter_id: ic?.chapter_id, item_key: `ic:${id}`, item_type: ic?.content_type || 'form', completed_at: new Date().toISOString() };
+      }).filter(r => r.chapter_id);
+
+      // Remove stale completions whose response is now empty
+      const toRemove = nonMediaIcIds.filter(id => completedIcIds.has(id) && !hasValidResponse(id));
+
+      await Promise.all([
+        toInsert.length > 0 ? supabase.schema('bookflow').from('chapter_item_completions')
+          .upsert(toInsert, { onConflict: 'user_id,chapter_id,item_key' }) : Promise.resolve(),
+        toRemove.length > 0 ? supabase.schema('bookflow').from('chapter_item_completions')
+          .delete().eq('user_id', req.user.id).in('item_key', toRemove.map(id => `ic:${id}`))
+          .in('chapter_id', chapterIds) : Promise.resolve(),
+      ]);
+
+      // Apply changes to completedByChapter for immediate correct response
+      for (const id of missingIds.filter(hasValidResponse)) {
+        const ic = (allInline || []).find(r => r.id === id);
+        if (!ic) continue;
+        if (!completedByChapter[ic.chapter_id]) completedByChapter[ic.chapter_id] = new Set();
+        completedByChapter[ic.chapter_id].add(`ic:${id}`);
+      }
+      for (const id of toRemove) {
+        const ic = (allInline || []).find(r => r.id === id);
+        if (!ic) continue;
+        completedByChapter[ic.chapter_id]?.delete(`ic:${id}`);
+      }
+    }
+
     // Build stats per chapter
     const stats = (chapters || []).map(ch => {
       const formKeys = (inlineByChapter[ch.id] || []).map(r => `ic:${r.id}`);
-      const mediaKeys = extractMediaKeys(ch.content?.content || [], ch.id).map(m => m.key);
-      const total = formKeys.length + mediaKeys.length;
+      const total = formKeys.length;
       const completedSet = completedByChapter[ch.id] || new Set();
-      const completed = [...formKeys, ...mediaKeys].filter(k => completedSet.has(k)).length;
+      const completed = formKeys.filter(k => completedSet.has(k)).length;
       return { chapter_id: ch.id, completed, total };
     });
 

@@ -298,6 +298,13 @@ class ApiClient {
     });
   }
 
+  async markItemIncomplete(chapterId: string, itemKey: string): Promise<void> {
+    return this.request('/progress/incomplete', {
+      method: 'POST',
+      body: JSON.stringify({ chapter_id: chapterId, item_key: itemKey }),
+    });
+  }
+
   async getChapterProgress(chapterId: string): Promise<{ completions: string[]; total: number }> {
     return this.request(`/progress/chapter/${chapterId}`);
   }
@@ -1046,6 +1053,31 @@ class ApiClient {
     if (params?.offset) qs.set('offset', String(params.offset));
     const query = qs.toString() ? `?${qs}` : '';
     return this.request(`/books/${bookId}/activity${query}`);
+  }
+
+  // ── Admin (super_admin only) ──────────────────────────────────────────────
+
+  async adminGetStats(): Promise<{ users: number; books: number; clubs: number; super_admins: number }> {
+    return this.request('/admin/stats');
+  }
+
+  async adminGetUsers(): Promise<Profile[]> {
+    return this.request('/admin/users');
+  }
+
+  async adminSetUserRole(userId: string, system_role: 'super_admin' | null): Promise<Profile> {
+    return this.request(`/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ system_role }),
+    });
+  }
+
+  async adminGetBooks(): Promise<any[]> {
+    return this.request('/admin/books');
+  }
+
+  async adminGetClubs(): Promise<any[]> {
+    return this.request('/admin/clubs');
   }
 }
 

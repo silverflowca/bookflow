@@ -7,6 +7,8 @@ export interface User {
   };
 }
 
+export type SystemRole = 'super_admin' | null;
+
 export interface Profile {
   id: string;
   email: string;
@@ -14,6 +16,7 @@ export interface Profile {
   avatar_url?: string;
   bio?: string;
   is_author: boolean;
+  system_role?: SystemRole;
   created_at: string;
   updated_at: string;
 }

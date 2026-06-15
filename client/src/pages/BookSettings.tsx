@@ -175,7 +175,7 @@ export default function BookSettings() {
       </div>
 
       {/* Quick links */}
-      <div className="flex gap-3 mb-8">
+      <div id="bf-settings-quicklinks" className="flex gap-3 mb-8">
         <Link
           to={`/edit/book/${bookId}/collaborators`}
           className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
@@ -257,7 +257,7 @@ export default function BookSettings() {
         </div>
 
         {/* Publishing */}
-        <div className="p-6">
+        <div id="bf-settings-publish" className="p-6">
           <h2 className="text-lg font-semibold mb-1 text-theme">Publishing</h2>
           <p className="text-sm text-muted mb-4">Control who can access this book</p>
 

@@ -30,6 +30,7 @@ import LiveDashboard from './pages/live/LiveDashboard';
 import LiveBible from './pages/live/LiveBible';
 import LiveQueue from './pages/live/LiveQueue';
 import ProfilePage from './pages/ProfilePage';
+import AdminPage from './pages/AdminPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -203,6 +204,13 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
         <Route path="profile/:userId" element={<ProfilePage />} />
+
+        {/* Super admin */}
+        <Route path="admin" element={
+          <ProtectedRoute>
+            <AdminPage />
+          </ProtectedRoute>
+        } />
       </Route>
     </Routes>
   );

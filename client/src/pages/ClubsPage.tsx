@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2 } from 'lucide-react';
+import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X } from 'lucide-react';
 import api from '../lib/api';
 
 interface Club {
@@ -157,6 +157,73 @@ function CreateClubModal({ onClose, onCreate }: CreateClubModalProps) {
   );
 }
 
+function RequestJoinModal({ club, onClose, onRequested }: { club: Club; onClose: () => void; onRequested: () => void }) {
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setError('');
+    try {
+      await api.requestToJoinClub(club.id, message.trim() || undefined);
+      setDone(true);
+      setTimeout(() => { onRequested(); onClose(); }, 1800);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send request');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="theme-section rounded-xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-theme">Request to Join</h3>
+          <button onClick={onClose} className="text-muted hover:text-theme"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted mb-4">{club.name}</p>
+
+        {done ? (
+          <div className="flex flex-col items-center gap-2 py-4 text-green-400">
+            <Check className="h-8 w-8" />
+            <p className="text-sm font-medium">Request sent!</p>
+            <p className="text-xs text-muted text-center">The club admin will review your request and get back to you.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs text-muted mb-1">Message (optional)</label>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Introduce yourself or tell us why you'd like to join…"
+                className="w-full px-3 py-2 theme-input rounded-lg text-sm resize-none"
+                rows={3}
+              />
+            </div>
+            {error && <p className="text-red-500 text-xs">{error}</p>}
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm theme-button-secondary rounded-lg">Cancel</button>
+              <button
+                type="submit"
+                disabled={sending}
+                className="flex items-center gap-2 px-4 py-2 text-sm theme-button-primary rounded-lg disabled:opacity-50"
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                Send Request
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ClubsPage() {
   const [myClubs, setMyClubs] = useState<Club[]>([]);
   const [publicClubs, setPublicClubs] = useState<Club[]>([]);
@@ -164,6 +231,8 @@ export default function ClubsPage() {
   const [tab, setTab] = useState<'mine' | 'discover'>('mine');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [joinRequestClub, setJoinRequestClub] = useState<Club | null>(null);
+  const [requestedClubIds, setRequestedClubIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -284,7 +353,19 @@ export default function ClubsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {displayedPublic.map(club => (
-                <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                <div key={club.id} className="flex flex-col">
+                  <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                  <button
+                    onClick={() => setJoinRequestClub(club)}
+                    disabled={requestedClubIds.has(club.id)}
+                    className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
+                  >
+                    {requestedClubIds.has(club.id)
+                      ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                      : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
+                    }
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -293,6 +374,13 @@ export default function ClubsPage() {
 
       {showCreate && (
         <CreateClubModal onClose={() => setShowCreate(false)} onCreate={handleCreated} />
+      )}
+      {joinRequestClub && (
+        <RequestJoinModal
+          club={joinRequestClub}
+          onClose={() => setJoinRequestClub(null)}
+          onRequested={() => setRequestedClubIds(prev => new Set([...prev, joinRequestClub.id]))}
+        />
       )}
     </div>
   );

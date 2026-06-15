@@ -16,6 +16,7 @@ router.post('/form-responses/:contentId', authenticate, async (req, res) => {
   try {
     // Verify content exists and user has access
     const { data: content, error: contentError } = await supabase
+      .schema('bookflow')
       .from('inline_content')
       .select('id, book_id, book:books(author_id, visibility)')
       .eq('id', contentId)
@@ -29,6 +30,7 @@ router.post('/form-responses/:contentId', authenticate, async (req, res) => {
     }
 
     const { data, error } = await supabase
+      .schema('bookflow')
       .from('form_responses')
       .upsert({
         inline_content_id: contentId,
@@ -52,6 +54,7 @@ router.post('/form-responses/:contentId', authenticate, async (req, res) => {
 router.get('/form-responses/:contentId/mine', authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
+      .schema('bookflow')
       .from('form_responses')
       .select('*')
       .eq('inline_content_id', req.params.contentId)
@@ -73,6 +76,7 @@ router.get('/form-responses/:contentId/all', authenticate, async (req, res) => {
   try {
     // Verify user is the book author
     const { data: content, error: contentError } = await supabase
+      .schema('bookflow')
       .from('inline_content')
       .select('id, content_type, content_data, book:books(author_id)')
       .eq('id', req.params.contentId)
@@ -85,6 +89,7 @@ router.get('/form-responses/:contentId/all', authenticate, async (req, res) => {
     }
 
     const { data: responses, error } = await supabase
+      .schema('bookflow')
       .from('form_responses')
       .select(`
         *,

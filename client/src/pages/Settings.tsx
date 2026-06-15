@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio } from 'lucide-react';
+import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid } from 'lucide-react';
 import api from '../lib/api';
+import { useTheme } from '../contexts/ThemeContext';
+import type { CoverSize } from '../contexts/ThemeContext';
 
 interface AppSettings {
   fileflow_url: string;
@@ -11,8 +13,15 @@ interface AppSettings {
   restream_client_secret: string;
 }
 
+const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string; preview: string }[] = [
+  { value: 'small',  label: 'Small',  description: 'Compact list rows, 4–5 per row', preview: '▪ ▪ ▪ ▪' },
+  { value: 'medium', label: 'Medium', description: 'Card grid, 3 per row (default)',   preview: '▬ ▬ ▬' },
+  { value: 'large',  label: 'Large',  description: 'Tall portrait covers, 3 per row',  preview: '▮ ▮ ▮' },
+];
+
 export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { coverSize, setCoverSize } = useTheme();
   const [settings, setSettings] = useState<AppSettings>({
     fileflow_url: '',
     fileflow_access_key: '',
@@ -386,6 +395,40 @@ export default function Settings() {
             {!restreamStatus?.connected && restreamStatus?.has_credentials && (
               <span className="text-xs text-gray-500">Credentials saved — click Connect to authorize</span>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Display Preferences */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <LayoutGrid className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-lg font-semibold">Display</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">Choose how book covers appear on your dashboard.</p>
+          <div className="grid grid-cols-3 gap-3">
+            {COVER_SIZE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setCoverSize(opt.value)}
+                className={`rounded-xl border-2 p-4 text-left transition-all ${
+                  coverSize === opt.value
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className={`text-2xl mb-2 tracking-widest ${coverSize === opt.value ? 'text-indigo-500' : 'text-gray-400'}`}>
+                  {opt.preview}
+                </div>
+                <p className={`font-semibold text-sm ${coverSize === opt.value ? 'text-indigo-700' : 'text-gray-700'}`}>{opt.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                {coverSize === opt.value && (
+                  <span className="inline-block mt-2 text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full font-medium">Active</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>
