@@ -138,10 +138,10 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Look up author dynamically (user must have signed up first)
-  SELECT id INTO v_author_id FROM bookflow.profiles WHERE email = 'admin.steen2@silverflow.ca';
+  -- Look up author dynamically — use damion.steen@silverflow.ca (the main production admin)
+  SELECT id INTO v_author_id FROM bookflow.profiles WHERE email = 'damion.steen@silverflow.ca';
   IF v_author_id IS NULL THEN
-    RAISE EXCEPTION 'User admin.steen2@silverflow.ca not found in profiles — sign up on the app first, then re-run this migration.';
+    RAISE EXCEPTION 'User damion.steen@silverflow.ca not found in profiles.';
   END IF;
 
   v_ch1_id := gen_random_uuid();
