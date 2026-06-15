@@ -7,7 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import type { CoverSize } from '../contexts/ThemeContext';
 
 // Lazy-loads progress for a single book and renders a reading card
-function ReadingProgressCard({ bookId, bookTitle, coverUrl, clubId, clubName }: {
+function ReadingProgressCard({ bookId, bookTitle, coverUrl, clubId: _clubId, clubName }: {
   bookId: string; bookTitle: string; coverUrl?: string | null;
   clubId?: string; clubName?: string;
 }) {

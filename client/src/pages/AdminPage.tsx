@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, BarChart2, Crown, X, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
