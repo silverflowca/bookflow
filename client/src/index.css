@@ -514,3 +514,59 @@ mark.tts-highlight {
 .text-theme { color: var(--color-text); }
 .text-muted { color: var(--color-text-muted); }
 .text-accent { color: var(--color-accent); }
+
+/* ─── Mobile improvements ──────────────────────────────────────────────────── */
+
+/* Prevent double-tap zoom on interactive elements */
+button, a, label, select, input[type="button"], input[type="submit"] {
+  touch-action: manipulation;
+}
+
+/* Reader: tighter padding on small screens, comfortable font size */
+@media (max-width: 640px) {
+  .reader-content {
+    font-size: 1.05rem;
+    line-height: 1.85;
+  }
+
+  /* Collapse multi-column layouts to single column on mobile */
+  .column-layout-wrapper[data-columns="2"] [data-node-view-content],
+  .column-layout-wrapper[data-columns="3"] [data-node-view-content],
+  .column-layout-wrapper[data-columns="4"] [data-node-view-content],
+  .column-layout-wrapper[data-columns="5"] [data-node-view-content] {
+    grid-template-columns: 1fr;
+  }
+
+  /* Wider article padding on phones */
+  article.max-w-3xl {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Make modals full-width on mobile */
+  .theme-modal {
+    border-radius: 1rem 1rem 0 0;
+  }
+}
+
+/* Increase touch target size for bottom-nav items */
+@media (max-width: 767px) {
+  /* Taller editor toolbar buttons for fat-finger friendliness */
+  #bf-editor-toolbar button {
+    min-height: 36px;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  /* Give the sticky reader header a tiny extra height for thumb reach */
+  .reader-sticky-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* iOS safe-area support for bottom nav */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

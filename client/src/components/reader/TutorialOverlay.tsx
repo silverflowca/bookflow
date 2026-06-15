@@ -25,6 +25,8 @@ export interface TutorialStep {
 
 export interface TutorialChapter {
   title: string;
+  /** One-line description shown on the welcome screen chapter list */
+  description?: string;
   steps: TutorialStep[];
 }
 
@@ -381,7 +383,7 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
             </div>
 
             <h1 className={`font-extrabold text-gray-900 dark:text-white tracking-tight ${mobile ? 'text-2xl' : 'text-3xl'}`}>
-              Welcome to BookFlow
+              Bookflow Tutorial
             </h1>
             <p className="mt-2 text-gray-500 dark:text-gray-400 text-sm leading-relaxed max-w-sm mx-auto">
               This interactive tutorial walks you through everything you need to know — from reading your first book to publishing your own.
@@ -428,10 +430,14 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
                       {ci + 1}. {ch.title}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {ch.steps.length} step{ch.steps.length !== 1 ? 's' : ''}
-                      {' · '}
-                      {ch.steps.map(s => s.title).slice(0, 2).join(', ')}
-                      {ch.steps.length > 2 ? '…' : ''}
+                      {ch.description ?? (
+                        <>
+                          {ch.steps.length} step{ch.steps.length !== 1 ? 's' : ''}
+                          {' · '}
+                          {ch.steps.map(s => s.title).slice(0, 2).join(', ')}
+                          {ch.steps.length > 2 ? '…' : ''}
+                        </>
+                      )}
                     </p>
                   </div>
 

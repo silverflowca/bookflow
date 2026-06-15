@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield, Highlighter, StickyNote, Link2, Play, List, Type, AlignLeft, Circle, CheckSquare, Code, Image, LayoutGrid } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 
@@ -18,16 +18,20 @@ export default function Layout() {
   const { user, profile, logout } = useAuth();
   const { colorScheme, setColorScheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showMobileTheme, setShowMobileTheme] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Close mobile menu on route change
+  useEffect(() => { setShowMobileMenu(false); }, [location.pathname]);
   const [tutorialActive, setTutorialActive] = useState(false);
 
   const TUTORIAL_CHAPTERS: TutorialChapter[] = [
     // ── Chapter 0: Navigating ────────────────────────────────────────────────
     {
       title: 'Navigating',
+      description: 'Table of contents, progress tracking, text-to-speech & the reader layout.',
       steps: [
         {
           target: '#bf-toc-sidebar',
@@ -76,6 +80,7 @@ export default function Layout() {
     // ── Chapter 1: Dashboard ─────────────────────────────────────────────────
     {
       title: 'Dashboard',
+      description: 'Your home base — view, create and manage all your books and clubs.',
       steps: [
         {
           target: '#bf-dash-header',
@@ -110,6 +115,7 @@ export default function Layout() {
     // ── Chapter 2: Creating ──────────────────────────────────────────────────
     {
       title: 'Creating',
+      description: 'Write chapters, format content and collaborate with co-authors.',
       steps: [
         {
           target: '#bf-book-meta',
@@ -119,9 +125,30 @@ export default function Layout() {
           navigateTo: READER_URL,
         },
         {
-          target: '#bf-editor-toolbar',
-          title: 'Adding Chapters & Writing',
-          description: <>Inside the book editor, this toolbar lets you format text and insert rich content. Click <strong>+ Add Chapter</strong> in the editor sidebar to create new chapters. Your work auto-saves every few seconds.</>,
+          target: '#bf-editor-toolbar [title="Bold"]',
+          title: '✏️ Text Formatting',
+          description: <><strong>B</strong> Bold · <strong>I</strong> Italic · <strong>U</strong> Underline · <strong>H2</strong> Heading · bullet list · numbered list · block quote. These apply to selected text or at your cursor position.</>,
+          placement: 'bottom', chapter: 2, action: { type: 'none', instruction: '' },
+          navigateTo: EDITOR_URL,
+        },
+        {
+          target: '#bf-editor-toolbar [title="Add Question"]',
+          title: '💬 Interactive Content',
+          description: <>Engage your readers with embedded content: <strong>Question</strong> (reader types a response), <strong>Poll</strong>, <strong>Highlight</strong>, <strong>Note</strong>, <strong>Link</strong>, <strong>Audio</strong> clip, and <strong>Video</strong>.</>,
+          placement: 'bottom', chapter: 2, action: { type: 'none', instruction: '' },
+          navigateTo: EDITOR_URL,
+        },
+        {
+          target: '#bf-editor-toolbar [title="Add Select Dropdown"]',
+          title: '📋 Form Fields',
+          description: <>Collect reader input with form elements: <strong>Select</strong> dropdown, <strong>Multi-select</strong>, <strong>Text input</strong> (single line), <strong>Text area</strong> (multi-line), <strong>Radio</strong> options, and <strong>Checkboxes</strong>.</>,
+          placement: 'bottom', chapter: 2, action: { type: 'none', instruction: '' },
+          navigateTo: EDITOR_URL,
+        },
+        {
+          target: '#bf-editor-toolbar [title="Add Code Block"]',
+          title: '🧱 Blocks & Media',
+          description: <>Insert structured content: <strong>Code block</strong> (syntax-highlighted), <strong>Scripture</strong> reference, <strong>Image</strong>, and <strong>Column layout</strong> (2–5 side-by-side columns).</>,
           placement: 'bottom', chapter: 2, action: { type: 'none', instruction: '' },
           navigateTo: EDITOR_URL,
         },
@@ -144,6 +171,7 @@ export default function Layout() {
     // ── Chapter 3: Rich Content ──────────────────────────────────────────────
     {
       title: 'Rich Content',
+      description: 'Embed video, audio, polls and questions to make chapters interactive.',
       steps: [
         {
           target: null,
@@ -184,6 +212,7 @@ export default function Layout() {
     // ── Chapter 4: Publishing ────────────────────────────────────────────────
     {
       title: 'Publishing',
+      description: 'Make your book public, invite readers and create book clubs.',
       steps: [
         {
           target: '#bf-settings-publish',
@@ -391,68 +420,103 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile menu — slide-down sheet */}
         {showMobileMenu && (
-          <div className="md:hidden border-t-2 border-theme bg-surface px-4 py-4 space-y-3">
+          <div className="md:hidden border-t-2 border-strong bg-surface shadow-xl">
             {user ? (
               <>
-                <Link to="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 pb-3 border-b border-theme">
-                  <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden">
+                {/* Profile row */}
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-3 px-4 py-4 border-b border-theme hover:bg-surface-hover transition-colors"
+                >
+                  <div className="h-10 w-10 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden flex-shrink-0">
                     {profile?.avatar_url
                       ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                      : <User className="h-4 w-4 text-accent" />}
+                      : <User className="h-5 w-5 text-accent" />}
                   </div>
-                  <span className="text-sm font-medium text-theme">{profile?.display_name || user.email}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-theme truncate">{profile?.display_name || user.email}</p>
+                    <p className="text-xs text-muted">View profile →</p>
+                  </div>
                 </Link>
-                <Link to="/dashboard" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
-                  <BookOpen className="h-4 w-4 text-accent" /> My Books
-                </Link>
-                <Link to="/clubs" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
-                  <Users className="h-4 w-4 text-accent" /> Book Clubs
-                </Link>
-                <Link to="/live" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
-                  <Radio className="h-4 w-4 text-accent" /> Live Shows
-                </Link>
-                <button onClick={() => { setTutorialActive(true); setShowMobileMenu(false); }} className="flex items-center gap-2 py-2 text-sm font-medium text-theme w-full">
-                  <GraduationCap className="h-4 w-4 text-accent" /> Tutorial
-                </button>
-                {profile?.system_role === 'super_admin' && (
-                  <Link to="/admin" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-purple-500">
-                    <Shield className="h-4 w-4" /> Admin Panel
+
+                {/* Nav links */}
+                <div className="py-2">
+                  <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                    <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> My Books
                   </Link>
-                )}
-                <Link to="/profile" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium text-theme">
-                  <User className="h-4 w-4 text-accent" /> My Profile
-                </Link>
-                <Link to="/dashboard" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-2 py-2 text-sm font-medium theme-button-primary px-3 rounded-md">
-                  <Plus className="h-4 w-4" /> New Book
-                </Link>
-                <div className="border-t border-theme pt-3">
+                  <Link to="/clubs" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                    <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs
+                  </Link>
+                  <Link to="/live" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                    <Radio className="h-5 w-5 text-accent flex-shrink-0" /> Live Shows
+                  </Link>
+                  <button
+                    onClick={() => { setTutorialActive(true); setShowMobileMenu(false); }}
+                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full"
+                  >
+                    <GraduationCap className="h-5 w-5 text-accent flex-shrink-0" /> Tutorial
+                  </button>
+                  {profile?.system_role === 'super_admin' && (
+                    <Link to="/admin" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-purple-500 hover:bg-surface-hover transition-colors">
+                      <Shield className="h-5 w-5 flex-shrink-0" /> Admin Panel
+                    </Link>
+                  )}
+                </div>
+
+                {/* New book CTA */}
+                <div className="px-4 pb-3 border-t border-theme pt-3">
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center justify-center gap-2 w-full theme-button-primary px-4 py-3 rounded-xl text-sm font-semibold"
+                  >
+                    <Plus className="h-5 w-5" /> New Book
+                  </Link>
+                </div>
+
+                {/* Theme toggle */}
+                <div className="border-t border-theme">
                   <button
                     onClick={() => setShowMobileTheme(v => !v)}
-                    className="flex items-center justify-between w-full py-2 text-sm font-medium text-theme"
+                    className="flex items-center justify-between w-full px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors"
                   >
-                    <span className="flex items-center gap-2"><Palette className="h-4 w-4 text-accent" /> Colour Theme</span>
-                    {showMobileTheme ? <X className="h-4 w-4 text-muted" /> : <Settings className="h-4 w-4 text-muted" />}
+                    <span className="flex items-center gap-3"><Palette className="h-5 w-5 text-accent" /> Colour Theme</span>
+                    <ChevronDown className={`h-4 w-4 text-muted transition-transform duration-200 ${showMobileTheme ? 'rotate-180' : ''}`} />
                   </button>
-                  {showMobileTheme && <ThemeDropdownContent />}
+                  {showMobileTheme && (
+                    <div className="px-4 pb-4">
+                      <ThemeDropdownContent />
+                    </div>
+                  )}
                 </div>
-                <button onClick={handleLogout} className="flex items-center gap-2 py-2 text-sm text-red-600 w-full">
-                  <LogOut className="h-4 w-4" /> Sign Out
-                </button>
+
+                {/* Sign out */}
+                <div className="border-t border-theme">
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors w-full"
+                  >
+                    <LogOut className="h-5 w-5 flex-shrink-0" /> Sign Out
+                  </button>
+                </div>
               </>
             ) : (
-              <>
-                <Link to="/login" onClick={() => setShowMobileMenu(false)} className="flex items-center py-2 text-sm font-medium text-theme">Login</Link>
-                <Link to="/register" onClick={() => setShowMobileMenu(false)} className="flex items-center py-2 text-sm font-medium theme-button-primary px-4 rounded-md">Sign Up</Link>
-              </>
+              <div className="px-4 py-4 flex flex-col gap-3">
+                <Link to="/login" className="flex items-center justify-center py-3 text-sm font-medium text-theme border-2 border-theme rounded-xl hover:bg-surface-hover transition-colors">
+                  Login
+                </Link>
+                <Link to="/register" className="flex items-center justify-center py-3 text-sm font-medium theme-button-primary rounded-xl">
+                  Sign Up
+                </Link>
+              </div>
             )}
           </div>
         )}
       </header>
 
-      {/* Main Content */}
-      <main>
+      {/* Main Content — extra bottom padding on mobile to clear bottom nav */}
+      <main className={user ? 'pb-20 md:pb-0' : ''}>
         <Outlet />
       </main>
 
@@ -465,8 +529,54 @@ export default function Layout() {
         />
       )}
 
+      {/* Mobile bottom navigation — hidden on md+ */}
+      {user && (
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t-2 border-strong flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <Link
+            to="/dashboard"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/edit') ? 'text-accent' : 'text-muted hover:text-theme'}`}
+          >
+            <BookOpen className="h-5 w-5" />
+            <span>Books</span>
+          </Link>
+          <Link
+            to="/clubs"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/clubs') ? 'text-accent' : 'text-muted hover:text-theme'}`}
+          >
+            <Users className="h-5 w-5" />
+            <span>Clubs</span>
+          </Link>
+          <Link
+            to="/dashboard"
+            onClick={() => navigate('/dashboard')}
+            className="flex flex-col items-center justify-center flex-shrink-0 -mt-4 mx-2"
+          >
+            <div className="theme-button-primary rounded-full h-12 w-12 flex items-center justify-center shadow-lg border-2 border-surface">
+              <Plus className="h-6 w-6" />
+            </div>
+          </Link>
+          <Link
+            to="/live"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/live') ? 'text-accent' : 'text-muted hover:text-theme'}`}
+          >
+            <Radio className="h-5 w-5" />
+            <span>Live</span>
+          </Link>
+          <Link
+            to="/profile"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/profile' ? 'text-accent' : 'text-muted hover:text-theme'}`}
+          >
+            {profile?.avatar_url
+              ? <img src={profile.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+              : <User className="h-5 w-5" />
+            }
+            <span>Profile</span>
+          </Link>
+        </nav>
+      )}
+
       {/* Footer */}
-      <footer className="bg-surface border-t-2 border-strong mt-auto">
+      <footer className="bg-surface border-t-2 border-strong mt-auto hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
             <p className="text-sm text-muted">
