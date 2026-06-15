@@ -122,6 +122,11 @@ class ApiClient {
     return this.request('/books/my');
   }
 
+  async getPublicBooks(q?: string): Promise<Book[]> {
+    const params = q ? `?q=${encodeURIComponent(q)}` : '';
+    return this.request(`/books/public${params}`);
+  }
+
   async searchBooks(search: string): Promise<Book[]> {
     const qs = search.trim() ? `?search=${encodeURIComponent(search)}&limit=30` : '?limit=30';
     const result = await this.request<{ data: Book[]; count: number }>(`/books${qs}`);

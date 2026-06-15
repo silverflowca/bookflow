@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight, Search, X } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -84,6 +84,11 @@ export default function Dashboard() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewBookModal, setShowNewBookModal] = useState(false);
+  const [tab, setTab] = useState<'mine' | 'discover'>('mine');
+  const [publicBooks, setPublicBooks] = useState<Book[]>([]);
+  const [publicLoading, setPublicLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
   const { coverSize } = useTheme();
 
@@ -115,6 +120,28 @@ export default function Dashboard() {
     }
   }
 
+  const loadPublicBooks = useCallback(async (q?: string) => {
+    setPublicLoading(true);
+    try {
+      const data = await api.getPublicBooks(q);
+      setPublicBooks(data);
+    } catch (err) {
+      console.error('Failed to load public books:', err);
+    } finally {
+      setPublicLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'discover') loadPublicBooks(search || undefined);
+  }, [tab]);
+
+  function handleSearchChange(val: string) {
+    setSearch(val);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => loadPublicBooks(val || undefined), 350);
+  }
+
   async function handleDeleteBook(id: string) {
     if (!confirm('Are you sure you want to delete this book? This cannot be undone.')) {
       return;
@@ -141,10 +168,10 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div id="bf-dash-header" className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+      <div id="bf-dash-header" className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-theme theme-title">My Books</h1>
-          <p className="text-muted mt-1">Create and manage your interactive books</p>
+          <h1 className="text-2xl font-bold text-theme theme-title">Books</h1>
+          <p className="text-muted mt-1">Your library and all public books</p>
         </div>
         <button
           id="bf-new-book-btn"
@@ -156,36 +183,93 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Books Grid */}
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong"></div>
-        </div>
-      ) : books.length === 0 ? (
-        <div id="bf-dash-empty" className="text-center py-12 theme-section border-dashed">
-          <BookOpen className="h-12 w-12 text-muted mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-theme mb-2">No books yet</h3>
-          <p className="text-muted mb-4">Get started by creating your first book</p>
-          <button
-            onClick={() => setShowNewBookModal(true)}
-            className="inline-flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium"
-          >
-            <Plus className="h-5 w-5" />
-            Create Book
-          </button>
-        </div>
-      ) : (
-        <div id="bf-dash-books-grid" className={`grid gap-4 ${gridClass[coverSize]}`}>
-          {books.map((book) => (
-            <BookCard
-              key={book.id}
-              book={book}
-              coverSize={coverSize}
-              onDelete={() => handleDeleteBook(book.id)}
-              onCoverUpdate={handleCoverUpdate}
-              onUpdate={handleBookUpdate}
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-[var(--color-border)] mb-6">
+        <button
+          onClick={() => setTab('mine')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'mine' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
+        >
+          My Books
+        </button>
+        <button
+          onClick={() => setTab('discover')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'discover' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
+        >
+          Discover
+        </button>
+      </div>
+
+      {/* My Books Tab */}
+      {tab === 'mine' && (
+        loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong"></div>
+          </div>
+        ) : books.length === 0 ? (
+          <div id="bf-dash-empty" className="text-center py-12 theme-section border-dashed">
+            <BookOpen className="h-12 w-12 text-muted mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-theme mb-2">No books yet</h3>
+            <p className="text-muted mb-4">Get started by creating your first book</p>
+            <button
+              onClick={() => setShowNewBookModal(true)}
+              className="inline-flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium"
+            >
+              <Plus className="h-5 w-5" />
+              Create Book
+            </button>
+          </div>
+        ) : (
+          <div id="bf-dash-books-grid" className={`grid gap-4 ${gridClass[coverSize]}`}>
+            {books.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                coverSize={coverSize}
+                onDelete={() => handleDeleteBook(book.id)}
+                onCoverUpdate={handleCoverUpdate}
+                onUpdate={handleBookUpdate}
+              />
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Discover Tab */}
+      {tab === 'discover' && (
+        <div>
+          {/* Search */}
+          <div className="relative mb-6 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Search books by title, author..."
+              className="w-full pl-9 pr-8 py-2 theme-input rounded-lg text-sm"
             />
-          ))}
+            {search && (
+              <button onClick={() => handleSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-theme">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {publicLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong"></div>
+            </div>
+          ) : publicBooks.length === 0 ? (
+            <div className="text-center py-12 text-muted">
+              <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p>{search ? 'No books match your search.' : 'No public books yet.'}</p>
+            </div>
+          ) : (
+            <div className={`grid gap-4 ${gridClass[coverSize]}`}>
+              {publicBooks.map((book) => (
+                <DiscoverBookCard key={book.id} book={book} coverSize={coverSize} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -549,6 +633,31 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
         {actionButtons}
       </div>
     </div>
+  );
+}
+
+function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSize }) {
+  const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
+  return (
+    <Link to={`/book/${book.id}`} className="theme-card rounded-xl block hover:shadow-md transition-shadow group">
+      <div className={`${coverSize === 'large' ? 'aspect-[2/3]' : 'aspect-[3/2]'} rounded-t-xl overflow-hidden bg-surface-hover flex items-center justify-center`}>
+        {book.cover_image_url
+          ? <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+          : <BookOpen className={`${coverSize === 'large' ? 'h-16 w-16' : 'h-8 w-8'} text-accent opacity-30`} />
+        }
+      </div>
+      <div className="p-4">
+        <h3 className="font-semibold text-base truncate text-theme group-hover:text-accent transition-colors">{book.title}</h3>
+        {book.subtitle && <p className="text-xs text-muted truncate mt-0.5">{book.subtitle}</p>}
+        {(book as any).author?.display_name && (
+          <p className="text-xs text-muted mt-1">by {(book as any).author.display_name}</p>
+        )}
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-xs text-muted">{chapterCount}</span>
+          <span className="text-xs text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
+        </div>
+      </div>
+    </Link>
   );
 }
 

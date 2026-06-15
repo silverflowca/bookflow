@@ -99,6 +99,35 @@ router.get('/my', authenticate, async (req, res) => {
   }
 });
 
+// Discover all public books with optional search
+router.get('/public', authenticate, async (req, res) => {
+  try {
+    const { q } = req.query;
+    let query = supabase
+      .from('books')
+      .select(`
+        id, title, subtitle, description, cover_image_url, status, visibility, updated_at, author_id,
+        chapters:chapters(count),
+        author:profiles!books_author_id_fkey(id, display_name, avatar_url)
+      `)
+      .eq('visibility', 'public')
+      .eq('status', 'published')
+      .order('updated_at', { ascending: false })
+      .limit(60);
+
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,subtitle.ilike.%${q}%,description.ilike.%${q}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Get public books error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get books where user is a collaborator (not owner)
 router.get('/collaborating', authenticate, async (req, res) => {
   try {
