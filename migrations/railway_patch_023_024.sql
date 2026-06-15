@@ -165,7 +165,7 @@ BEGIN
     allow_public_tts, enable_progress_tracking, show_ratings
   ) VALUES (
     v_book_id, true, true, true, true, true, true, true, true, true
-  );
+  ) ON CONFLICT (book_id) DO NOTHING;
 
   -- Chapter 1
   INSERT INTO bookflow.chapters (id, book_id, title, order_index, status, content_text, content)
