@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2 } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2, Star } from 'lucide-react';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
-import ReviewBanner from '../components/review/ReviewBanner';
 
 // ── Publish Modal ─────────────────────────────────────────────────────────────
 function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
@@ -216,6 +215,12 @@ export default function BookEditor() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  // Inline review state
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewerNote, setReviewerNote] = useState('');
+  const reviewPanelRef = useRef<HTMLDivElement>(null);
   const [chapterCommentsPage, setChapterCommentsPage] = useState<Record<string, number>>({});
   const PAGE_SIZE = 5;
 
@@ -304,6 +309,67 @@ export default function BookEditor() {
       setChapters(chapters.filter(c => c.id !== id));
     } catch (err) {
       console.error('Failed to delete chapter:', err);
+    }
+  }
+
+  async function handleReviewSubmit() {
+    if (!bookId) return;
+    setReviewLoading(true);
+    try {
+      await api.submitForReview(bookId, reviewMessage);
+      setBook(prev => prev ? { ...prev, review_status: 'pending' } : prev);
+      setReviewPanelOpen(false);
+      setReviewMessage('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to submit for review');
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
+  async function handleReviewDecision(status: 'approved' | 'rejected') {
+    if (!bookId || !latestReview) return;
+    setReviewLoading(true);
+    try {
+      await api.reviewDecision(bookId, latestReview.id, { status, reviewer_note: reviewerNote });
+      setBook(prev => prev ? { ...prev, review_status: status } : prev);
+      api.getReviews(bookId).then(reviews => { if (reviews.length > 0) setLatestReview(reviews[0]); }).catch(() => {});
+      setReviewPanelOpen(false);
+      setReviewerNote('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update review');
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
+  async function handleReviewCancel() {
+    if (!bookId || !latestReview) return;
+    if (!confirm('Cancel this review request?')) return;
+    setReviewLoading(true);
+    try {
+      await api.cancelReview(bookId, latestReview.id);
+      setBook(prev => prev ? { ...prev, review_status: 'none' } : prev);
+      setReviewPanelOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to cancel review');
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
+  async function handleReviewReset() {
+    if (!bookId || !latestReview) return;
+    if (!confirm('Cancel this approval and reset to "not submitted"?')) return;
+    setReviewLoading(true);
+    try {
+      await api.resetReview(bookId, latestReview.id);
+      setBook(prev => prev ? { ...prev, review_status: 'none' } : prev);
+      setReviewPanelOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to reset review');
+    } finally {
+      setReviewLoading(false);
     }
   }
 
@@ -405,37 +471,178 @@ export default function BookEditor() {
         </div>
       </div>
 
-      {/* Status Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-surface rounded-lg border-theme border p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <span className={`px-2 py-1 text-sm font-medium rounded ${
+      {/* Status + Actions Bar */}
+      <div className="relative bg-surface rounded-lg border-theme border px-4 py-3 mb-6">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Left: status pill + chapter count */}
+          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
             book.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
           }`}>
             {book.status}
           </span>
-          <span className="text-sm text-muted">
-            {chapters.length} chapters
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted">{chapters.length} chapters</span>
+
+          <div className="flex-1" />
+
+          {/* Review status + actions */}
+          {['owner', 'author', 'reviewer'].includes(userRole) && (() => {
+            const rs = book.review_status || 'none';
+            const REVIEW_STYLE: Record<string, { pill: string; label: string }> = {
+              none:     { pill: 'bg-surface-hover text-muted border border-theme',         label: 'Not submitted' },
+              pending:  { pill: 'bg-yellow-100 text-yellow-800 border border-yellow-300',  label: 'Review pending' },
+              approved: { pill: 'bg-green-100 text-green-800 border border-green-300',     label: 'Approved' },
+              rejected: { pill: 'bg-red-100 text-red-800 border border-red-300',           label: 'Changes requested' },
+            };
+            const { pill, label } = REVIEW_STYLE[rs] ?? REVIEW_STYLE.none;
+            return (
+              <div className="relative" ref={reviewPanelRef}>
+                <button
+                  onClick={() => setReviewPanelOpen(v => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${pill}`}
+                >
+                  <Star className="h-3.5 w-3.5" />
+                  {label}
+                  <ChevronDown className="h-3 w-3 ml-0.5" />
+                </button>
+
+                {reviewPanelOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-72 bg-surface border border-theme rounded-lg shadow-xl z-50 overflow-hidden">
+                    <div className="p-3 border-b border-theme flex items-center justify-between">
+                      <span className="text-sm font-medium">Review</span>
+                      <button onClick={() => setReviewPanelOpen(false)} className="text-muted hover:text-theme"><X className="h-4 w-4" /></button>
+                    </div>
+
+                    {/* Reviewer note (if any) */}
+                    {latestReview?.reviewer_note && (
+                      <div className="px-3 py-2 border-b border-theme">
+                        <p className="text-xs text-muted italic">"{latestReview.reviewer_note}"</p>
+                      </div>
+                    )}
+
+                    <div className="p-3 space-y-2">
+                      {/* none → submit form */}
+                      {rs === 'none' && ['owner', 'author'].includes(userRole) && (
+                        <>
+                          <textarea
+                            placeholder="Message to reviewers (optional)..."
+                            value={reviewMessage}
+                            onChange={e => setReviewMessage(e.target.value)}
+                            className="w-full text-sm border border-theme rounded-lg px-3 py-2 bg-surface text-theme placeholder-muted focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                            rows={2}
+                          />
+                          <button
+                            onClick={handleReviewSubmit}
+                            disabled={reviewLoading}
+                            className="flex items-center gap-1.5 theme-button-primary px-3 py-1.5 rounded-lg text-sm font-medium w-full justify-center"
+                          >
+                            {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            Submit for review
+                          </button>
+                        </>
+                      )}
+
+                      {/* pending → reviewer can approve/reject; submitter can cancel */}
+                      {rs === 'pending' && (
+                        <>
+                          {['owner', 'reviewer'].includes(userRole) && (
+                            <>
+                              <textarea
+                                placeholder="Optional note for the author..."
+                                value={reviewerNote}
+                                onChange={e => setReviewerNote(e.target.value)}
+                                className="w-full text-sm border border-theme rounded-lg px-3 py-2 bg-surface text-theme placeholder-muted focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                                rows={2}
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleReviewDecision('approved')}
+                                  disabled={reviewLoading}
+                                  className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+                                >
+                                  {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleReviewDecision('rejected')}
+                                  disabled={reviewLoading}
+                                  className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+                                >
+                                  {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                                  Request changes
+                                </button>
+                              </div>
+                            </>
+                          )}
+                          {['owner', 'author'].includes(userRole) && latestReview?.submitted_by && (
+                            <button
+                              onClick={handleReviewCancel}
+                              disabled={reviewLoading}
+                              className="w-full text-xs text-muted hover:text-red-500 border border-theme px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Cancel request
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      {/* approved/rejected → re-submit or cancel approval */}
+                      {['approved', 'rejected'].includes(rs) && (
+                        <>
+                          {['owner', 'author'].includes(userRole) && (
+                            <>
+                              <textarea
+                                placeholder="Message to reviewers (optional)..."
+                                value={reviewMessage}
+                                onChange={e => setReviewMessage(e.target.value)}
+                                className="w-full text-sm border border-theme rounded-lg px-3 py-2 bg-surface text-theme placeholder-muted focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                                rows={2}
+                              />
+                              <button
+                                onClick={handleReviewSubmit}
+                                disabled={reviewLoading}
+                                className="flex items-center gap-1.5 theme-button-primary px-3 py-1.5 rounded-lg text-sm font-medium w-full justify-center"
+                              >
+                                {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                Re-submit for review
+                              </button>
+                            </>
+                          )}
+                          {['owner', 'reviewer'].includes(userRole) && (
+                            <button
+                              onClick={handleReviewReset}
+                              disabled={reviewLoading}
+                              className="w-full text-xs text-muted hover:text-red-500 border border-theme px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Cancel approval
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Export dropdown */}
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(v => !v)}
               disabled={!!exporting}
-              className="flex items-center gap-1.5 px-3 py-2 rounded font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-sm bg-surface-hover text-theme hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
-              {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-              {exporting ? `Exporting ${exporting.toUpperCase()}…` : 'Export'}
-              <ChevronDown size={13} />
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {exporting ? `Exporting…` : 'Export'}
+              <ChevronDown size={12} />
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+              <div className="absolute right-0 mt-1 w-44 bg-surface border border-theme rounded-lg shadow-lg z-50 overflow-hidden">
                 {(['json', 'pdf', 'epub', 'docx'] as const).map(fmt => (
                   <button
                     key={fmt}
                     onClick={() => handleExport(fmt)}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-surface-hover text-theme"
                   >
                     {fmt === 'json' ? 'Book JSON (backup)' : fmt.toUpperCase()}
                   </button>
@@ -444,17 +651,18 @@ export default function BookEditor() {
             )}
           </div>
 
-          {/* Publish button → opens modal */}
+          {/* Publish button */}
           {userRole === 'owner' && (
             <button
               onClick={() => setShowPublishModal(true)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded font-medium text-sm transition-colors ${
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-medium text-sm transition-colors ${
                 book.status === 'published'
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
-              {book.status === 'published' ? <><Globe size={14} /> Published</> : <><Globe size={14} /> Publish</>}
+              <Globe size={14} />
+              {book.status === 'published' ? 'Published' : 'Publish'}
             </button>
           )}
         </div>
@@ -468,22 +676,6 @@ export default function BookEditor() {
           onClose={() => setShowPublishModal(false)}
           onPublished={(b) => { setBook(prev => prev ? { ...prev, ...b } : prev); }}
           onUnpublished={(b) => { setBook(prev => prev ? { ...prev, ...b } : prev); }}
-        />
-      )}
-
-      {/* Review Banner — visible to all collaborators */}
-      {['owner', 'author', 'reviewer'].includes(userRole) && (
-        <ReviewBanner
-          bookId={bookId!}
-          reviewStatus={book.review_status || 'none'}
-          userRole={userRole}
-          latestReview={latestReview}
-          onStatusChange={(status) => {
-            setBook({ ...book!, review_status: status as Book['review_status'] });
-            api.getReviews(bookId!).then(reviews => {
-              if (reviews.length > 0) setLatestReview(reviews[0]);
-            }).catch(() => {});
-          }}
         />
       )}
 

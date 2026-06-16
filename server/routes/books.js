@@ -202,7 +202,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
           const { data: clubMember } = await supabase
             .schema('bookflow')
             .from('club_members')
-            .select('id')
+            .select('id, club_id')
             .eq('user_id', req.user.id)
             .in('club_id', clubIds)
             .not('invite_accepted_at', 'is', null)
@@ -210,6 +210,18 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
           if (!clubMember) {
             return res.status(403).json({ error: 'Not authorized to view this book' });
+          }
+
+          // Check if any of the user's clubs have progress tracking enabled for this book
+          const { data: clubSettingsRows } = await supabase
+            .schema('bookflow')
+            .from('club_settings')
+            .select('enable_progress_tracking')
+            .in('club_id', clubIds);
+
+          const clubProgressEnabled = (clubSettingsRows || []).some(cs => cs.enable_progress_tracking);
+          if (clubProgressEnabled) {
+            book.club_progress_tracking_enabled = true;
           }
         } else {
           return res.status(403).json({ error: 'Not authorized to view this book' });

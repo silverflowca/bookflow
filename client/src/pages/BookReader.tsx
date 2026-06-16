@@ -34,7 +34,7 @@ import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import type {
-  Book, Chapter, InlineContent, InlineContentType, QuestionData, PollData, MediaData, LinkData, NoteData, HighlightData,
+  Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData,
   AllFormResponsesResult,
 } from '../types';
@@ -51,7 +51,6 @@ export default function BookReader() {
   const [loading, setLoading] = useState(true);
   const [chapterLoading, setChapterLoading] = useState(false);
   const [showToc, setShowToc] = useState(false);
-  const [showComponentBar, setShowComponentBar] = useState(false);
   const [activeContent, setActiveContent] = useState<InlineContent | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
 
@@ -428,7 +427,7 @@ export default function BookReader() {
     }
   }, [user, bookId, book, isAuthor]);
 
-  const progressEnabled = !!(user && book?.settings?.enable_progress_tracking);
+  const progressEnabled = !!(user && (book?.settings?.enable_progress_tracking || (book as any)?.club_progress_tracking_enabled));
 
   // Load progress when chapterId, bookId, or settings become available.
   // Guard on book !== null so we don't clear stats before settings are known.
@@ -747,15 +746,6 @@ export default function BookReader() {
               <span className="font-semibold">BookFlow</span>
             </Link>
             <div className="flex items-center gap-2">
-              {/* Component bar toggle — mobile only */}
-              <button
-                onClick={() => { setShowComponentBar(v => !v); if (showComponentBar) setFilterType(null); setShowToc(false); }}
-                className="lg:hidden flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border border-theme text-muted hover:text-theme hover:bg-surface-hover transition-colors"
-                title={showComponentBar ? 'Hide component bar' : 'Show component bar'}
-              >
-                <List className="h-4 w-4" />
-                <span>{showComponentBar ? 'Hide Bar' : 'Components'}</span>
-              </button>
               <button
                 onClick={() => setShowToc(false)}
                 className="lg:hidden text-muted hover:text-theme"
@@ -911,6 +901,7 @@ export default function BookReader() {
 
         {/* Header */}
         <header className="sticky top-0 bg-surface border-b border-theme z-10">
+          {/* Row 1: nav + chapter counter + TTS + Edit */}
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <button
               onClick={() => setShowToc(true)}
@@ -965,16 +956,44 @@ export default function BookReader() {
               </Link>
             )}
           </div>
-        </header>
 
-        {/* Right Side Icons Toolbar */}
-        <RightSideToolbar
-          inlineContent={inlineContent}
-          filterType={filterType}
-          onFilterChange={setFilterType}
-          onContentSelect={setActiveContent}
-          mobileVisible={showComponentBar}
-        />
+          {/* Row 2: content filter + component type icons */}
+          <div className="border-t border-theme">
+            <div className="max-w-3xl mx-auto px-4 py-1.5 flex items-center gap-2 overflow-x-auto">
+              {/* Content filter pills */}
+              {(isAuthor || inlineContent.some(ic => ic.created_by === user?.id)) && (
+                <div className="flex items-center gap-1 shrink-0 border-r border-theme pr-2 mr-1">
+                  <span className="text-xs text-muted">Show:</span>
+                  {(['all', 'author', 'mine'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setContentFilter(f)}
+                      className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-colors ${
+                        contentFilter === f
+                          ? f === 'all' ? 'bg-primary-600 text-white'
+                            : f === 'author' ? 'bg-amber-500 text-white'
+                            : 'bg-blue-500 text-white'
+                          : 'text-muted hover:bg-surface-hover'
+                      }`}
+                    >
+                      {f === 'author' && <Crown className="h-3 w-3" />}
+                      {f === 'mine' && <User className="h-3 w-3" />}
+                      {f === 'all' ? 'All' : f === 'author' ? 'Author' : isAuthor ? 'Mine' : 'My Notes'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Component type filter icons */}
+              <HeaderComponentIcons
+                inlineContent={inlineContent}
+                filterType={filterType}
+                onFilterChange={setFilterType}
+                onContentSelect={setActiveContent}
+              />
+            </div>
+          </div>
+        </header>
 
         {/* Chapter Content */}
         {chapterLoading ? (
@@ -1174,14 +1193,7 @@ export default function BookReader() {
         />
       )}
 
-      {/* Content Filter (for author or readers with content) */}
-      {(isAuthor || inlineContent.some(ic => ic.created_by === user?.id)) && (
-        <ContentFilterBar
-          filter={contentFilter}
-          onFilterChange={setContentFilter}
-          isAuthor={isAuthor}
-        />
-      )}
+
 
     </div>
   );
@@ -1817,7 +1829,14 @@ function InlineContentBlock({ content, isAuthor = false, userId }: { content: In
 }
 
 function QuestionBlock({ content }: { content: InlineContent }) {
-  const data = content.content_data as QuestionData;
+  // Support both field naming conventions:
+  //   {question, type:'open'} (editor-created) and
+  //   {question_text, question_type:'free_response'} (SQL-seeded)
+  const raw = content.content_data as any;
+  const questionText: string = raw.question || raw.question_text || '';
+  const questionType: string = raw.type || raw.question_type || 'open';
+  const isOpenResponse = !questionType || questionType === 'open' || questionType === 'free_response';
+
   const [answer, setAnswer] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
@@ -1835,9 +1854,10 @@ function QuestionBlock({ content }: { content: InlineContent }) {
       .then(r => {
         const text = r?.answer_text ?? '';
         setAnswer(text);
+        if (text.trim() && progressEnabled) markCompleteRef.current(itemKey, 'question');
       })
       .catch(() => {});
-  }, [content.id]);
+  }, [content.id, itemKey, progressEnabled]);
 
   const save = useCallback(async (text: string) => {
     setSaveStatus('saving');
@@ -1855,7 +1875,6 @@ function QuestionBlock({ content }: { content: InlineContent }) {
     setAnswer(val);
     setSaveStatus('idle');
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    // Update progress immediately — don't wait for debounced save
     if (val.trim()) markComplete(itemKey, 'question');
     else markIncomplete(itemKey);
     saveTimer.current = setTimeout(() => save(val), 1000);
@@ -1877,8 +1896,8 @@ function QuestionBlock({ content }: { content: InlineContent }) {
           {saveStatus === 'error' && <span className="text-red-500">Error saving</span>}
         </span>
       </div>
-      <p className="text-theme font-medium mb-3">{data.question}</p>
-      {data.type === 'open' && (
+      <p className="text-theme font-medium mb-3">{questionText}</p>
+      {isOpenResponse && (
         <textarea
           value={answer}
           onChange={handleChange}
@@ -3731,118 +3750,100 @@ function InlineContentPanel({
   );
 }
 
-// Right Side Toolbar with content type icons
-function RightSideToolbar({
+// Horizontal component-type icon strip for the header bar
+function HeaderComponentIcons({
   inlineContent,
   filterType,
   onFilterChange,
   onContentSelect,
-  mobileVisible,
 }: {
   inlineContent: InlineContent[];
   filterType: string | null;
   onFilterChange: (type: string | null) => void;
   onContentSelect: (content: InlineContent) => void;
-  mobileVisible: boolean;
 }) {
-
-  // Count items by type
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    // Initialize all types with 0
     const allTypes = [
       'question', 'poll', 'highlight', 'note', 'link', 'audio', 'video',
       'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox',
       'code_block', 'scripture_block'
     ];
     allTypes.forEach(t => c[t] = 0);
-    inlineContent.forEach(item => {
-      if (c[item.content_type] !== undefined) {
-        c[item.content_type]++;
-      }
-    });
+    inlineContent.forEach(item => { if (c[item.content_type] !== undefined) c[item.content_type]++; });
     return c;
   }, [inlineContent]);
 
-  // Get items for expanded list
-  const filteredItems = filterType
-    ? inlineContent.filter(item => item.content_type === filterType)
-    : [];
+  const filteredItems = filterType ? inlineContent.filter(item => item.content_type === filterType) : [];
 
   const toolbarItems = [
-    { type: 'question', icon: MessageSquare, label: 'Questions', color: 'text-blue-600', bgColor: 'bg-blue-100', hoverBg: 'hover:bg-blue-50' },
-    { type: 'poll', icon: BarChart2, label: 'Polls', color: 'text-green-600', bgColor: 'bg-green-100', hoverBg: 'hover:bg-green-50' },
-    { type: 'highlight', icon: Highlighter, label: 'Highlights', color: 'text-yellow-600', bgColor: 'bg-yellow-100', hoverBg: 'hover:bg-yellow-50' },
-    { type: 'note', icon: StickyNote, label: 'Notes', color: 'text-purple-600', bgColor: 'bg-purple-100', hoverBg: 'hover:bg-purple-50' },
-    { type: 'link', icon: Link2, label: 'Links', color: 'text-cyan-600', bgColor: 'bg-cyan-100', hoverBg: 'hover:bg-cyan-50' },
-    { type: 'audio', icon: Play, label: 'Audio', color: 'text-orange-600', bgColor: 'bg-orange-100', hoverBg: 'hover:bg-orange-50' },
-    { type: 'video', icon: Video, label: 'Video', color: 'text-red-600', bgColor: 'bg-red-100', hoverBg: 'hover:bg-red-50' },
-    { type: 'select', icon: ChevronRight, label: 'Dropdowns', color: 'text-accent', bgColor: 'bg-indigo-100', hoverBg: 'hover:bg-indigo-50' },
-    { type: 'multiselect', icon: List, label: 'Multi-Selects', color: 'text-violet-600', bgColor: 'bg-violet-100', hoverBg: 'hover:bg-violet-50' },
-    { type: 'textbox', icon: Type, label: 'Text Inputs', color: 'text-muted', bgColor: 'bg-surface-hover', hoverBg: 'hover:bg-surface-hover' },
-    { type: 'textarea', icon: AlignLeft, label: 'Text Areas', color: 'text-muted', bgColor: 'bg-surface-hover', hoverBg: 'hover:bg-surface-hover' },
-    { type: 'radio', icon: Circle, label: 'Radio Options', color: 'text-orange-600', bgColor: 'bg-orange-100', hoverBg: 'hover:bg-orange-50' },
-    { type: 'checkbox', icon: CheckSquare, label: 'Checkboxes', color: 'text-teal-600', bgColor: 'bg-teal-100', hoverBg: 'hover:bg-teal-50' },
-    { type: 'code_block', icon: Code, label: 'Code Blocks', color: 'text-slate-600', bgColor: 'bg-slate-100', hoverBg: 'hover:bg-slate-50' },
-    { type: 'scripture_block', icon: BookOpen, label: 'Scripture', color: 'text-amber-700', bgColor: 'bg-amber-100', hoverBg: 'hover:bg-amber-50' },
+    { type: 'question',       icon: MessageSquare, label: 'Questions',    color: 'text-blue-600',   bgColor: 'bg-blue-100',   hoverBg: 'hover:bg-blue-50' },
+    { type: 'poll',           icon: BarChart2,     label: 'Polls',        color: 'text-green-600',  bgColor: 'bg-green-100',  hoverBg: 'hover:bg-green-50' },
+    { type: 'highlight',      icon: Highlighter,   label: 'Highlights',   color: 'text-yellow-600', bgColor: 'bg-yellow-100', hoverBg: 'hover:bg-yellow-50' },
+    { type: 'note',           icon: StickyNote,    label: 'Notes',        color: 'text-purple-600', bgColor: 'bg-purple-100', hoverBg: 'hover:bg-purple-50' },
+    { type: 'link',           icon: Link2,         label: 'Links',        color: 'text-cyan-600',   bgColor: 'bg-cyan-100',   hoverBg: 'hover:bg-cyan-50' },
+    { type: 'audio',          icon: Play,          label: 'Audio',        color: 'text-orange-600', bgColor: 'bg-orange-100', hoverBg: 'hover:bg-orange-50' },
+    { type: 'video',          icon: Video,         label: 'Video',        color: 'text-red-600',    bgColor: 'bg-red-100',    hoverBg: 'hover:bg-red-50' },
+    { type: 'select',         icon: ChevronRight,  label: 'Dropdowns',    color: 'text-accent',     bgColor: 'bg-indigo-100', hoverBg: 'hover:bg-indigo-50' },
+    { type: 'multiselect',    icon: List,          label: 'Multi-Select', color: 'text-violet-600', bgColor: 'bg-violet-100', hoverBg: 'hover:bg-violet-50' },
+    { type: 'textbox',        icon: Type,          label: 'Text Inputs',  color: 'text-muted',      bgColor: 'bg-surface-hover', hoverBg: 'hover:bg-surface-hover' },
+    { type: 'textarea',       icon: AlignLeft,     label: 'Text Areas',   color: 'text-muted',      bgColor: 'bg-surface-hover', hoverBg: 'hover:bg-surface-hover' },
+    { type: 'radio',          icon: Circle,        label: 'Radio',        color: 'text-orange-600', bgColor: 'bg-orange-100', hoverBg: 'hover:bg-orange-50' },
+    { type: 'checkbox',       icon: CheckSquare,   label: 'Checkboxes',   color: 'text-teal-600',   bgColor: 'bg-teal-100',   hoverBg: 'hover:bg-teal-50' },
+    { type: 'code_block',     icon: Code,          label: 'Code Blocks',  color: 'text-slate-600',  bgColor: 'bg-slate-100',  hoverBg: 'hover:bg-slate-50' },
+    { type: 'scripture_block',icon: BookOpen,      label: 'Scripture',    color: 'text-amber-700',  bgColor: 'bg-amber-100',  hoverBg: 'hover:bg-amber-50' },
   ];
+
+  // Only show icon types that have at least 1 item
+  const visibleItems = toolbarItems.filter(({ type }) => counts[type] > 0);
+  if (visibleItems.length === 0) return null;
 
   return (
     <>
-      {/* Icon Toolbar - Fixed to right; hidden on mobile unless toggled via TOC menu */}
-      <div className={`fixed right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-surface rounded-lg shadow-lg p-2 border-theme border
-        ${mobileVisible ? 'flex' : 'hidden'} lg:flex`}>
-        {toolbarItems.map(({ type, icon: Icon, label, color, bgColor, hoverBg }) => {
+      <div className="flex items-center gap-1">
+        {visibleItems.map(({ type, icon: Icon, label, color, bgColor, hoverBg }) => {
           const count = counts[type];
           const isActive = filterType === type;
-
           return (
             <button
               key={type}
               onClick={() => onFilterChange(isActive ? null : type)}
-              className={`relative p-3 rounded-lg transition-all group ${
-                isActive ? bgColor : hoverBg
-              } ${count === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
-              disabled={count === 0}
+              className={`relative flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${
+                isActive ? `${bgColor} ${color}` : `text-muted ${hoverBg} hover:${color}`
+              }`}
               title={`${label} (${count})`}
             >
-              <Icon className={`h-5 w-5 ${isActive ? color : 'text-muted group-hover:' + color}`} />
-
-              {/* Count badge */}
-              {count > 0 && (
-                <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-bold rounded-full ${bgColor} ${color}`}>
-                  {count}
-                </span>
-              )}
-
-              {/* Tooltip */}
-              <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                {label}
-              </span>
+              <Icon className="h-3.5 w-3.5" />
+              <span>{count}</span>
             </button>
           );
         })}
+        {filterType && (
+          <button
+            onClick={() => onFilterChange(null)}
+            className="ml-1 text-muted hover:text-theme"
+            title="Clear filter"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
-      {/* Expanded List Panel */}
+      {/* Expanded item list — drops down below the header */}
       {filterType && filteredItems.length > 0 && (
-        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-20 w-72 max-h-[60vh] bg-surface rounded-lg shadow-xl border-theme border overflow-hidden">
+        <div className="fixed left-1/2 -translate-x-1/2 top-[88px] z-20 w-80 max-h-[50vh] bg-surface rounded-lg shadow-xl border-theme border overflow-hidden">
           <div className="flex items-center justify-between p-3 border-b border-theme bg-surface-hover">
             <h4 className="font-semibold capitalize text-sm">{filterType}s ({filteredItems.length})</h4>
-            <button
-              onClick={() => onFilterChange(null)}
-              className="text-muted hover:text-theme"
-            >
+            <button onClick={() => onFilterChange(null)} className="text-muted hover:text-theme">
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="overflow-y-auto max-h-[calc(60vh-48px)]">
+          <div className="overflow-y-auto max-h-[calc(50vh-48px)]">
             {filteredItems.map((item, index) => (
               <button
                 key={item.id}
                 onClick={() => {
                   onContentSelect(item);
-                  // Scroll to inline mark in text, or to the block if start/end of chapter
                   const pos = item.position_in_chapter;
                   if (pos === 'start_of_chapter' || pos === 'end_of_chapter') {
                     const block = document.getElementById(`reader-block-${item.id}`);
@@ -3857,13 +3858,12 @@ function RightSideToolbar({
                   <p className="text-sm text-theme line-clamp-2 flex-1">
                     {item.anchor_text || `${filterType} ${index + 1}`}
                   </p>
-                  {/* Author/Reader Badge */}
                   {item.is_author_content ? (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full" title="Author content">
+                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
                       <Crown className="h-3 w-3" />
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full" title="Reader content">
+                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
                       <User className="h-3 w-3" />
                     </span>
                   )}
@@ -3881,6 +3881,7 @@ function RightSideToolbar({
     </>
   );
 }
+
 
 // Reader Selection Toolbar - appears when reader selects text
 function ReaderSelectionToolbar({
@@ -3980,51 +3981,3 @@ function ReaderSelectionToolbar({
   );
 }
 
-// Content Filter Bar - allows filtering by author/reader content
-function ContentFilterBar({
-  filter,
-  onFilterChange,
-  isAuthor
-}: {
-  filter: 'all' | 'author' | 'mine';
-  onFilterChange: (filter: 'all' | 'author' | 'mine') => void;
-  isAuthor: boolean;
-}) {
-  return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-surface rounded-full shadow-lg border-theme border px-3 py-2">
-      <span className="text-xs text-muted">Show:</span>
-      <button
-        onClick={() => onFilterChange('all')}
-        className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-          filter === 'all'
-            ? 'bg-primary-600 text-white'
-            : 'text-muted hover:bg-surface-hover'
-        }`}
-      >
-        All
-      </button>
-      <button
-        onClick={() => onFilterChange('author')}
-        className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-          filter === 'author'
-            ? 'bg-amber-500 text-white'
-            : 'text-muted hover:bg-surface-hover'
-        }`}
-      >
-        <Crown className="h-3 w-3" />
-        Author
-      </button>
-      <button
-        onClick={() => onFilterChange('mine')}
-        className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-          filter === 'mine'
-            ? 'bg-blue-500 text-white'
-            : 'text-muted hover:bg-surface-hover'
-        }`}
-      >
-        <User className="h-3 w-3" />
-        {isAuthor ? 'Mine' : 'My Notes'}
-      </button>
-    </div>
-  );
-}
