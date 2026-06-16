@@ -70,7 +70,9 @@ function getTargetRect(selector: string): Rect | null {
   const el = document.querySelector(selector);
   if (!el) return null;
   const r = el.getBoundingClientRect();
-  return { top: r.top + window.scrollY, left: r.left + window.scrollX, width: r.width, height: r.height };
+  // Store viewport-relative coords (no scrollY offset) so the rect is always
+  // immediately usable for fixed-position placement without any conversion.
+  return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
 // ── Tooltip position ──────────────────────────────────────────────────────────
@@ -96,9 +98,9 @@ function computeTooltipPos(rect: Rect | null, placement: TutorialStep['placement
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  // Convert absolute rect to viewport coords
-  const vpTop = rect.top - window.scrollY;
-  const vpLeft = rect.left - window.scrollX;
+  // rect is already in viewport coords
+  const vpTop = rect.top;
+  const vpLeft = rect.left;
 
   let top = 0, left = 0;
 
@@ -194,6 +196,12 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   }
 
   // ── Measure target + scroll into view ───────────────────────────────────────
+  // remeasureOnly: just read the current viewport rect without scrolling (used on scroll/resize)
+  const remeasureRect = useCallback(() => {
+    if (!step?.target) { setTargetRect(null); return; }
+    setTargetRect(getTargetRect(step.target));
+  }, [step]);
+
   const measureTarget = useCallback(() => {
     if (!step?.target) { setTargetRect(null); return; }
     const el = document.querySelector(step.target);
@@ -254,16 +262,16 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
     const t2 = setTimeout(() => measureTarget(), 500);
     // Final retry for slow mobile devices
     const t3 = setTimeout(() => measureTarget(), 1000);
-    window.addEventListener('resize', measureTarget);
-    window.addEventListener('scroll', measureTarget);
+    window.addEventListener('resize', remeasureRect);
+    window.addEventListener('scroll', remeasureRect, { passive: true });
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
-      window.removeEventListener('resize', measureTarget);
-      window.removeEventListener('scroll', measureTarget);
+      window.removeEventListener('resize', remeasureRect);
+      window.removeEventListener('scroll', remeasureRect);
     };
-  }, [step, onBeforeStep, measureTarget, navigate, location.pathname]);
+  }, [step, onBeforeStep, measureTarget, remeasureRect, navigate, location.pathname]);
 
   // ── Action listener ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -494,8 +502,8 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
       {targetRect ? (() => {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-        const sx = targetRect.left - window.scrollX - spotPad;
-        const sy = targetRect.top - window.scrollY - spotPad;
+        const sx = targetRect.left - spotPad;
+        const sy = targetRect.top - spotPad;
         const sw = targetRect.width + spotPad * 2;
         const sh = targetRect.height + spotPad * 2;
         const dim = 'rgba(0,0,0,0.55)';
