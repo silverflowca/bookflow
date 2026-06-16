@@ -1081,7 +1081,7 @@ function ImageForm({ onSubmit, onClose, initialData, isEditing, bookId }: { onSu
     const finalUrl = url.trim();
     if (!finalUrl) return;
     const contentData: ImageData = { url: finalUrl, alt: alt.trim() || undefined, caption: caption.trim() || undefined, width };
-    onSubmit({ content_data: contentData, visibility: 'all_readers', position_in_chapter: 'end_of_chapter' });
+    onSubmit({ content_data: contentData, visibility: 'all_readers', position_in_chapter: 'inline' });
   };
 
   const previewUrl = url.trim();
