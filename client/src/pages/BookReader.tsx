@@ -3855,42 +3855,50 @@ function HeaderComponentIcons({
             </button>
           </div>
           <div className="overflow-y-auto max-h-[calc(50vh-48px)]">
-            {filteredItems.map((item, index) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onContentSelect(item);
-                  const pos = item.position_in_chapter;
-                  if (pos === 'start_of_chapter' || pos === 'end_of_chapter') {
-                    const block = document.getElementById(`reader-block-${item.id}`);
-                    if (block) { block.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(block); }
-                  } else {
-                    scrollToInline(item.id);
-                  }
-                }}
-                className="w-full text-left p-3 hover:bg-surface-hover border-b border-theme last:border-b-0 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-theme line-clamp-2 flex-1">
-                    {item.anchor_text || `${filterType} ${index + 1}`}
-                  </p>
-                  {item.is_author_content ? (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
-                      <Crown className="h-3 w-3" />
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-                      <User className="h-3 w-3" />
-                    </span>
+            {filteredItems.map((item, index) => {
+              const done = completions.has(`ic:${item.id}`);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onContentSelect(item);
+                    const pos = item.position_in_chapter;
+                    if (pos === 'start_of_chapter' || pos === 'end_of_chapter') {
+                      const block = document.getElementById(`reader-block-${item.id}`);
+                      if (block) { block.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(block); }
+                    } else {
+                      scrollToInline(item.id);
+                    }
+                  }}
+                  className="w-full text-left p-3 hover:bg-surface-hover border-b border-theme last:border-b-0 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {/* Completion checkbox */}
+                    {done
+                      ? <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                      : <Circle className="h-4 w-4 text-gray-300 shrink-0" />
+                    }
+                    <p className={`text-sm line-clamp-2 flex-1 ${done ? 'text-muted line-through' : 'text-theme'}`}>
+                      {item.anchor_text || `${filterType} ${index + 1}`}
+                    </p>
+                    {item.is_author_content ? (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                        <Crown className="h-3 w-3" />
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                        <User className="h-3 w-3" />
+                      </span>
+                    )}
+                  </div>
+                  {item.content_data && (
+                    <p className="text-xs text-muted mt-1 line-clamp-1 pl-6">
+                      {(item.content_data as any).question || (item.content_data as any).note || (item.content_data as any).url || ''}
+                    </p>
                   )}
-                </div>
-                {item.content_data && (
-                  <p className="text-xs text-muted mt-1 line-clamp-1">
-                    {(item.content_data as any).question || (item.content_data as any).note || (item.content_data as any).url || ''}
-                  </p>
-                )}
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
