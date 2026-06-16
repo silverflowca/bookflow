@@ -526,6 +526,14 @@ export default function Layout() {
           chapters={TUTORIAL_CHAPTERS}
           bookId={TUTORIAL_BOOK_ID}
           onClose={() => setTutorialActive(false)}
+          onBeforeStep={(step) => {
+            // Open the BookReader sidebar before steps that target it, so the element
+            // is visible in the DOM when TutorialOverlay measures it.
+            const SIDEBAR_TARGETS = new Set(['#bf-toc-sidebar', '#bf-chapter-list', '#bf-progress-btn', '#bf-book-meta']);
+            if (step?.target && SIDEBAR_TARGETS.has(step.target)) {
+              window.dispatchEvent(new CustomEvent('bf-open-sidebar'));
+            }
+          }}
         />
       )}
 

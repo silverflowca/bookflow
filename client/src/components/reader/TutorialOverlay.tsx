@@ -250,13 +250,16 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
     }
     // Initial measure — delay to let host state changes propagate to DOM
     const t1 = setTimeout(() => measureTarget(), 200);
-    // Retry after longer delay in case element takes time to appear (e.g. sidebar animation)
-    const t2 = setTimeout(() => measureTarget(), 700);
+    // Retry after sidebar/animation completes (~300ms CSS transition)
+    const t2 = setTimeout(() => measureTarget(), 500);
+    // Final retry for slow mobile devices
+    const t3 = setTimeout(() => measureTarget(), 1000);
     window.addEventListener('resize', measureTarget);
     window.addEventListener('scroll', measureTarget);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
       window.removeEventListener('resize', measureTarget);
       window.removeEventListener('scroll', measureTarget);
     };
@@ -488,7 +491,7 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   return (
     <>
       {/* ── Spotlight overlay ───────────────────────────────────────────────── */}
-      {targetRect && !mobile ? (() => {
+      {targetRect ? (() => {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const sx = targetRect.left - window.scrollX - spotPad;
@@ -496,19 +499,21 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
         const sw = targetRect.width + spotPad * 2;
         const sh = targetRect.height + spotPad * 2;
         const dim = 'rgba(0,0,0,0.55)';
+        // On mobile the bottom sheet covers ~75vh — only show top rects above the sheet
+        const dimBottom = mobile ? Math.max(0, vh * 0.25) : Math.max(0, vh - sy - sh);
         return (
           <>
-            {/* 4 rects around the cutout — no mask needed */}
+            {/* 4 rects around the cutout */}
             <div className="fixed z-[9998] pointer-events-none" style={{ top: 0, left: 0, width: vw, height: Math.max(0, sy), background: dim }} />
             <div className="fixed z-[9998] pointer-events-none" style={{ top: sy, left: 0, width: Math.max(0, sx), height: sh, background: dim }} />
             <div className="fixed z-[9998] pointer-events-none" style={{ top: sy, left: sx + sw, width: Math.max(0, vw - sx - sw), height: sh, background: dim }} />
-            <div className="fixed z-[9998] pointer-events-none" style={{ top: sy + sh, left: 0, width: vw, height: Math.max(0, vh - sy - sh), background: dim }} />
+            <div className="fixed z-[9998] pointer-events-none" style={{ top: sy + sh, left: 0, width: vw, height: dimBottom, background: dim }} />
             {/* Blue highlight ring over the cutout */}
             <div className="fixed z-[10001] pointer-events-none rounded-lg" style={{ top: sy, left: sx, width: sw, height: sh, outline: '2px solid #3b82f6', outlineOffset: '0px' }} />
           </>
         );
       })() : (
-        /* Full dimmed backdrop when no target (or mobile — sheet covers bottom, dim the rest) */
+        /* Full dimmed backdrop when no target */
         <div className="fixed inset-0 z-[9998] bg-black/55 pointer-events-none" />
       )}
 

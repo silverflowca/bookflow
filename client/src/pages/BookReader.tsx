@@ -212,15 +212,21 @@ export default function BookReader() {
     }
   };
 
-  // Open sidebar when the Layout-level tutorial overlay steps into a sidebar-targeting step
+  // Open sidebar when the tutorial overlay is about to highlight a sidebar element
   useEffect(() => {
+    const openHandler = () => setShowToc(true);
+    window.addEventListener('bf-open-sidebar', openHandler);
+    // Legacy: also handle the step event for backward compat
     const SIDEBAR_TARGETS = new Set(['#bf-toc-sidebar', '#bf-chapter-list', '#bf-progress-btn', '#bf-book-meta']);
-    const handler = (e: Event) => {
+    const stepHandler = (e: Event) => {
       const step = (e as CustomEvent).detail;
       if (step?.target && SIDEBAR_TARGETS.has(step.target)) setShowToc(true);
     };
-    window.addEventListener('bf-tutorial-step', handler);
-    return () => window.removeEventListener('bf-tutorial-step', handler);
+    window.addEventListener('bf-tutorial-step', stepHandler);
+    return () => {
+      window.removeEventListener('bf-open-sidebar', openHandler);
+      window.removeEventListener('bf-tutorial-step', stepHandler);
+    };
   }, []);
 
   // Listen for mouseup events to detect text selection
