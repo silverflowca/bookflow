@@ -248,6 +248,7 @@ export interface MediaData {
   title?: string;
   duration?: number;
   start_time?: number;
+  size?: 25 | 50 | 75 | 100;
 }
 
 // Interactive form element types

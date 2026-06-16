@@ -135,9 +135,10 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
     }
     case 'video': {
       const src = (contentData as any)?.url || (contentData as any)?.src;
+      const sizePct = (contentData as any)?.size ?? 100;
       if (!src) return <span className="text-xs opacity-60 ml-1">[no video]</span>;
       return (
-        <div style={{ display: 'block', width: '100%' }} contentEditable={false}>
+        <div style={{ display: 'block', width: `${sizePct}%` }} contentEditable={false}>
           <video
             src={src}
             controls

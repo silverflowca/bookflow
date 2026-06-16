@@ -540,6 +540,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
   const [title, setTitle] = useState(initialData?.title || '');
   const [duration, setDuration] = useState(initialData?.duration?.toString() || '');
   const [startTime, setStartTime] = useState(initialData?.start_time?.toString() || '');
+  const [videoSize, setVideoSize] = useState<25 | 50 | 75 | 100>(initialData?.size ?? 100);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string } | null>(null);
@@ -728,6 +729,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
       title: title || undefined,
       duration: finalDuration || (mode === 'record' ? recordingTime : undefined),
       start_time: startTime ? parseInt(startTime) : undefined,
+      ...(type === 'video' ? { size: videoSize } : {}),
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers' });
   };
@@ -934,6 +936,28 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {type === 'video' && (
+        <div>
+          <label className="block text-sm font-medium mb-2">Video Size</label>
+          <div className="flex gap-2">
+            {([25, 50, 75, 100] as const).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setVideoSize(s)}
+                className={`flex-1 py-2 rounded text-sm font-medium border transition-colors ${
+                  videoSize === s
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {s}%
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
