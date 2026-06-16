@@ -729,7 +729,7 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
       title: title || undefined,
       duration: finalDuration || (mode === 'record' ? recordingTime : undefined),
       start_time: startTime ? parseInt(startTime) : undefined,
-      ...(type === 'video' ? { size: videoSize } : {}),
+      size: videoSize,
     };
     onSubmit({ content_data: contentData, visibility: 'all_readers' });
   };
@@ -939,9 +939,8 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
         </div>
       )}
 
-      {type === 'video' && (
-        <div>
-          <label className="block text-sm font-medium mb-2">Video Size</label>
+      <div>
+          <label className="block text-sm font-medium mb-2">{type === 'video' ? 'Video' : 'Audio Player'} Size</label>
           <div className="flex gap-2">
             {([25, 50, 75, 100] as const).map(s => (
               <button
@@ -959,7 +958,6 @@ function MediaForm({ type, onSubmit, onClose, maxDuration = 60, initialData, isE
             ))}
           </div>
         </div>
-      )}
 
       <div>
         <label className="block text-sm font-medium mb-1">Title (optional)</label>

@@ -127,8 +127,8 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
             src={src}
             controls
             preload="metadata"
-            className="w-full rounded"
-            style={{ height: 36 }}
+            className="rounded"
+            style={{ height: 36, width: '100%' }}
           />
         </span>
       );
@@ -290,7 +290,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   const isFullWidth = isMedia || (contentData as any)?.width === 'full';
 
   if (isMedia) {
-    const mediaSizePct = contentType === 'video' ? ((contentData as any)?.size ?? 100) : 100;
+    const mediaSizePct = (contentData as any)?.size ?? 100;
     return (
       <NodeViewWrapper as="div" className="my-2" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
         <div

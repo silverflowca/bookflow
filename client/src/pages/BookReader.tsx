@@ -2023,10 +2023,10 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
   const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const sizePct = !isAudio ? ((data as any).size ?? 100) : 100;
+  const sizePct = (data as any).size ?? 100;
 
   return (
-    <div ref={containerRef} className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined} style={!isAudio && sizePct < 100 ? { width: `${sizePct}%` } : undefined}>
+    <div ref={containerRef} className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined} style={sizePct < 100 ? { width: `${sizePct}%` } : undefined}>
       <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)]">
 
         {/* Embed (YouTube/Vimeo) */}
