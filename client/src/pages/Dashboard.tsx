@@ -195,7 +195,7 @@ export default function Dashboard() {
           onClick={() => setTab('discover')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'discover' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
         >
-          Discover
+          Discover More Books
         </button>
       </div>
 
