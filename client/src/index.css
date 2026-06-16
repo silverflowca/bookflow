@@ -495,6 +495,36 @@ body {
   margin-bottom: 1rem;
 }
 
+.reader-content ul {
+  list-style-type: disc;
+  padding-left: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.reader-content ol {
+  list-style-type: decimal;
+  padding-left: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.reader-content li {
+  display: list-item;
+  margin-bottom: 0.4rem;
+  line-height: 1.7;
+}
+
+.reader-content li > p {
+  margin-bottom: 0.2rem;
+}
+
+.reader-content blockquote {
+  border-left: 4px solid var(--color-border-strong);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 /* TTS active — pointer cursor signals click-to-seek */
 .reader-content.tts-active {
   cursor: pointer;
