@@ -135,10 +135,9 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
     }
     case 'video': {
       const src = (contentData as any)?.url || (contentData as any)?.src;
-      const sizePct = (contentData as any)?.size ?? 100;
       if (!src) return <span className="text-xs opacity-60 ml-1">[no video]</span>;
       return (
-        <div style={{ display: 'block', width: `${sizePct}%` }} contentEditable={false}>
+        <div style={{ display: 'block', width: '100%' }} contentEditable={false}>
           <video
             src={src}
             controls
@@ -296,7 +295,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
       <NodeViewWrapper as="div" className="my-2" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
         <div
           className={`px-1.5 py-1.5 rounded border ${colorClass}${ringClass} cursor-pointer`}
-          style={{ maxWidth: `${mediaSizePct}%`, boxSizing: 'border-box' }}
+          style={{ width: `${mediaSizePct}%`, boxSizing: 'border-box' }}
           onDoubleClick={handleDoubleClick}
           title="Double-click to edit"
         >
