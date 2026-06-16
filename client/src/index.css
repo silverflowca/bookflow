@@ -180,7 +180,8 @@ body {
   line-height: 1.6;
 }
 .ProseMirror li > p {
-  margin-bottom: 0.15rem;
+  display: inline;
+  margin: 0;
 }
 .ProseMirror blockquote {
   border-left: 4px solid var(--color-border-strong);
@@ -514,7 +515,8 @@ body {
 }
 
 .reader-content li > p {
-  margin-bottom: 0.2rem;
+  display: inline;
+  margin: 0;
 }
 
 .reader-content blockquote {
