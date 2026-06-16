@@ -293,23 +293,21 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   if (isMedia) {
     const mediaSizePct = contentType === 'video' ? ((contentData as any)?.size ?? 100) : 100;
     return (
-      <NodeViewWrapper
-        as="div"
-        className={`my-2 px-1.5 py-1.5 rounded border ${colorClass}${ringClass} cursor-pointer`}
-        style={{ display: mediaSizePct < 100 ? 'inline-block' : 'block', boxSizing: 'border-box', width: `${mediaSizePct}%`, verticalAlign: 'top' }}
-        data-content-id={contentId}
-        data-content-type={contentType}
-        data-testid="inline-form-node"
-        onDoubleClick={handleDoubleClick}
-        title="Double-click to edit"
-      >
-        <span className="flex items-center gap-1.5 mb-1 text-xs font-medium opacity-70" contentEditable={false}>
-          <span>{label}</span>
-          {anchorText && <span className="underline decoration-dotted underline-offset-2">{anchorText}</span>}
-        </span>
-        {contentData && (
-          <FormPreview contentType={contentType} contentData={contentData} />
-        )}
+      <NodeViewWrapper as="div" className="my-2" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
+        <div
+          className={`px-1.5 py-1.5 rounded border ${colorClass}${ringClass} cursor-pointer`}
+          style={{ width: `${mediaSizePct}%`, boxSizing: 'border-box' }}
+          onDoubleClick={handleDoubleClick}
+          title="Double-click to edit"
+        >
+          <span className="flex items-center gap-1.5 mb-1 text-xs font-medium opacity-70" contentEditable={false}>
+            <span>{label}</span>
+            {anchorText && <span className="underline decoration-dotted underline-offset-2">{anchorText}</span>}
+          </span>
+          {contentData && (
+            <FormPreview contentType={contentType} contentData={contentData} />
+          )}
+        </div>
       </NodeViewWrapper>
     );
   }
