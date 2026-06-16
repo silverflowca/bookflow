@@ -996,6 +996,7 @@ export default function BookReader() {
                 filterType={filterType}
                 onFilterChange={setFilterType}
                 onContentSelect={setActiveContent}
+                completions={chapterCompletions}
               />
             </div>
           </div>
@@ -3763,11 +3764,13 @@ function HeaderComponentIcons({
   filterType,
   onFilterChange,
   onContentSelect,
+  completions,
 }: {
   inlineContent: InlineContent[];
   filterType: string | null;
   onFilterChange: (type: string | null) => void;
   onContentSelect: (content: InlineContent) => void;
+  completions: Set<string>;
 }) {
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -3811,17 +3814,23 @@ function HeaderComponentIcons({
         {visibleItems.map(({ type, icon: Icon, label, color, bgColor, hoverBg }) => {
           const count = counts[type];
           const isActive = filterType === type;
+          const itemsOfType = inlineContent.filter(i => i.content_type === type);
+          const allDone = itemsOfType.length > 0 && itemsOfType.every(i => completions.has(`ic:${i.id}`));
           return (
             <button
               key={type}
               onClick={() => onFilterChange(isActive ? null : type)}
-              className={`relative flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${
-                isActive ? `${bgColor} ${color}` : `text-muted ${hoverBg} hover:${color}`
+              className={`relative flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-all border ${
+                allDone
+                  ? 'border-green-400 bg-green-50 text-green-700'
+                  : isActive
+                  ? `border-transparent ${bgColor} ${color}`
+                  : `border-transparent text-muted ${hoverBg} hover:${color}`
               }`}
               title={`${label} (${count})`}
             >
               <Icon className="h-3.5 w-3.5" />
-              <span>{count}</span>
+              {count > 1 && <span>{count}</span>}
             </button>
           );
         })}
