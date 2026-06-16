@@ -291,11 +291,12 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
   const isFullWidth = isMedia || (contentData as any)?.width === 'full';
 
   if (isMedia) {
+    const mediaSizePct = contentType === 'video' ? ((contentData as any)?.size ?? 100) : 100;
     return (
       <NodeViewWrapper
         as="div"
-        className={`my-2 px-1.5 py-1.5 rounded border w-full ${colorClass}${ringClass} cursor-pointer`}
-        style={{ display: 'block', boxSizing: 'border-box' }}
+        className={`my-2 px-1.5 py-1.5 rounded border ${colorClass}${ringClass} cursor-pointer`}
+        style={{ display: 'block', boxSizing: 'border-box', width: `${mediaSizePct}%` }}
         data-content-id={contentId}
         data-content-type={contentType}
         data-testid="inline-form-node"
