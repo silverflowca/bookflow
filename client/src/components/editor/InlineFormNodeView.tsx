@@ -296,7 +296,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
       <NodeViewWrapper
         as="div"
         className={`my-2 px-1.5 py-1.5 rounded border ${colorClass}${ringClass} cursor-pointer`}
-        style={{ display: 'block', boxSizing: 'border-box', width: `${mediaSizePct}%` }}
+        style={{ display: mediaSizePct < 100 ? 'inline-block' : 'block', boxSizing: 'border-box', width: `${mediaSizePct}%`, verticalAlign: 'top' }}
         data-content-id={contentId}
         data-content-type={contentType}
         data-testid="inline-form-node"
