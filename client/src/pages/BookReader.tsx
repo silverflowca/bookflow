@@ -1623,8 +1623,28 @@ function TipTapNode({
         const markerClass = getInlineContentClass(ic.content_type);
         const icon = getInlineContentIcon(ic.content_type);
 
-        if (isMediaType && position !== 'start_of_chapter' && position !== 'end_of_chapter') {
-          // Image/audio/video render inline as block — suppress anchor text (it's just the selection range)
+        if (!ic.is_author_content) {
+          // Reader-added content: show anchor text as a styled clickable marker only.
+          // Highlights show their marked text; everything else shows the anchor + icon.
+          // Clicking always opens the right-side panel — nothing renders inline.
+          const isHighlight = ic.content_type === 'highlight';
+          segments.push(
+            <span key={`reader-${ic.id}`} id={`reader-inline-${ic.id}`}
+              className={`${markerClass} cursor-pointer group`}
+              onClick={() => onContentClick(ic)}
+              title={`Click to view ${ic.content_type}`}
+            >
+              <TextWithMarks text={segText} marks={node.marks} />
+              {!isHighlight && (
+                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
+                  {icon}
+                  <User className="h-2.5 w-2.5 text-blue-500" />
+                </span>
+              )}
+            </span>
+          );
+        } else if (isMediaType && position !== 'start_of_chapter' && position !== 'end_of_chapter') {
+          // Author image/audio/video renders inline as a block player
           segments.push(
             <span key={`media-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-3 w-full">
               {ic.content_type === 'image' ? <InlineFormElement content={ic} /> : <InlineMediaPlayer content={ic} />}
