@@ -4,15 +4,17 @@ FROM node:20-alpine AS client-builder
 
 WORKDIR /app/client
 
-# Build arguments for Vite (client-side config)
+# Build arguments for Vite (baked into the JS bundle at build time, not secret at runtime)
 ARG VITE_API_URL=/api
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 
-# Set as environment variables for the build
-ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+# Expose to the build environment so Vite can inline them into the JS bundle.
+# These are public anon keys baked into client JS — not server-side secrets.
+# hadolint ignore=DL3044
+ENV VITE_API_URL=${VITE_API_URL} \
+    VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
+    VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
 # Copy client package files
 COPY client/package*.json ./

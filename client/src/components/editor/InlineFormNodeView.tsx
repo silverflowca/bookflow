@@ -304,7 +304,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
             {anchorText && <span className="underline decoration-dotted underline-offset-2">{anchorText}</span>}
           </span>
           {contentData && (
-            <FormPreview contentType={contentType} contentData={contentData} />
+            <FormPreview contentType={contentType} contentData={contentData as any} />
           )}
         </div>
       </NodeViewWrapper>
