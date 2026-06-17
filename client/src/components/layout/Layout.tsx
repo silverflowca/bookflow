@@ -585,14 +585,14 @@ export default function Layout() {
 
       {/* Footer */}
       <footer className="bg-surface border-t-2 border-strong mt-auto hidden md:block">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
-            <p className="text-sm text-muted">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-1">
+            <p className="text-xs text-muted">
               &copy; {new Date().getFullYear()} BookFlow. Interactive book platform.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="text-sm text-muted hover:text-theme transition-colors">About</a>
-              <a href="#" className="text-sm text-muted hover:text-theme transition-colors">Help</a>
+              <a href="#" className="text-xs text-muted hover:text-theme transition-colors">About</a>
+              <a href="#" className="text-xs text-muted hover:text-theme transition-colors">Help</a>
             </div>
           </div>
         </div>
