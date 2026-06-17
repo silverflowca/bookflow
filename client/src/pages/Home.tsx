@@ -490,15 +490,15 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
               {/* Add to My Books overlay — shown on hover */}
               {hoveredIndex === i && (
                 <div
-                  className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 py-2 px-1"
-                  style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(2px)' }}
+                  className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-center"
+                  style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(2px)' }}
                   onClick={e => {
                     e.stopPropagation();
                     navigate(`/book/${book.id}`);
                   }}
                 >
-                  <PlusCircle className="h-3.5 w-3.5 text-white shrink-0" />
-                  <span className="text-white text-[10px] font-semibold leading-tight whitespace-nowrap">
+                  <PlusCircle className="h-4 w-4 text-white" />
+                  <span className="text-white text-[9px] font-semibold leading-tight">
                     Add to My Books
                   </span>
                 </div>
