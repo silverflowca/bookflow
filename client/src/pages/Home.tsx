@@ -134,7 +134,8 @@ export default function Home() {
                 { icon: <Share2 className="h-4 w-4" />, text: 'Share publicly or with select readers & clubs' },
                 { icon: <Sparkles className="h-4 w-4" />, text: 'Self-publish and reach your audience directly' },
               ]}
-              cta={{ label: 'Start Writing', to: '/register' }}
+              cta={{ label: 'Start Writing', to: '/dashboard' }}
+              loggedIn={!!user}
             />
 
             {/* Readers */}
@@ -151,6 +152,7 @@ export default function Home() {
                 { icon: <PenLine className="h-4 w-4" />, text: 'Dialogue directly with the author' },
               ]}
               cta={{ label: 'Browse Books', to: '/#books' }}
+              loggedIn={!!user}
             />
 
             {/* Book Studies */}
@@ -166,7 +168,8 @@ export default function Home() {
                 { icon: <MessageCircle className="h-4 w-4" />, text: 'Discuss insights and reflections in real time' },
                 { icon: <GraduationCap className="h-4 w-4" />, text: 'Track comprehension with built-in quizzes' },
               ]}
-              cta={{ label: 'Join a Study', to: '/register' }}
+              cta={{ label: 'Join a Study', to: '/clubs' }}
+              loggedIn={!!user}
             />
 
             {/* Book Club Leaders */}
@@ -182,7 +185,8 @@ export default function Home() {
                 { icon: <HelpCircle className="h-4 w-4" />, text: 'Post study questions for your members' },
                 { icon: <Share2 className="h-4 w-4" />, text: 'Invite members with a shareable club link' },
               ]}
-              cta={{ label: 'Start a Club', to: '/register' }}
+              cta={{ label: 'Start a Club', to: '/clubs' }}
+              loggedIn={!!user}
             />
           </div>
 
@@ -526,7 +530,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
 // ─── Role Card ────────────────────────────────────────────────────────────────
 
 function RoleCard({
-  accent, icon, title, tagline, bullets, cta,
+  accent, icon, title, tagline, bullets, cta, loggedIn,
 }: {
   accent: string;
   icon: React.ReactNode;
@@ -534,6 +538,7 @@ function RoleCard({
   tagline: string;
   bullets: { icon: React.ReactNode; text: string }[];
   cta: { label: string; to: string };
+  loggedIn: boolean;
 }) {
   return (
     <div className="bg-surface rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
@@ -557,7 +562,7 @@ function RoleCard({
       {/* CTA */}
       <div className="px-6 pb-6">
         <Link
-          to={cta.to}
+          to={loggedIn ? cta.to : '/login'}
           className={`block text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r ${accent} hover:opacity-90 transition-opacity`}
         >
           {cta.label}
