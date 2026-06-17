@@ -302,9 +302,9 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
     const { w: bw, h: bh } = getBookSize(rect.width, count);
     return {
       rx: rect.width * 0.42,
-      ry: rect.height * 0.22,
+      ry: rect.height * 0.20,
       cx: rect.width / 2,
-      cy: rect.height * 0.38,
+      cy: rect.height * 0.33,
       bw,
       bh,
     };
@@ -508,7 +508,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         ))}
 
         {/* Book title/author — absolute overlay at bottom of orbit stage */}
-        <div className="absolute bottom-4 inset-x-0 flex flex-col items-center pointer-events-none">
+        <div className="absolute bottom-6 inset-x-0 flex flex-col items-center pointer-events-none">
           <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
             {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
           </p>
