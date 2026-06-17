@@ -831,6 +831,10 @@ export default function BookReader() {
             )}
           </div>
 
+          <div className="px-4 pt-3 pb-1">
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted">Chapters</span>
+          </div>
+
           <div className="flex-1 overflow-y-auto">
             <nav id="bf-chapter-list" className="px-2">
               {book.chapters?.map((ch, index) => {
