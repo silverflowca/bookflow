@@ -1318,6 +1318,10 @@ function ChapterContent({
     const unmatched = inlineContent.filter(
       ic => formTypes.includes(ic.content_type) && (!ic.position_in_chapter || ic.position_in_chapter === 'inline') && !ic.anchor_text && !assignedIds.has(ic.id)
     );
+    // Highlights/notes/questions that couldn't be matched to a text node (e.g. span split by formatting)
+    const unmatchedMarkers = inlineContent.filter(
+      ic => !assignedIds.has(ic.id) && !formTypes.includes(ic.content_type) && (!ic.position_in_chapter || ic.position_in_chapter === 'inline')
+    );
 
     return (
       <div className="prose prose-lg max-w-none">
@@ -1336,6 +1340,24 @@ function ChapterContent({
             <InlineFormElement content={ic} />
           </div>
         ))}
+        {unmatchedMarkers.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-theme">
+            {unmatchedMarkers.map(ic => {
+              const markerClass = getInlineContentClass(ic.content_type);
+              const icon = getInlineContentIcon(ic.content_type);
+              return (
+                <span key={ic.id} id={`reader-inline-${ic.id}`}
+                  className={`${markerClass} cursor-pointer text-sm px-1 rounded`}
+                  onClick={() => onContentClick(ic)}
+                  title={ic.anchor_text || ic.content_type}
+                >
+                  {ic.anchor_text || ic.content_type}
+                  {ic.content_type !== 'highlight' && <span className="ml-0.5 opacity-60">{icon}</span>}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
@@ -1677,14 +1699,17 @@ function TipTapNode({
             </span>
           );
         } else {
+          const isHighlight = ic.content_type === 'highlight';
           segments.push(
             <span key={`click-${ic.id}`} id={`reader-inline-${ic.id}`} className={`${markerClass} cursor-pointer group`}
               onClick={() => onContentClick(ic)} title={`Click to view ${ic.content_type}`}>
               <TextWithMarks text={segText} marks={node.marks} />
-              <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
-                {icon}
-                {ic.is_author_content ? <Crown className="h-2.5 w-2.5 text-amber-500" /> : <User className="h-2.5 w-2.5 text-blue-500" />}
-              </span>
+              {!isHighlight && (
+                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
+                  {icon}
+                  {ic.is_author_content ? <Crown className="h-2.5 w-2.5 text-amber-500" /> : <User className="h-2.5 w-2.5 text-blue-500" />}
+                </span>
+              )}
             </span>
           );
         }
