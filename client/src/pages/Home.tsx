@@ -75,11 +75,11 @@ export default function Home() {
       {/* Hero Section */}
       <section className="text-white overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.55) 0%, rgba(107,33,168,0.70) 100%)' }}>
         {/* Text block — sits above carousel, never overlapped */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-8 pb-4 sm:pb-8 text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-3 sm:mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-8 pb-3 text-center">
+          <h1 className="text-3xl md:text-5xl font-bold mb-2 sm:mb-4">
             Interactive Books, Engaged Readers
           </h1>
-          <p className="text-base sm:text-xl text-primary-100 mb-4 sm:mb-8 max-w-2xl mx-auto">
+          <p className="text-base sm:text-xl text-primary-100 mb-3 sm:mb-5 max-w-2xl mx-auto">
             {tagline}
           </p>
           <div className="flex gap-4 justify-center">
