@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Users, Sparkles, Star, PlusCircle } from 'lucide-react';
+import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles } from 'lucide-react';
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
@@ -82,33 +82,98 @@ export default function Home() {
         )}
       </section>
 
-      {/* Features Section */}
+      {/* Role Promo Section */}
       <section className="py-20 bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            Everything You Need to Create Interactive Books
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <FeatureCard
-              icon={<HelpCircle className="h-8 w-8" />}
-              title="Inline Questions"
-              description="Embed questions and quizzes directly in your text at any position."
+          <h2 className="text-3xl font-bold text-center mb-4">Who Is This For?</h2>
+          <p className="text-center text-muted mb-14 max-w-2xl mx-auto">
+            Whether you write, read, lead, or teach — there's a place for you here.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-8">
+
+            {/* Authors */}
+            <RoleCard
+              accent="from-purple-500 to-indigo-600"
+              icon={<PenLine className="h-7 w-7 text-white" />}
+              title="Authors"
+              tagline="Create books that breathe."
+              bullets={[
+                { icon: <BookOpen className="h-4 w-4" />, text: 'Write multi-chapter books with a rich editor' },
+                { icon: <HelpCircle className="h-4 w-4" />, text: 'Embed questions, polls, audio & video inline' },
+                { icon: <FileText className="h-4 w-4" />, text: 'Publish as interactive books or export to PDF' },
+                { icon: <Share2 className="h-4 w-4" />, text: 'Share publicly or with select readers & clubs' },
+                { icon: <Sparkles className="h-4 w-4" />, text: 'Self-publish and reach your audience directly' },
+              ]}
+              cta={{ label: 'Start Writing', to: '/register' }}
             />
-            <FeatureCard
-              icon={<Users className="h-8 w-8" />}
-              title="Polls & Discussions"
-              description="Create polls to engage readers and spark discussions."
+
+            {/* Readers */}
+            <RoleCard
+              accent="from-emerald-500 to-teal-600"
+              icon={<BookMarked className="h-7 w-7 text-white" />}
+              title="Readers"
+              tagline="Read. React. Connect."
+              bullets={[
+                { icon: <Highlighter className="h-4 w-4" />, text: 'Highlight passages and add personal notes' },
+                { icon: <MessageCircle className="h-4 w-4" />, text: 'Chat with fellow readers and spark discussions' },
+                { icon: <HelpCircle className="h-4 w-4" />, text: 'Answer embedded questions as you read' },
+                { icon: <Users className="h-4 w-4" />, text: 'Join book clubs and read together' },
+                { icon: <PenLine className="h-4 w-4" />, text: 'Dialogue directly with the author' },
+              ]}
+              cta={{ label: 'Browse Books', to: '/#books' }}
             />
-            <FeatureCard
-              icon={<Sparkles className="h-8 w-8" />}
-              title="Rich Annotations"
-              description="Add highlights, notes, and external links throughout your book."
+
+            {/* Book Studies */}
+            <RoleCard
+              accent="from-amber-500 to-orange-600"
+              icon={<GraduationCap className="h-7 w-7 text-white" />}
+              title="Book Studies"
+              tagline="Learn together, grow together."
+              bullets={[
+                { icon: <BookOpen className="h-4 w-4" />, text: 'Study books chapter by chapter as a group' },
+                { icon: <Share2 className="h-4 w-4" />, text: 'Share your reading progress with others' },
+                { icon: <HelpCircle className="h-4 w-4" />, text: 'Work through study questions together' },
+                { icon: <MessageCircle className="h-4 w-4" />, text: 'Discuss insights and reflections in real time' },
+                { icon: <GraduationCap className="h-4 w-4" />, text: 'Track comprehension with built-in quizzes' },
+              ]}
+              cta={{ label: 'Join a Study', to: '/register' }}
             />
-            <FeatureCard
-              icon={<BookOpen className="h-8 w-8" />}
-              title="Audio & Video"
-              description="Link audio and video clips to specific paragraphs."
+
+            {/* Book Club Leaders */}
+            <RoleCard
+              accent="from-rose-500 to-pink-600"
+              icon={<Crown className="h-7 w-7 text-white" />}
+              title="Book Club Leaders"
+              tagline="Lead your community."
+              bullets={[
+                { icon: <Users className="h-4 w-4" />, text: 'Create and manage your own book clubs' },
+                { icon: <BookMarked className="h-4 w-4" />, text: 'Assign books and set reading schedules' },
+                { icon: <MessageCircle className="h-4 w-4" />, text: 'Facilitate group discussions and polls' },
+                { icon: <HelpCircle className="h-4 w-4" />, text: 'Post study questions for your members' },
+                { icon: <Share2 className="h-4 w-4" />, text: 'Invite members with a shareable club link' },
+              ]}
+              cta={{ label: 'Start a Club', to: '/register' }}
             />
+          </div>
+
+          {/* Bring Old Books Alive banner */}
+          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-slate-800 to-slate-900 p-8 md:p-12 flex flex-col md:flex-row items-center gap-6 mt-4">
+            <div className="flex-shrink-0 p-4 rounded-full bg-white/10">
+              <Flame className="h-10 w-10 text-amber-400" />
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h3 className="text-2xl font-bold text-white mb-2">Bring Old Books Alive</h3>
+              <p className="text-slate-300 max-w-xl">
+                Take any classic text, public domain book, or legacy manuscript and transform it into a living, interactive experience — with embedded questions, audio narration, polls, and reader discussion built right in.
+              </p>
+            </div>
+            <Link
+              to="/register"
+              className="flex-shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-6 py-3 rounded-xl transition-colors whitespace-nowrap"
+            >
+              Get Started
+            </Link>
           </div>
         </div>
       </section>
@@ -435,16 +500,47 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   );
 }
 
-// ─── Feature Card ─────────────────────────────────────────────────────────────
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+// ─── Role Card ────────────────────────────────────────────────────────────────
+
+function RoleCard({
+  accent, icon, title, tagline, bullets, cta,
+}: {
+  accent: string;
+  icon: React.ReactNode;
+  title: string;
+  tagline: string;
+  bullets: { icon: React.ReactNode; text: string }[];
+  cta: { label: string; to: string };
+}) {
   return (
-    <div className="text-center p-6">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 text-accent mb-4">
-        {icon}
+    <div className="bg-surface rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+      {/* Header strip */}
+      <div className={`bg-gradient-to-r ${accent} px-6 py-5 flex items-center gap-4`}>
+        <div className="p-2.5 rounded-xl bg-white/20">{icon}</div>
+        <div>
+          <h3 className="text-xl font-bold text-white">{title}</h3>
+          <p className="text-white/80 text-sm">{tagline}</p>
+        </div>
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-muted">{description}</p>
+      {/* Bullets */}
+      <ul className="flex-1 px-6 py-5 space-y-3">
+        {bullets.map((b, i) => (
+          <li key={i} className="flex items-start gap-3 text-sm text-theme">
+            <span className="mt-0.5 text-muted shrink-0">{b.icon}</span>
+            {b.text}
+          </li>
+        ))}
+      </ul>
+      {/* CTA */}
+      <div className="px-6 pb-6">
+        <Link
+          to={cta.to}
+          className={`block text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r ${accent} hover:opacity-90 transition-opacity`}
+        >
+          {cta.label}
+        </Link>
+      </div>
     </div>
   );
 }
