@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef, createContext, useContext } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
+  ChevronLeft, ChevronRight, Menu, X, BookOpen, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff
+  Eye, EyeOff, HelpCircle
 } from 'lucide-react';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
@@ -1489,7 +1489,7 @@ function getInlineContentIcon(type: string): React.ReactNode {
   const iconClass = "h-3 w-3 inline-block";
   switch (type) {
     case 'question':
-      return <MessageSquare className={`${iconClass} text-blue-600`} />;
+      return <HelpCircle className={`${iconClass} text-blue-600`} />;
     case 'poll':
       return <BarChart2 className={`${iconClass} text-green-600`} />;
     case 'highlight':
@@ -1969,7 +1969,7 @@ function QuestionBlock({ content }: { content: InlineContent }) {
       style={{ background: 'var(--color-surface)' }}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-blue-500" />
+          <HelpCircle className="h-4 w-4 text-blue-500" />
           <span className="text-xs font-semibold uppercase tracking-wide text-blue-500">Reflection Question</span>
         </div>
         <span className="text-xs text-muted">
@@ -3864,7 +3864,7 @@ function HeaderComponentIcons({
   const filteredItems = filterType ? inlineContent.filter(item => item.content_type === filterType) : [];
 
   const toolbarItems = [
-    { type: 'question',       icon: MessageSquare, label: 'Questions',    color: 'text-blue-600',   bgColor: 'bg-blue-100',   hoverBg: 'hover:bg-blue-50' },
+    { type: 'question',       icon: HelpCircle,    label: 'Questions',    color: 'text-blue-600',   bgColor: 'bg-blue-100',   hoverBg: 'hover:bg-blue-50' },
     { type: 'poll',           icon: BarChart2,     label: 'Polls',        color: 'text-green-600',  bgColor: 'bg-green-100',  hoverBg: 'hover:bg-green-50' },
     { type: 'highlight',      icon: Highlighter,   label: 'Highlights',   color: 'text-yellow-600', bgColor: 'bg-yellow-100', hoverBg: 'hover:bg-yellow-50' },
     { type: 'note',           icon: StickyNote,    label: 'Notes',        color: 'text-purple-600', bgColor: 'bg-purple-100', hoverBg: 'hover:bg-purple-50' },
@@ -4065,7 +4065,7 @@ function ReaderSelectionToolbar({
   const buttons = [
     { type: 'highlight' as const, icon: Highlighter, label: 'Highlight', enabled: canAddHighlight, color: 'text-yellow-600 hover:bg-yellow-50' },
     { type: 'note' as const, icon: StickyNote, label: 'Note', enabled: canAddNote, color: 'text-purple-600 hover:bg-purple-50' },
-    { type: 'question' as const, icon: MessageSquare, label: 'Question', enabled: canAddQuestion, color: 'text-blue-600 hover:bg-blue-50' },
+    { type: 'question' as const, icon: HelpCircle,    label: 'Question', enabled: canAddQuestion, color: 'text-blue-600 hover:bg-blue-50' },
     { type: 'poll' as const, icon: BarChart2, label: 'Poll', enabled: canAddPoll, color: 'text-green-600 hover:bg-green-50' },
     { type: 'link' as const, icon: Link2, label: 'Link', enabled: canAddLink, color: 'text-cyan-600 hover:bg-cyan-50' },
     { type: 'audio' as const, icon: Play, label: 'Audio', enabled: canAddAudio, color: 'text-orange-600 hover:bg-orange-50' },

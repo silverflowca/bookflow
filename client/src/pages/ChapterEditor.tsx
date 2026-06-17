@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
-  ChevronLeft, Save, Eye, MessageSquare, BarChart2, Highlighter, StickyNote, Link2, Play,
+  ChevronLeft, Save, Eye, HelpCircle, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen,
   LayoutGrid, Image, ArrowUp, ArrowDown, Copy
@@ -811,7 +811,7 @@ export default function ChapterEditor() {
                   className="flex items-center gap-1 px-2 py-1.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors text-sm font-medium"
                   title="Comment on selected text"
                 >
-                  <MessageSquare className="h-4 w-4" />
+                  <HelpCircle className="h-4 w-4" />
                   <span className="hidden sm:inline">Comment</span>
                 </button>
               )}
@@ -822,7 +822,7 @@ export default function ChapterEditor() {
                 }`}
                 title="Comments"
               >
-                <MessageSquare className="h-4 w-4" />
+                <HelpCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Comments</span>
               </button>
               <Link
@@ -941,7 +941,7 @@ export default function ChapterEditor() {
               title="Add Question"
               className="text-blue-600"
             >
-              <MessageSquare className="h-4 w-4" />
+              <HelpCircle className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => handleAddInlineContent('poll')}
@@ -1122,7 +1122,7 @@ export default function ChapterEditor() {
                 showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
               }`}
             >
-              <MessageSquare className="h-3.5 w-3.5" />
+              <HelpCircle className="h-3.5 w-3.5" />
               Comments
             </button>
             <div className="w-px bg-theme" />
@@ -1293,7 +1293,7 @@ function InlineContentItem({
   const [showPositionMenu, setShowPositionMenu] = useState(false);
 
   const icons: Record<string, React.ReactNode> = {
-    question: <MessageSquare className="h-4 w-4 text-blue-600" />,
+    question: <HelpCircle className="h-4 w-4 text-blue-600" />,
     poll: <BarChart2 className="h-4 w-4 text-green-600" />,
     highlight: <Highlighter className="h-4 w-4 text-yellow-600" />,
     note: <StickyNote className="h-4 w-4 text-purple-600" />,
