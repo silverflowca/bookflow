@@ -1248,6 +1248,8 @@ function ChapterContent({
   inlineContent: InlineContent[];
   onContentClick: (content: InlineContent) => void;
 }) {
+  const showHighlights = useContext(HighlightsContext);
+
   // Parse TipTap JSON content if available
   const parsedContent = useMemo(() => {
     if (!content) return null;
@@ -1368,7 +1370,7 @@ function ChapterContent({
         {unmatchedMarkers.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-theme">
             {unmatchedMarkers.map(ic => {
-              const markerClass = getInlineContentClass(ic.content_type);
+              const markerClass = showHighlights ? getInlineContentClass(ic.content_type) : '';
               const icon = getInlineContentIcon(ic.content_type);
               return (
                 <span key={ic.id} id={`reader-inline-${ic.id}`}
@@ -1377,7 +1379,7 @@ function ChapterContent({
                   title={ic.anchor_text || ic.content_type}
                 >
                   {ic.anchor_text || ic.content_type}
-                  {ic.content_type !== 'highlight' && <span className="ml-0.5 opacity-60">{icon}</span>}
+                  {showHighlights && ic.content_type !== 'highlight' && <span className="ml-0.5 opacity-60">{icon}</span>}
                 </span>
               );
             })}
@@ -1432,7 +1434,7 @@ function ChapterContent({
     elements.push(
       <span
         key={`marker-${marker.id}`}
-        className={markerClass}
+        className={showHighlights ? markerClass : undefined}
         onClick={() => onContentClick(marker)}
         title={`Click to view ${marker.content_type}`}
       >
