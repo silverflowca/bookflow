@@ -487,14 +487,15 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
                 className="w-full h-full object-cover"
                 draggable={false}
               />
-              {/* Add to My Books overlay — shown on hover */}
+              {/* Read overlay — navigates to book, stops save from firing */}
               {hoveredIndex === i && (
                 <div
                   className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-center gap-0.5 py-1 px-1 text-center"
                   style={{ background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(2px)' }}
+                  onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation();
-                    navigate(`/book/${book.id}`);
+                    if (wasClickRef.current) navigate(`/book/${book.id}`);
                   }}
                 >
                   <span className="flex items-center gap-1 text-white text-xs font-bold leading-tight"><PlusCircle className="h-3.5 w-3.5 shrink-0" /> Read</span>
