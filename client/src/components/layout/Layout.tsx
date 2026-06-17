@@ -86,7 +86,7 @@ export default function Layout() {
         {
           target: '#bf-dash-header',
           title: 'My Books Dashboard',
-          description: <>The <strong>Dashboard</strong> is your home base. It shows all the books you have created. Click <strong>My Books</strong> in the nav, or the <strong><BookOpen className="inline h-3.5 w-3.5 mb-0.5" /> BookFlow</strong> logo, to get here from anywhere.</>,
+          description: <>The <strong>Dashboard</strong> is your home base. It shows all the books you have created. Click <strong>Read Books</strong> in the nav, or the <strong><BookOpen className="inline h-3.5 w-3.5 mb-0.5" /> BookFlow</strong> logo, to get here from anywhere.</>,
           placement: 'bottom', chapter: 1, action: { type: 'none', instruction: '' },
           navigateTo: '/dashboard',
         },
@@ -368,12 +368,14 @@ export default function Layout() {
               <span className="text-xl font-bold">BookFlow</span>
             </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-4">
+            {/* Desktop Navigation — always shown */}
+            <nav className="flex items-center gap-1">
               {user ? (
                 <>
-                  <Link to="/dashboard" className="relative text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                    My Books
+                  {/* Core nav — always visible, text label shown on lg+ */}
+                  <Link to="/dashboard" className="relative flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Books">
+                    <BookOpen className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Books</span>
                     {savedCount > 0 && (
                       <span
                         key={savedCount}
@@ -383,35 +385,38 @@ export default function Layout() {
                       </span>
                     )}
                   </Link>
-                  <Link id="bf-nav-clubs" to="/clubs" className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                    <Users className="h-4 w-4" /> Clubs
+                  <Link id="bf-nav-clubs" to="/clubs" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Clubs">
+                    <Users className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Clubs</span>
                   </Link>
-                  <span className="flex items-center gap-1 text-muted/40 px-3 py-2 rounded-md text-sm font-medium cursor-not-allowed select-none" title="Coming soon">
-                    <BookOpen className="h-4 w-4" /> Read Books
+                  <span className="flex items-center gap-1 text-muted/40 px-2 md:px-3 py-2 rounded-md text-sm font-medium cursor-not-allowed select-none" title="Live — coming soon">
+                    <Video className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Live</span>
                   </span>
-                  <button id="bf-tutorial-btn" onClick={() => setTutorialActive(true)} className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                  {/* Tutorial + Admin — only on xl screens */}
+                  <button id="bf-tutorial-btn" onClick={() => setTutorialActive(true)} className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <GraduationCap className="h-4 w-4" /> Tutorial
                   </button>
                   {profile?.system_role === 'super_admin' && (
-                    <Link to="/admin" className="flex items-center gap-1 text-purple-500 hover:text-purple-700 dark:hover:text-purple-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <Link to="/admin" className="hidden xl:flex items-center gap-1 text-purple-500 hover:text-purple-700 dark:hover:text-purple-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                       <Shield className="h-4 w-4" /> Admin
                     </Link>
                   )}
-                  <Link to="/dashboard" className="flex items-center gap-1 theme-button-primary px-4 py-2 rounded-md text-sm font-medium">
-                    <Plus className="h-4 w-4" /> New Book
-                  </Link>
-                  <div className="flex items-center gap-3 ml-4 pl-4 border-l-2 border-strong">
-                    <NotificationBell />
-                    <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                      <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden">
+                  {/* Profile / settings strip */}
+                  <div className="flex items-center gap-1 ml-2 pl-3 border-l-2 border-strong">
+                    <div className="hidden md:flex items-center gap-1">
+                      <NotificationBell />
+                    </div>
+                    <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity p-1" title={profile?.display_name || user.email}>
+                      <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden flex-shrink-0">
                         {profile?.avatar_url
                           ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
                           : <User className="h-4 w-4 text-accent" />}
                       </div>
-                      <span className="text-sm font-medium text-theme">{profile?.display_name || user.email}</span>
+                      <span className="hidden xl:inline text-sm font-medium text-theme">{profile?.display_name || user.email}</span>
                     </Link>
-                    <div className="relative" ref={dropdownRef}>
-                      <button onClick={() => setShowThemeDropdown(!showThemeDropdown)} className="text-muted hover:text-theme p-2 rounded-md transition-colors hover:bg-surface-hover" title="Theme Settings">
+                    <div className="relative hidden md:block" ref={dropdownRef}>
+                      <button onClick={() => setShowThemeDropdown(!showThemeDropdown)} className="text-muted hover:text-theme p-2 rounded-md transition-colors hover:bg-surface-hover" title="Settings">
                         <Settings className="h-5 w-5" />
                       </button>
                       {showThemeDropdown && (
@@ -420,8 +425,15 @@ export default function Layout() {
                         </div>
                       )}
                     </div>
-                    <button onClick={handleLogout} className="text-muted hover:text-theme p-2 rounded-md transition-colors hover:bg-surface-hover" title="Logout">
+                    <button onClick={handleLogout} className="hidden md:flex text-muted hover:text-theme p-2 rounded-md transition-colors hover:bg-surface-hover" title="Logout">
                       <LogOut className="h-5 w-5" />
+                    </button>
+                    {/* Overflow hamburger — hidden on xl+ */}
+                    <button
+                      onClick={() => setShowMobileMenu(!showMobileMenu)}
+                      className="xl:hidden text-muted hover:text-theme p-2 rounded-md transition-colors hover:bg-surface-hover"
+                    >
+                      {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                     </button>
                   </div>
                 </>
@@ -433,8 +445,8 @@ export default function Layout() {
               )}
             </nav>
 
-            {/* Mobile right side */}
-            <div className="flex md:hidden items-center gap-2">
+            {/* Mobile notification bell — always hidden since nav is always shown */}
+            <div className="hidden items-center gap-2">
               {user && <NotificationBell />}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -448,7 +460,7 @@ export default function Layout() {
 
         {/* Mobile menu — slide-down sheet */}
         {showMobileMenu && (
-          <div className="md:hidden border-t-2 border-strong bg-surface shadow-xl">
+          <div className="border-t-2 border-strong bg-surface shadow-xl">
             {user ? (
               <>
                 {/* Profile row */}
@@ -470,13 +482,13 @@ export default function Layout() {
                 {/* Nav links */}
                 <div className="py-2">
                   <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
-                    <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> My Books
+                    <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> Books
                   </Link>
                   <Link to="/clubs" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
                     <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs
                   </Link>
                   <span className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted/40 cursor-not-allowed select-none">
-                    <BookOpen className="h-5 w-5 flex-shrink-0" /> Read Books <span className="ml-1 text-xs">(coming soon)</span>
+                    <Video className="h-5 w-5 flex-shrink-0" /> Live <span className="ml-1 text-xs">(coming soon)</span>
                   </span>
                   <button
                     onClick={() => { setTutorialActive(true); setShowMobileMenu(false); }}
@@ -489,16 +501,6 @@ export default function Layout() {
                       <Shield className="h-5 w-5 flex-shrink-0" /> Admin Panel
                     </Link>
                   )}
-                </div>
-
-                {/* New book CTA */}
-                <div className="px-4 pb-3 border-t border-theme pt-3">
-                  <Link
-                    to="/dashboard"
-                    className="flex items-center justify-center gap-2 w-full theme-button-primary px-4 py-3 rounded-xl text-sm font-semibold"
-                  >
-                    <Plus className="h-5 w-5" /> New Book
-                  </Link>
                 </div>
 
                 {/* Theme toggle */}
@@ -598,8 +600,8 @@ export default function Layout() {
             </div>
           </Link>
           <span className="flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium text-muted/40 cursor-not-allowed select-none">
-            <BookOpen className="h-5 w-5" />
-            <span>Read Books</span>
+            <Video className="h-5 w-5" />
+            <span>Live</span>
           </span>
           <Link
             to="/profile"
