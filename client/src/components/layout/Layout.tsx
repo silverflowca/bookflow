@@ -386,9 +386,9 @@ export default function Layout() {
                   <Link id="bf-nav-clubs" to="/clubs" className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <Users className="h-4 w-4" /> Clubs
                   </Link>
-                  <Link to="/live" className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                    <Radio className="h-4 w-4" /> Live
-                  </Link>
+                  <span className="flex items-center gap-1 text-muted/40 px-3 py-2 rounded-md text-sm font-medium cursor-not-allowed select-none" title="Coming soon">
+                    <BookOpen className="h-4 w-4" /> Read Books
+                  </span>
                   <button id="bf-tutorial-btn" onClick={() => setTutorialActive(true)} className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <GraduationCap className="h-4 w-4" /> Tutorial
                   </button>
@@ -475,9 +475,9 @@ export default function Layout() {
                   <Link to="/clubs" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
                     <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs
                   </Link>
-                  <Link to="/live" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
-                    <Radio className="h-5 w-5 text-accent flex-shrink-0" /> Live Shows
-                  </Link>
+                  <span className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted/40 cursor-not-allowed select-none">
+                    <BookOpen className="h-5 w-5 flex-shrink-0" /> Read Books <span className="ml-1 text-xs">(coming soon)</span>
+                  </span>
                   <button
                     onClick={() => { setTutorialActive(true); setShowMobileMenu(false); }}
                     className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full"
@@ -597,13 +597,10 @@ export default function Layout() {
               <Plus className="h-6 w-6" />
             </div>
           </Link>
-          <Link
-            to="/live"
-            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/live') ? 'text-accent' : 'text-muted hover:text-theme'}`}
-          >
-            <Radio className="h-5 w-5" />
-            <span>Live</span>
-          </Link>
+          <span className="flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium text-muted/40 cursor-not-allowed select-none">
+            <BookOpen className="h-5 w-5" />
+            <span>Read Books</span>
+          </span>
           <Link
             to="/profile"
             className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/profile' ? 'text-accent' : 'text-muted hover:text-theme'}`}
