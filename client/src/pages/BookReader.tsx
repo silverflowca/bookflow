@@ -740,12 +740,12 @@ export default function BookReader() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-hover flex">
+    <div className="h-screen bg-surface-hover flex overflow-hidden">
       {/* Table of Contents Sidebar */}
       <aside id="bf-toc-sidebar" className={`fixed inset-y-0 left-0 w-72 bg-surface border-r border-theme transform transition-transform z-20 ${
         showToc ? 'translate-x-0' : '-translate-x-full'
-      } lg:relative lg:translate-x-0`}>
-        <div className="h-full flex flex-col">
+      } lg:relative lg:translate-x-0 lg:flex-shrink-0 lg:h-full`}>
+        <div className="h-full flex flex-col overflow-y-auto">
           <div className="p-4 border-b border-theme flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2 text-accent">
               <BookOpen className="h-6 w-6" />
@@ -881,10 +881,10 @@ export default function BookReader() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 relative">
+      <main className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         {/* Live Episode Banner */}
         {liveEpisode && !liveBannerDismissed && (
-          <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
+          <div className="flex-shrink-0 bg-red-600 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
             <div className="flex items-center gap-2 min-w-0">
               <span className="animate-pulse font-bold shrink-0">🔴 LIVE NOW</span>
               <span className="truncate font-medium">{liveEpisode.title}</span>
@@ -906,7 +906,7 @@ export default function BookReader() {
         )}
 
         {/* Header */}
-        <header className="sticky top-0 bg-surface border-b border-theme z-10">
+        <header className="flex-shrink-0 bg-surface border-b border-theme z-10">
           {/* Row 1: nav + chapter counter + TTS + Edit */}
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <button
@@ -1001,6 +1001,9 @@ export default function BookReader() {
             </div>
           </div>
         </header>
+
+        {/* Scrollable chapter content */}
+        <div className="flex-1 overflow-y-auto">
 
         {/* Chapter Content */}
         {chapterLoading ? (
@@ -1147,6 +1150,8 @@ export default function BookReader() {
             Select a chapter to start reading
           </div>
         )}
+
+        </div>{/* end scrollable chapter content */}
       </main>
 
 
