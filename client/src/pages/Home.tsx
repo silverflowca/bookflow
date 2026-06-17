@@ -174,6 +174,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
 
   // Book button refs for imperative DOM updates
   const bookRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Inner div refs — scale is applied here via CSS transition so it animates smoothly
+  const innerRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // React state only for the title display + hovered index (cheap — only changes on hover)
   const [hoveredTitle, setHoveredTitle] = useState<string | null>(null);
@@ -243,42 +245,48 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
 
       order.forEach(({ i, z }) => {
         const btn = bookRefs.current[i];
-        if (!btn) return;
+        const inner = innerRefs.current[i];
+        if (!btn || !inner) return;
         const theta = angleRef.current + (i / count) * Math.PI * 2;
         const x = cx + rx * Math.cos(theta) - BOOK_W / 2;
         const y = cy + ry * Math.sin(theta) - BOOK_H / 2;
         const isHovered = hoveredIndexRef.current === i;
-        // Depth scale: far=0.5, near=1.0; hovered gets a pop-up bonus
+        const isFeatured = i === featuredIndexRef.current && hoveredIndexRef.current === null;
+
+        // Depth scale applied on button (position layer) — no transition so orbit is smooth
         const depthScale = 0.5 + 0.5 * ((z + 1) / 2);
-        const isFeaturedScale = i === featuredIndexRef.current && hoveredIndexRef.current === null;
-        const scale = isHovered ? 1.5 : isFeaturedScale ? depthScale * 1.18 : depthScale;
-        // Front books that pass through the title zone get a transparency cap so text shows through
+        const tilt = isHovered ? 0 : Math.cos(theta) * 8;
+
+        // Front books that pass through the title zone get a transparency cap
         const isFront = z > 0.5;
         const baseOpacity = isHovered ? 1 : (0.3 + 0.7 * ((z + 1) / 2));
         const opacity = (!isHovered && isFront) ? Math.min(baseOpacity, 0.75) : baseOpacity;
         const zIndex = isHovered ? 150 : Math.round((z + 1) * 50);
-        const tilt = isHovered ? 0 : Math.cos(theta) * 8;
 
-        const isFeatured = i === featuredIndexRef.current && hoveredIndexRef.current === null;
-
-        btn.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${scale.toFixed(3)}) rotateY(${tilt.toFixed(1)}deg)`;
+        // Position + depth on the outer button (no transition — runs every rAF)
+        btn.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${depthScale.toFixed(3)}) rotateY(${tilt.toFixed(1)}deg)`;
         btn.style.opacity = isFeatured ? '1' : opacity.toFixed(3);
-        // Keep featured book at its natural z-order so it never covers the title area
         btn.style.zIndex = isHovered ? '150' : String(zIndex);
+        btn.style.transition = 'none';
+
+        // Scale multiplier on inner div — CSS transition handles smooth grow/shrink
+        const innerScale = isHovered ? 1.5 : isFeatured ? 1.18 : 1.0;
+        inner.style.transform = `scale(${innerScale})`;
+        inner.style.transition = isHovered
+          ? 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1)'
+          : 'transform 0.5s cubic-bezier(0.34,1.56,0.64,1)';
+
+        // Glow + outline on button (CSS transition handles fade)
         btn.style.filter = isHovered
           ? 'drop-shadow(0 0 14px rgba(255,255,255,0.5))'
           : isFeatured
             ? 'drop-shadow(0 0 6px rgba(255,255,255,0.5))'
             : '';
-        // White outline — fades in smoothly when book becomes featured
         btn.style.outline = isFeatured ? '3px solid rgba(255,255,255,0.9)' : '3px solid rgba(255,255,255,0)';
-        btn.style.outlineOffset = isFeatured ? '3px' : '3px';
+        btn.style.outlineOffset = '3px';
         btn.style.borderRadius = '0.75rem';
-        btn.style.transition = isHovered
-          ? 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s, filter 0.2s, outline-color 0.4s'
-          : isFeatured
-            ? 'transform 0.4s ease, outline-color 0.5s ease, filter 0.5s ease, opacity 0.3s ease'
-            : 'outline-color 0.4s ease, filter 0.3s ease';
+        // Allow outline/filter to animate — but not transform (that's the rAF position)
+        btn.style.transition = 'outline-color 0.5s ease, filter 0.5s ease, opacity 0.3s ease';
       });
 
       rafRef.current = requestAnimationFrame(tick);
@@ -359,7 +367,11 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
               if (wasClickRef.current) navigate(`/book/${book.id}`);
             }}
           >
-            <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 relative">
+            <div
+              ref={el => { innerRefs.current[i] = el; }}
+              className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 relative"
+              style={{ transformOrigin: 'center center' }}
+            >
               <img
                 src={book.cover_image_url!}
                 alt={book.title}
