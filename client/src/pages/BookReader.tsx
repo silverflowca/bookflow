@@ -1585,7 +1585,7 @@ function TipTapNode({
     case 'text': {
       const nodeText = node.text || '';
       const FORM_TYPES_SET = new Set(['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block']);
-      const MEDIA_TYPES_SET = new Set(['audio', 'video']);
+      const MEDIA_TYPES_SET = new Set(['audio', 'video', 'image']);
 
       // Look up pre-assigned matches for this exact node key (computed before render, no mutation)
       const matchingContent = (nodeKeyPrefix && assignmentMap?.get(nodeKeyPrefix)) || [];
@@ -1623,10 +1623,10 @@ function TipTapNode({
         const icon = getInlineContentIcon(ic.content_type);
 
         if (isMediaType && position !== 'start_of_chapter' && position !== 'end_of_chapter') {
-          // Audio/video always renders as a player inline — suppress anchor text (it's just the selection range)
+          // Image/audio/video render inline as block — suppress anchor text (it's just the selection range)
           segments.push(
             <span key={`media-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-3 w-full">
-              <InlineMediaPlayer content={ic} />
+              {ic.content_type === 'image' ? <InlineFormElement content={ic} /> : <InlineMediaPlayer content={ic} />}
             </span>
           );
         } else if (isFormType && position === 'inline') {
