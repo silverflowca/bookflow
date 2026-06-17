@@ -5,9 +5,28 @@ import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 
+// ─── Carousel config (written by AdminPage, read here) ───────────────────────
+export const CAROUSEL_SETTINGS_KEY = 'bookflow_carousel_settings';
+export interface CarouselSettings {
+  secondsPerRev: number; // 4–30
+  maxBooks: number;      // 4–20
+}
+export const CAROUSEL_DEFAULTS: CarouselSettings = { secondsPerRev: 10, maxBooks: 12 };
+
+export function loadCarouselSettings(): CarouselSettings {
+  try {
+    const raw = localStorage.getItem(CAROUSEL_SETTINGS_KEY);
+    if (!raw) return CAROUSEL_DEFAULTS;
+    return { ...CAROUSEL_DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    return CAROUSEL_DEFAULTS;
+  }
+}
+
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [carouselSettings] = useState<CarouselSettings>(loadCarouselSettings);
 
   useEffect(() => {
     loadBooks();
@@ -55,7 +74,9 @@ export default function Home() {
         </div>
 
         {/* Spiral book carousel */}
-        {!loading && books.length > 0 && <SpiralCarousel books={books} />}
+        {!loading && books.length > 0 && (
+          <SpiralCarousel books={books} settings={carouselSettings} />
+        )}
       </section>
 
       {/* Features Section */}
@@ -126,16 +147,19 @@ export default function Home() {
 
 const BOOK_W = 80;   // px width of each book card
 const BOOK_H = 107;  // px height (3:4 ratio)
-const AUTO_RPM = 6;  // seconds per revolution
 
-function SpiralCarousel({ books }: { books: Book[] }) {
+function SpiralCarousel({ books, settings }: { books: Book[]; settings: CarouselSettings }) {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  const maxBooks = settings.maxBooks;
 
   // Pad to at least 6 items so the orbit looks full
   const items = books.length < 6
-    ? Array.from({ length: Math.ceil(6 / books.length) }, () => books).flat().slice(0, 10)
-    : books.slice(0, 12);
+    ? Array.from({ length: Math.ceil(6 / books.length) }, () => books).flat().slice(0, maxBooks)
+    : books.slice(0, maxBooks);
 
   const count = items.length;
 
@@ -175,12 +199,9 @@ function SpiralCarousel({ books }: { books: Book[] }) {
       last = now;
 
       if (!draggingRef.current) {
-        // Auto-rotate + dampen any residual drag velocity
-        const autoSpeed = (Math.PI * 2) / AUTO_RPM;
-        velRef.current = velRef.current * 0.92 + autoSpeed * dt * 0.08; // blend toward auto
-        // Actually: auto is additive baseline; dampen drag residual separately
+        const autoSpeed = (Math.PI * 2) / settingsRef.current.secondsPerRev;
         angleRef.current += autoSpeed * dt + velRef.current;
-        velRef.current *= 0.88;
+        velRef.current *= 0.88; // dampen residual drag momentum
       }
 
       const { rx, ry, cx, cy } = getEllipse();

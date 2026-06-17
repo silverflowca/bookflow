@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
+import {
+  CAROUSEL_SETTINGS_KEY,
+  CAROUSEL_DEFAULTS,
+  loadCarouselSettings,
+  type CarouselSettings,
+} from './Home';
 
 interface AdminStats {
   users: number;
@@ -12,7 +18,7 @@ interface AdminStats {
   super_admins: number;
 }
 
-type Tab = 'users' | 'books' | 'clubs';
+type Tab = 'users' | 'books' | 'clubs' | 'carousel';
 
 export default function AdminPage() {
   const { profile } = useAuth();
@@ -26,6 +32,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roleActionId, setRoleActionId] = useState<string | null>(null);
+  const [carousel, setCarousel] = useState<CarouselSettings>(loadCarouselSettings);
+  const [carouselSaved, setCarouselSaved] = useState(false);
 
   // Guard — non super-admins bounced to dashboard
   useEffect(() => {
@@ -130,16 +138,17 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-surface-hover">
-        {(['users', 'books', 'clubs'] as Tab[]).map(t => (
+        {(['users', 'books', 'clubs', 'carousel'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => loadTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors -mb-px ${
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors -mb-px ${
               tab === t
                 ? 'border-purple-500 text-purple-600 dark:text-purple-400'
                 : 'border-transparent text-muted hover:text-theme'
             }`}
           >
+            {t === 'carousel' && <Clapperboard className="h-3.5 w-3.5" />}
             {t}
           </button>
         ))}
@@ -252,6 +261,86 @@ export default function AdminPage() {
                   </a>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── Carousel tab ──────────────────────────────────────────────────── */}
+          {tab === 'carousel' && (
+            <div className="max-w-lg space-y-8">
+              <p className="text-sm text-muted">
+                Configure the spinning book carousel displayed in the home page hero section.
+                Changes take effect the next time the home page loads.
+              </p>
+
+              {/* Speed */}
+              <div className="theme-section rounded-xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-medium text-theme text-sm">Rotation speed</label>
+                  <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 tabular-nums">
+                    {carousel.secondsPerRev}s / revolution
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={4} max={30} step={1}
+                  value={carousel.secondsPerRev}
+                  onChange={e => setCarousel(prev => ({ ...prev, secondsPerRev: Number(e.target.value) }))}
+                  className="w-full accent-purple-500"
+                />
+                <div className="flex justify-between text-xs text-muted">
+                  <span>Fast (4 s)</span>
+                  <span>Slow (30 s)</span>
+                </div>
+              </div>
+
+              {/* Book count */}
+              <div className="theme-section rounded-xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-medium text-theme text-sm">Max books shown</label>
+                  <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 tabular-nums">
+                    {carousel.maxBooks} books
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={4} max={20} step={1}
+                  value={carousel.maxBooks}
+                  onChange={e => setCarousel(prev => ({ ...prev, maxBooks: Number(e.target.value) }))}
+                  className="w-full accent-purple-500"
+                />
+                <div className="flex justify-between text-xs text-muted">
+                  <span>4 books</span>
+                  <span>20 books</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    localStorage.setItem(CAROUSEL_SETTINGS_KEY, JSON.stringify(carousel));
+                    setCarouselSaved(true);
+                    setTimeout(() => setCarouselSaved(false), 2500);
+                  }}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Save settings
+                </button>
+                <button
+                  onClick={() => {
+                    setCarousel(CAROUSEL_DEFAULTS);
+                    localStorage.removeItem(CAROUSEL_SETTINGS_KEY);
+                    setCarouselSaved(true);
+                    setTimeout(() => setCarouselSaved(false), 2500);
+                  }}
+                  className="px-4 py-2 bg-surface-hover hover:bg-surface text-muted text-sm font-medium rounded-lg transition-colors border border-theme"
+                >
+                  Reset to defaults
+                </button>
+                {carouselSaved && (
+                  <span className="text-sm text-green-600 dark:text-green-400 font-medium">✓ Saved</span>
+                )}
+              </div>
             </div>
           )}
         </>
