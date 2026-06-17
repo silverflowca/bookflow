@@ -84,7 +84,7 @@ export default function Dashboard() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewBookModal, setShowNewBookModal] = useState(false);
-  const [tab, setTab] = useState<'mine' | 'discover'>('mine');
+  const [tab, setTab] = useState<'mine' | 'discover'>('discover');
   const [publicBooks, setPublicBooks] = useState<Book[]>([]);
   const [publicLoading, setPublicLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -186,16 +186,16 @@ export default function Dashboard() {
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border)] mb-6">
         <button
+          onClick={() => setTab('discover')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'discover' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
+        >
+          Discover Books
+        </button>
+        <button
           onClick={() => setTab('mine')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'mine' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
         >
           My Books
-        </button>
-        <button
-          onClick={() => setTab('discover')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'discover' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
-        >
-          Discover More Books
         </button>
       </div>
 
