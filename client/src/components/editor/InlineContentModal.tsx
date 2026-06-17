@@ -299,16 +299,24 @@ function PollForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
   );
   const [allowMultiple, setAllowMultiple] = useState(initialData?.allow_multiple || false);
   const [showResultsBefore, setShowResultsBefore] = useState(initialData?.show_results_before_vote || false);
+  const [optionError, setOptionError] = useState('');
 
   const addOption = () => {
     setOptions([...options, { id: `opt_${Date.now()}`, text: '' }]);
+    setOptionError('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const filledOptions = options.filter(o => o.text.trim());
+    if (filledOptions.length < 2) {
+      setOptionError('A poll must have at least 2 options.');
+      return;
+    }
+    setOptionError('');
     const contentData: PollData = {
       question,
-      options: options.filter(o => o.text.trim()),
+      options: filledOptions,
       allow_multiple: allowMultiple,
       show_results_before_vote: showResultsBefore,
     };
@@ -363,6 +371,7 @@ function PollForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit: (da
           >
             <Plus className="h-4 w-4" /> Add Option
           </button>
+          {optionError && <p className="text-xs text-red-500 mt-1">{optionError}</p>}
         </div>
       </div>
 
