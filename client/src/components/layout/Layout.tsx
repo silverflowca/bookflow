@@ -73,7 +73,7 @@ export default function Layout() {
           target: '.reader-content',
           title: 'Chapter Content',
           description: <>The chapter text appears here. Interactive elements like questions, polls and form fields are embedded directly in the text or shown below it.</>,
-          placement: 'top', chapter: 0, action: { type: 'scroll', instruction: 'Scroll down to read the chapter content.' },
+          placement: 'top', chapter: 0, action: { type: 'none', instruction: '' },
           navigateTo: READER_URL,
         },
       ],
