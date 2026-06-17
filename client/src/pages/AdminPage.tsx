@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -10,6 +10,7 @@ import {
   loadCarouselSettings,
   type CarouselSettings,
 } from './Home';
+import SettingsPage from './Settings';
 
 interface AdminStats {
   users: number;
@@ -18,7 +19,7 @@ interface AdminStats {
   super_admins: number;
 }
 
-type Tab = 'users' | 'books' | 'clubs' | 'carousel';
+type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings';
 
 export default function AdminPage() {
   const { profile } = useAuth();
@@ -138,7 +139,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-surface-hover">
-        {(['users', 'books', 'clubs', 'carousel'] as Tab[]).map(t => (
+        {(['users', 'books', 'clubs', 'carousel', 'settings'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => loadTab(t)}
@@ -149,6 +150,7 @@ export default function AdminPage() {
             }`}
           >
             {t === 'carousel' && <Clapperboard className="h-3.5 w-3.5" />}
+            {t === 'settings' && <Settings className="h-3.5 w-3.5" />}
             {t}
           </button>
         ))}
@@ -265,6 +267,13 @@ export default function AdminPage() {
           )}
 
           {/* ── Carousel tab ──────────────────────────────────────────────────── */}
+          {/* ── Settings tab ──────────────────────────────────────────────────── */}
+          {tab === 'settings' && (
+            <div className="-mx-4">
+              <SettingsPage />
+            </div>
+          )}
+
           {tab === 'carousel' && (
             <div className="max-w-lg space-y-8">
               <p className="text-sm text-muted">

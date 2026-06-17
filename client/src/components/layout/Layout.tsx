@@ -278,14 +278,14 @@ export default function Layout() {
 
   const ThemeDropdownContent = () => (
     <div className="theme-modal rounded-lg overflow-hidden">
-      {/* More Settings — prominent at top */}
+      {/* More Settings — goes to Admin for super admins, otherwise Settings */}
       <Link
-        to="/settings"
+        to={profile?.system_role === 'super_admin' ? '/admin' : '/settings'}
         onClick={() => { setShowThemeDropdown(false); setShowMobileMenu(false); }}
         className="flex items-center gap-3 px-4 py-3 border-b-2 border-theme text-sm font-semibold text-theme hover:bg-surface-hover transition-colors"
       >
         <Settings className="h-4 w-4 text-accent" />
-        <span>More Settings</span>
+        <span>{profile?.system_role === 'super_admin' ? 'Admin & Settings' : 'More Settings'}</span>
       </Link>
 
       {/* Colour Themes — collapsible sub-section */}
