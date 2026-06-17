@@ -23,13 +23,17 @@ export function loadCarouselSettings(): CarouselSettings {
   }
 }
 
+const DEFAULT_TAGLINE = 'Authors, readers, book clubs, write: Read, Write, Publish, Chat, Audio, Video, Interactive books, Online Forms, questions and answers.';
+
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [carouselSettings] = useState<CarouselSettings>(loadCarouselSettings);
+  const [tagline, setTagline] = useState(DEFAULT_TAGLINE);
 
   useEffect(() => {
     loadBooks();
+    api.getPublicSettings().then(s => { if (s.home_tagline) setTagline(s.home_tagline); }).catch(() => {});
   }, []);
 
   async function loadBooks() {
@@ -54,7 +58,7 @@ export default function Home() {
             Interactive Books, Engaged Readers
           </h1>
           <p className="text-base sm:text-xl text-primary-100 mb-4 sm:mb-8 max-w-2xl mx-auto">
-            Authors, readers, book clubs, write: Read, Write, Publish, Chat, forms, Interactive books, audio, video, questions and answers.
+            {tagline}
           </p>
           <div className="flex gap-4 justify-center">
             <Link

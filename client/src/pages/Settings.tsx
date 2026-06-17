@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe } from 'lucide-react';
 import api from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import type { CoverSize } from '../contexts/ThemeContext';
@@ -11,6 +11,7 @@ interface AppSettings {
   deepgram_api_key: string;
   restream_client_id: string;
   restream_client_secret: string;
+  home_tagline: string;
 }
 
 const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string; preview: string }[] = [
@@ -28,6 +29,7 @@ export default function Settings() {
     deepgram_api_key: '',
     restream_client_id: '',
     restream_client_secret: '',
+    home_tagline: '',
   });
   const [showKey, setShowKey] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
@@ -68,6 +70,7 @@ export default function Settings() {
         deepgram_api_key: data.deepgram_api_key || '',
         restream_client_id: data.restream_client_id || '',
         restream_client_secret: data.restream_client_secret || '',
+        home_tagline: data.home_tagline || '',
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -77,6 +80,7 @@ export default function Settings() {
         deepgram_api_key: '',
         restream_client_id: '',
         restream_client_secret: '',
+        home_tagline: '',
       });
     }
   }
@@ -153,6 +157,34 @@ export default function Settings() {
         <div>
           <h1 className="text-2xl font-bold">App Settings</h1>
           <p className="text-gray-500">Configure integrations and preferences</p>
+        </div>
+      </div>
+
+      {/* Home Page Settings */}
+      <div className="bg-white rounded-lg border mb-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Globe className="h-5 w-5 text-primary-500" />
+            <h2 className="text-lg font-semibold">Home Page</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            Customize text displayed on the public home page hero section.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hero Tagline
+            </label>
+            <textarea
+              rows={3}
+              value={settings.home_tagline}
+              onChange={e => setSettings({ ...settings, home_tagline: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm resize-none"
+              placeholder="Authors, readers, book clubs, write: Read, Write, Publish, Chat, Audio, Video, Interactive books, Online Forms, questions and answers."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Leave empty to use the default tagline.
+            </p>
+          </div>
         </div>
       </div>
 

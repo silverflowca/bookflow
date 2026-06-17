@@ -23,6 +23,7 @@ router.get('/', authenticate, async (req, res) => {
         deepgram_api_key: '',
         restream_client_id: '',
         restream_client_secret: '',
+        home_tagline: '',
       });
     }
 
@@ -32,6 +33,7 @@ router.get('/', authenticate, async (req, res) => {
       deepgram_api_key: data.deepgram_api_key || '',
       restream_client_id: data.restream_client_id || '',
       restream_client_secret: data.restream_client_secret || '',
+      home_tagline: data.home_tagline || '',
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -41,7 +43,7 @@ router.get('/', authenticate, async (req, res) => {
 
 // Update app settings
 router.put('/', authenticate, async (req, res) => {
-  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret } = req.body;
+  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline } = req.body;
 
   try {
     const { data, error } = await supabase
@@ -53,6 +55,7 @@ router.put('/', authenticate, async (req, res) => {
         deepgram_api_key: deepgram_api_key || '',
         restream_client_id: restream_client_id || '',
         restream_client_secret: restream_client_secret || '',
+        home_tagline: home_tagline || '',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
@@ -68,10 +71,36 @@ router.put('/', authenticate, async (req, res) => {
       deepgram_api_key: data.deepgram_api_key || '',
       restream_client_id: data.restream_client_id || '',
       restream_client_secret: data.restream_client_secret || '',
+      home_tagline: data.home_tagline || '',
     });
   } catch (err) {
     console.error('Update settings error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Public home page settings — no auth required, returns display-only fields
+router.get('/public', async (req, res) => {
+  try {
+    // Find the first super_admin's settings to use as the site-wide config
+    const { data: admin } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('system_role', 'super_admin')
+      .limit(1)
+      .maybeSingle();
+
+    if (!admin) return res.json({ home_tagline: '' });
+
+    const { data } = await supabase
+      .from('app_settings')
+      .select('home_tagline')
+      .eq('user_id', admin.id)
+      .maybeSingle();
+
+    res.json({ home_tagline: data?.home_tagline || '' });
+  } catch (err) {
+    res.json({ home_tagline: '' });
   }
 });
 

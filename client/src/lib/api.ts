@@ -399,15 +399,19 @@ class ApiClient {
   }
 
   // App Settings
-  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string }> {
+  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string }> {
     return this.request('/settings');
   }
 
-  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string }): Promise<void> {
+  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string }): Promise<void> {
     return this.request('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     });
+  }
+
+  async getPublicSettings(): Promise<{ home_tagline: string }> {
+    return this.request('/settings/public');
   }
 
   async getRestreamStatus(): Promise<{ connected: boolean; has_credentials: boolean; has_token: boolean; expires_at: string | null }> {
