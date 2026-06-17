@@ -35,7 +35,8 @@ export default function Home() {
   async function loadBooks() {
     try {
       const response = await api.getBooks({ visibility: 'public', status: 'published' });
-      setBooks(response.data || []);
+      // Only keep books that have a cover image (carousel only shows covers)
+      setBooks((response.data || []).filter((b: Book) => !!b.cover_image_url));
     } catch (err) {
       console.error('Failed to load books:', err);
     } finally {
@@ -180,6 +181,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
 
   // Track drag distance to distinguish click vs drag
   const dragDistRef = useRef(0);
+  const wasClickRef = useRef(true); // true if pointer-up had small drag distance
 
   const getEllipse = useCallback(() => {
     const el = containerRef.current;
@@ -253,6 +255,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     draggingRef.current = true;
     dragDistRef.current = 0;
+    wasClickRef.current = true;
     lastXRef.current = e.clientX;
     lastTimeRef.current = performance.now();
     velRef.current = 0;
@@ -274,6 +277,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   }, [getEllipse]);
 
   const onPointerUp = useCallback(() => {
+    wasClickRef.current = dragDistRef.current < 8;
     draggingRef.current = false;
   }, []);
 
@@ -294,18 +298,12 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         style={{ background: 'linear-gradient(to left, rgba(30,58,138,0.92), transparent)' }} />
 
       {/* Hovered book title — pinned to very bottom of hero */}
-      <div className="absolute bottom-0 left-0 right-0 z-[202] pointer-events-none flex flex-col items-center gap-1 pb-5">
+      <div className="absolute bottom-0 left-0 right-0 z-[202] pointer-events-none flex items-center justify-center pb-5" style={{ minHeight: '2.5rem' }}>
         <p
           className="text-white font-semibold text-xl text-center px-8 drop-shadow-lg transition-opacity duration-200"
-          style={{ opacity: hoveredTitle ? 1 : 0, minHeight: '1.75rem' }}
+          style={{ opacity: hoveredTitle ? 1 : 0 }}
         >
           {hoveredTitle ?? ''}
-        </p>
-        <p
-          className="text-white/50 text-xs tracking-widest uppercase transition-opacity duration-200"
-          style={{ opacity: hoveredTitle ? 0 : 1 }}
-        >
-          drag to spin · click to read
         </p>
       </div>
 
@@ -329,7 +327,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
             setHoveredTitle(null);
           }}
           onClick={() => {
-            if (dragDistRef.current < 8) navigate(`/book/${book.id}`);
+            if (wasClickRef.current) navigate(`/book/${book.id}`);
           }}
         >
           <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20">
