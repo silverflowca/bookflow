@@ -49,11 +49,11 @@ export default function Home() {
       {/* Hero Section */}
       <section className="text-white overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.55) 0%, rgba(107,33,168,0.70) 100%)' }}>
         {/* Text block — sits above carousel, never overlapped */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-16 pb-4 sm:pb-8 text-center">
+          <h1 className="text-3xl md:text-5xl font-bold mb-3 sm:mb-6">
             Interactive Books, Engaged Readers
           </h1>
-          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-base sm:text-xl text-primary-100 mb-4 sm:mb-8 max-w-2xl mx-auto">
             Authors, readers, book clubs, write: Read, Write, Publish, Chat, forms, Interactive books, audio, video, questions and answers.
           </p>
           <div className="flex gap-4 justify-center">
@@ -330,12 +330,12 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   }, []);
 
   return (
-    <div className="w-full pb-8">
-      {/* Orbit stage — fixed height, relative so books position inside it */}
+    <div className="w-full pb-4 sm:pb-8">
+      {/* Orbit stage — shorter on mobile so carousel + title fit on screen */}
       <div
         ref={containerRef}
         className="relative w-full select-none"
-        style={{ height: 340, cursor: 'grab' }}
+        style={{ height: 'clamp(220px, 45vw, 340px)', cursor: 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -399,7 +399,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
       </div>
 
       {/* Book info display — always shows nearest-to-center book; hover overrides */}
-      <div className="w-full flex flex-col items-center justify-center" style={{ minHeight: '4rem' }}>
+      <div className="w-full flex flex-col items-center justify-center" style={{ minHeight: '3rem' }}>
         <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
           {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
         </p>
