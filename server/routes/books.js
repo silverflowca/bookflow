@@ -339,6 +339,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     allow_public_tts,
     enable_progress_tracking,
     show_ratings,
+    show_component_panel,
   } = req.body;
 
   try {
@@ -355,6 +356,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         allow_public_tts,
         enable_progress_tracking,
         show_ratings,
+        show_component_panel,
       })
       .eq('book_id', req.params.id)
       .select()

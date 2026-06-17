@@ -65,6 +65,7 @@ export interface BookSettings {
   allow_public_tts?: boolean;
   enable_progress_tracking?: boolean;
   show_ratings?: boolean;
+  show_component_panel?: boolean;
 }
 
 // Chapter types

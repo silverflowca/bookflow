@@ -997,6 +997,7 @@ export default function BookReader() {
                 onFilterChange={setFilterType}
                 onContentSelect={setActiveContent}
                 completions={chapterCompletions}
+                showComponentPanel={settings?.show_component_panel ?? false}
               />
             </div>
           </div>
@@ -3770,12 +3771,14 @@ function HeaderComponentIcons({
   onFilterChange,
   onContentSelect,
   completions,
+  showComponentPanel,
 }: {
   inlineContent: InlineContent[];
   filterType: string | null;
   onFilterChange: (type: string | null) => void;
   onContentSelect: (content: InlineContent) => void;
   completions: Set<string>;
+  showComponentPanel: boolean;
 }) {
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -3821,10 +3824,29 @@ function HeaderComponentIcons({
           const isActive = filterType === type;
           const itemsOfType = inlineContent.filter(i => i.content_type === type);
           const allDone = itemsOfType.length > 0 && itemsOfType.every(i => completions.has(`ic:${i.id}`));
+
+          function handleIconClick() {
+            // If only one item: skip popup, scroll directly to it
+            if (count === 1) {
+              const item = itemsOfType[0];
+              if (showComponentPanel) onContentSelect(item);
+              const pos = item.position_in_chapter;
+              if (pos === 'start_of_chapter' || pos === 'end_of_chapter') {
+                const block = document.getElementById(`reader-block-${item.id}`);
+                if (block) { block.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(block); }
+              } else {
+                scrollToInline(item.id);
+              }
+              return;
+            }
+            // Multiple items: toggle the popup
+            onFilterChange(isActive ? null : type);
+          }
+
           return (
             <button
               key={type}
-              onClick={() => onFilterChange(isActive ? null : type)}
+              onClick={handleIconClick}
               className={`relative flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-all border ${
                 allDone
                   ? 'border-green-400 bg-green-50 text-green-700'
@@ -3866,7 +3888,8 @@ function HeaderComponentIcons({
                 <button
                   key={item.id}
                   onClick={() => {
-                    onContentSelect(item);
+                    if (showComponentPanel) onContentSelect(item);
+                    onFilterChange(null);
                     const pos = item.position_in_chapter;
                     if (pos === 'start_of_chapter' || pos === 'end_of_chapter') {
                       const block = document.getElementById(`reader-block-${item.id}`);

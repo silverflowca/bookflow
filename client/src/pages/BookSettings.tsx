@@ -488,6 +488,22 @@ export default function BookSettings() {
           </div>
         </div>
 
+        {/* Component Panel */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Component Panel</h2>
+          <p className="text-sm text-muted mb-4">
+            When readers click a component icon (question, poll, audio, etc.) in the chapter header bar, open a detail panel on the right side. When off, clicking scrolls directly to the component in the chapter.
+          </p>
+          <div className="space-y-4">
+            <ToggleSetting
+              label="Show component detail panel"
+              description="Open the right-side detail panel when clicking a component icon. Off by default — clicking just scrolls to the item."
+              checked={settings.show_component_panel ?? false}
+              onChange={(v) => updateSetting('show_component_panel', v)}
+            />
+          </div>
+        </div>
+
         {/* Ratings */}
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-4 text-theme">Ratings</h2>
