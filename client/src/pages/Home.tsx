@@ -145,8 +145,8 @@ export default function Home() {
 // Auto-rotates at 1 full revolution per 10 s; drag/swipe scrubs the angle.
 // Books closer to the viewer (bottom of ellipse) are larger and rendered last (on top).
 
-const BOOK_W = 80;   // px width of each book card
-const BOOK_H = 107;  // px height (3:4 ratio)
+const BOOK_W = 120;  // px width of each book card
+const BOOK_H = 160;  // px height (3:4 ratio)
 
 function SpiralCarousel({ books, settings }: { books: Book[]; settings: CarouselSettings }) {
   const navigate = useNavigate();
@@ -164,29 +164,32 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   const count = items.length;
 
   // Shared mutable state (not React state — updated every rAF)
-  const angleRef = useRef(0);           // current rotation offset in radians
-  const velRef = useRef(0);             // drag-imparted velocity (rad/frame)
+  const angleRef = useRef(0);
+  const velRef = useRef(0);
   const draggingRef = useRef(false);
   const lastXRef = useRef(0);
   const lastTimeRef = useRef(0);
   const rafRef = useRef<number>(0);
+  const hoveredIndexRef = useRef<number | null>(null); // which book is hovered
 
   // Book button refs for imperative DOM updates
   const bookRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const labelRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // React state only for the title display (cheap — only changes on hover)
+  const [hoveredTitle, setHoveredTitle] = useState<string | null>(null);
 
   // Track drag distance to distinguish click vs drag
   const dragDistRef = useRef(0);
 
   const getEllipse = useCallback(() => {
     const el = containerRef.current;
-    if (!el) return { rx: 400, ry: 90, cx: 0, cy: 0 };
+    if (!el) return { rx: 400, ry: 110, cx: 0, cy: 0 };
     const rect = el.getBoundingClientRect();
     return {
-      rx: rect.width * 0.44,
-      ry: rect.height * 0.32,
+      rx: rect.width * 0.42,
+      ry: rect.height * 0.28,
       cx: rect.width / 2,
-      cy: rect.height / 2,
+      cy: rect.height * 0.48,
     };
   }, []);
 
@@ -195,18 +198,20 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
     let last = performance.now();
 
     const tick = (now: number) => {
-      const dt = Math.min((now - last) / 1000, 0.1); // seconds, capped
+      const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
 
-      if (!draggingRef.current) {
+      // Pause auto-rotation while hovering; dampen drag residual
+      const paused = hoveredIndexRef.current !== null;
+      if (!draggingRef.current && !paused) {
         const autoSpeed = (Math.PI * 2) / settingsRef.current.secondsPerRev;
         angleRef.current += autoSpeed * dt + velRef.current;
-        velRef.current *= 0.88; // dampen residual drag momentum
       }
+      velRef.current *= 0.88;
 
       const { rx, ry, cx, cy } = getEllipse();
 
-      // Sort by depth (z = sin) for correct stacking
+      // Sort by depth for correct stacking
       const order = items
         .map((_, i) => {
           const theta = angleRef.current + (i / count) * Math.PI * 2;
@@ -220,15 +225,21 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         const theta = angleRef.current + (i / count) * Math.PI * 2;
         const x = cx + rx * Math.cos(theta) - BOOK_W / 2;
         const y = cy + ry * Math.sin(theta) - BOOK_H / 2;
-        // Depth: z ranges -1 (far) to +1 (near)
-        const scale = 0.55 + 0.45 * ((z + 1) / 2);
-        const opacity = 0.35 + 0.65 * ((z + 1) / 2);
-        const zIndex = Math.round((z + 1) * 50);
-        const tilt = Math.cos(theta) * 8; // slight perspective tilt
+        const isHovered = hoveredIndexRef.current === i;
+        // Depth scale: far=0.5, near=1.0; hovered gets a pop-up bonus
+        const depthScale = 0.5 + 0.5 * ((z + 1) / 2);
+        const scale = isHovered ? depthScale * 1.35 : depthScale;
+        const opacity = isHovered ? 1 : (0.3 + 0.7 * ((z + 1) / 2));
+        const zIndex = isHovered ? 150 : Math.round((z + 1) * 50);
+        const tilt = isHovered ? 0 : Math.cos(theta) * 8;
 
         btn.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${scale.toFixed(3)}) rotateY(${tilt.toFixed(1)}deg)`;
         btn.style.opacity = opacity.toFixed(3);
         btn.style.zIndex = String(zIndex);
+        btn.style.filter = isHovered ? 'drop-shadow(0 0 18px rgba(255,255,255,0.5))' : '';
+        btn.style.transition = isHovered
+          ? 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s, filter 0.2s'
+          : 'none';
       });
 
       rafRef.current = requestAnimationFrame(tick);
@@ -253,10 +264,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
     const dx = e.clientX - lastXRef.current;
     dragDistRef.current += Math.abs(dx);
     const { rx } = getEllipse();
-    // Map horizontal drag pixels → radians
     const dAngle = (dx / (rx * 2)) * Math.PI * 2;
     angleRef.current += dAngle;
-
     const now = performance.now();
     const dt = (now - lastTimeRef.current) / 1000;
     if (dt > 0) velRef.current = dAngle / dt;
@@ -272,43 +281,58 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
     <div
       ref={containerRef}
       className="absolute inset-0 select-none"
-      style={{ cursor: draggingRef.current ? 'grabbing' : 'grab' }}
+      style={{ cursor: 'grab' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      {/* Left/right fade masks so books gracefully appear/disappear at edges */}
+      {/* Left/right fade masks */}
       <div className="absolute inset-y-0 left-0 w-24 z-[200] pointer-events-none"
-        style={{ background: 'linear-gradient(to right, rgba(30,58,138,0.9), transparent)' }} />
+        style={{ background: 'linear-gradient(to right, rgba(30,58,138,0.92), transparent)' }} />
       <div className="absolute inset-y-0 right-0 w-24 z-[200] pointer-events-none"
-        style={{ background: 'linear-gradient(to left, rgba(30,58,138,0.9), transparent)' }} />
+        style={{ background: 'linear-gradient(to left, rgba(30,58,138,0.92), transparent)' }} />
 
-      {/* Hint label */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[201] pointer-events-none
-        text-white/40 text-xs tracking-widest uppercase select-none">
-        drag to spin
+      {/* Hovered book title — centred below the orbit */}
+      <div className="absolute bottom-8 left-0 right-0 z-[202] pointer-events-none flex flex-col items-center gap-1">
+        <p
+          className="text-white font-semibold text-xl text-center px-8 drop-shadow-lg transition-opacity duration-200"
+          style={{ opacity: hoveredTitle ? 1 : 0, minHeight: '1.75rem' }}
+        >
+          {hoveredTitle ?? ''}
+        </p>
+        <p
+          className="text-white/50 text-xs tracking-widest uppercase transition-opacity duration-200"
+          style={{ opacity: hoveredTitle ? 0 : 1 }}
+        >
+          drag to spin · click to read
+        </p>
       </div>
 
       {items.map((book, i) => (
         <button
           key={`${book.id}-${i}`}
           ref={el => { bookRefs.current[i] = el; }}
-          className="absolute top-0 left-0 focus:outline-none group"
+          className="absolute top-0 left-0 focus:outline-none"
           style={{
             width: BOOK_W,
             height: BOOK_H,
             willChange: 'transform, opacity',
             transformOrigin: 'center center',
           }}
-          title={book.title}
+          onMouseEnter={() => {
+            hoveredIndexRef.current = i;
+            setHoveredTitle(book.title);
+          }}
+          onMouseLeave={() => {
+            hoveredIndexRef.current = null;
+            setHoveredTitle(null);
+          }}
           onClick={() => {
-            // Only navigate if it was a click, not a drag
             if (dragDistRef.current < 8) navigate(`/book/${book.id}`);
           }}
         >
-          <div className="w-full h-full rounded-lg overflow-hidden shadow-2xl
-            ring-2 ring-white/20 group-hover:ring-white/70 transition-all duration-150">
+          <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20">
             {book.cover_image_url ? (
               <img
                 src={book.cover_image_url}
@@ -318,22 +342,12 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500
-                flex items-center justify-center p-2">
-                <span className="text-white text-[9px] font-semibold text-center leading-tight line-clamp-4">
+                flex items-center justify-center p-3">
+                <span className="text-white text-xs font-semibold text-center leading-tight line-clamp-4">
                   {book.title}
                 </span>
               </div>
             )}
-          </div>
-          {/* Tooltip */}
-          <div
-            ref={el => { labelRefs.current[i] = el; }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-0.5
-              bg-black/80 text-white text-[10px] rounded whitespace-nowrap
-              opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none
-              max-w-[150px] truncate z-10"
-          >
-            {book.title}
           </div>
         </button>
       ))}
