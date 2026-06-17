@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Users, Sparkles, Star } from 'lucide-react';
+import { BookOpen, Users, Sparkles, Star, PlusCircle } from 'lucide-react';
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
@@ -47,34 +47,33 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary-600 to-primary-800 text-white overflow-hidden min-h-[640px]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Interactive Books, Engaged Readers
-            </h1>
-            <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
-              Create multi-chapter books with embedded questions, polls, highlights, notes, and media.
-              Let your readers engage deeply with your content.
-            </p>
-            <div className="flex gap-4 justify-center">
-              <Link
-                to="/register"
-                className="bg-white text-accent hover:bg-primary-50 px-6 py-3 rounded-lg font-semibold"
-              >
-                Start Writing
-              </Link>
-              <a
-                href="#books"
-                className="border-2 border-white text-white hover:bg-white/10 px-6 py-3 rounded-lg font-semibold"
-              >
-                Browse Books
-              </a>
-            </div>
+      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white overflow-hidden">
+        {/* Text block — sits above carousel, never overlapped */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8 text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6">
+            Interactive Books, Engaged Readers
+          </h1>
+          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
+            Create multi-chapter books with embedded questions, polls, highlights, notes, and media.
+            Let your readers engage deeply with your content.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Link
+              to="/register"
+              className="bg-white text-accent hover:bg-primary-50 px-6 py-3 rounded-lg font-semibold"
+            >
+              Start Writing
+            </Link>
+            <a
+              href="#books"
+              className="border-2 border-white text-white hover:bg-white/10 px-6 py-3 rounded-lg font-semibold"
+            >
+              Browse Books
+            </a>
           </div>
         </div>
 
-        {/* Spiral book carousel */}
+        {/* Carousel block — below text, never overlaps it */}
         {!loading && books.length > 0 && (
           <SpiralCarousel books={books} settings={carouselSettings} />
         )}
@@ -176,22 +175,28 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   // Book button refs for imperative DOM updates
   const bookRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // React state only for the title display (cheap — only changes on hover)
+  // React state only for the title display + hovered index (cheap — only changes on hover)
   const [hoveredTitle, setHoveredTitle] = useState<string | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // "Nearest to front-center" book — updated every rAF tick, drives always-on title display
+  const [featuredBook, setFeaturedBook] = useState<{ title: string; author: string } | null>(null);
+  const featuredIndexRef = useRef<number>(-1);
 
   // Track drag distance to distinguish click vs drag
   const dragDistRef = useRef(0);
   const wasClickRef = useRef(true); // true if pointer-up had small drag distance
+  const clickPausedRef = useRef(false); // true after a click, cleared by drag
 
   const getEllipse = useCallback(() => {
     const el = containerRef.current;
-    if (!el) return { rx: 400, ry: 110, cx: 0, cy: 0 };
+    if (!el) return { rx: 400, ry: 90, cx: 0, cy: 0 };
     const rect = el.getBoundingClientRect();
     return {
       rx: rect.width * 0.42,
-      ry: rect.height * 0.22,
+      ry: rect.height * 0.30,
       cx: rect.width / 2,
-      cy: rect.height * 0.62,
+      cy: rect.height * 0.32,
     };
   }, []);
 
@@ -203,8 +208,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
 
-      // Pause auto-rotation while hovering; dampen drag residual
-      const paused = hoveredIndexRef.current !== null;
+      // Pause auto-rotation while hovering or after a click (until next drag)
+      const paused = hoveredIndexRef.current !== null || clickPausedRef.current;
       if (!draggingRef.current && !paused) {
         const autoSpeed = (Math.PI * 2) / settingsRef.current.secondsPerRev;
         angleRef.current += autoSpeed * dt + velRef.current;
@@ -221,6 +226,21 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         })
         .sort((a, b) => a.z - b.z);
 
+      // Find the book nearest to the front-center (sin θ closest to +1, i.e. θ ≈ π/2)
+      let bestScore = -Infinity;
+      let bestIdx = 0;
+      order.forEach(({ i, z }) => {
+        const theta = angleRef.current + (i / count) * Math.PI * 2;
+        // Score: highest sin (frontmost) + small bonus for being near horizontal center
+        const score = z - Math.abs(Math.cos(theta)) * 0.3;
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      });
+      if (bestIdx !== featuredIndexRef.current) {
+        featuredIndexRef.current = bestIdx;
+        const fb = items[bestIdx];
+        setFeaturedBook({ title: fb.title, author: fb.author?.display_name || 'Unknown Author' });
+      }
+
       order.forEach(({ i, z }) => {
         const btn = bookRefs.current[i];
         if (!btn) return;
@@ -230,15 +250,29 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         const isHovered = hoveredIndexRef.current === i;
         // Depth scale: far=0.5, near=1.0; hovered gets a pop-up bonus
         const depthScale = 0.5 + 0.5 * ((z + 1) / 2);
-        const scale = isHovered ? depthScale * 1.35 : depthScale;
-        const opacity = isHovered ? 1 : (0.3 + 0.7 * ((z + 1) / 2));
+        const scale = isHovered ? 1.5 : depthScale;
+        // Front books that pass through the title zone get a transparency cap so text shows through
+        const isFront = z > 0.5;
+        const baseOpacity = isHovered ? 1 : (0.3 + 0.7 * ((z + 1) / 2));
+        const opacity = (!isHovered && isFront) ? Math.min(baseOpacity, 0.75) : baseOpacity;
         const zIndex = isHovered ? 150 : Math.round((z + 1) * 50);
         const tilt = isHovered ? 0 : Math.cos(theta) * 8;
 
+        const isFeatured = i === featuredIndexRef.current && hoveredIndexRef.current === null;
+
         btn.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${scale.toFixed(3)}) rotateY(${tilt.toFixed(1)}deg)`;
-        btn.style.opacity = opacity.toFixed(3);
-        btn.style.zIndex = String(zIndex);
-        btn.style.filter = isHovered ? 'drop-shadow(0 0 18px rgba(255,255,255,0.5))' : '';
+        btn.style.opacity = isFeatured ? '1' : opacity.toFixed(3);
+        // Keep featured book at its natural z-order so it never covers the title area
+        btn.style.zIndex = isHovered ? '150' : String(zIndex);
+        btn.style.filter = isHovered
+          ? 'drop-shadow(0 0 14px rgba(255,255,255,0.5))'
+          : isFeatured
+            ? 'drop-shadow(0 0 3px rgba(255,255,255,0.6))'
+            : '';
+        // Thick white outline offset from the image — outline-offset pushes it 3px outside
+        btn.style.outline = isFeatured ? '3px solid rgba(255,255,255,0.9)' : '';
+        btn.style.outlineOffset = isFeatured ? '3px' : '';
+        btn.style.borderRadius = isFeatured ? '0.75rem' : '';
         btn.style.transition = isHovered
           ? 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s, filter 0.2s'
           : 'none';
@@ -264,6 +298,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;
+    // Drag resumes auto-rotation
+    clickPausedRef.current = false;
     const dx = e.clientX - lastXRef.current;
     dragDistRef.current += Math.abs(dx);
     const { rx } = getEllipse();
@@ -277,78 +313,89 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   }, [getEllipse]);
 
   const onPointerUp = useCallback(() => {
-    wasClickRef.current = dragDistRef.current < 8;
+    const isClick = dragDistRef.current < 8;
+    wasClickRef.current = isClick;
+    if (isClick) clickPausedRef.current = true; // click freezes scroll until next drag
     draggingRef.current = false;
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 select-none"
-      style={{ cursor: 'grab' }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      {/* Left/right fade masks */}
-      <div className="absolute inset-y-0 left-0 w-24 z-[200] pointer-events-none"
-        style={{ background: 'linear-gradient(to right, rgba(30,58,138,0.92), transparent)' }} />
-      <div className="absolute inset-y-0 right-0 w-24 z-[200] pointer-events-none"
-        style={{ background: 'linear-gradient(to left, rgba(30,58,138,0.92), transparent)' }} />
-
-      {/* Hovered book title — pinned to very bottom of hero */}
-      <div className="absolute bottom-0 left-0 right-0 z-[202] pointer-events-none flex items-center justify-center pb-5" style={{ minHeight: '2.5rem' }}>
-        <p
-          className="text-white font-semibold text-xl text-center px-8 drop-shadow-lg transition-opacity duration-200"
-          style={{ opacity: hoveredTitle ? 1 : 0 }}
-        >
-          {hoveredTitle ?? ''}
-        </p>
-      </div>
-
-      {items.map((book, i) => (
-        <button
-          key={`${book.id}-${i}`}
-          ref={el => { bookRefs.current[i] = el; }}
-          className="absolute top-0 left-0 focus:outline-none"
-          style={{
-            width: BOOK_W,
-            height: BOOK_H,
-            willChange: 'transform, opacity',
-            transformOrigin: 'center center',
-          }}
-          onMouseEnter={() => {
-            hoveredIndexRef.current = i;
-            setHoveredTitle(book.title);
-          }}
-          onMouseLeave={() => {
-            hoveredIndexRef.current = null;
-            setHoveredTitle(null);
-          }}
-          onClick={() => {
-            if (wasClickRef.current) navigate(`/book/${book.id}`);
-          }}
-        >
-          <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20">
-            {book.cover_image_url ? (
+    <div className="w-full pb-8">
+      {/* Orbit stage — fixed height, relative so books position inside it */}
+      <div
+        ref={containerRef}
+        className="relative w-full select-none"
+        style={{ height: 340, cursor: 'grab' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {items.map((book, i) => (
+          <button
+            key={`${book.id}-${i}`}
+            ref={el => { bookRefs.current[i] = el; }}
+            className="absolute top-0 left-0 focus:outline-none"
+            style={{
+              width: BOOK_W,
+              height: BOOK_H,
+              willChange: 'transform, opacity',
+              transformOrigin: 'center center',
+            }}
+            onMouseEnter={() => {
+              hoveredIndexRef.current = i;
+              setHoveredTitle(book.title);
+              setHoveredIndex(i);
+            }}
+            onMouseLeave={() => {
+              hoveredIndexRef.current = null;
+              setHoveredTitle(null);
+              setHoveredIndex(null);
+            }}
+            onClick={() => {
+              if (wasClickRef.current) navigate(`/book/${book.id}`);
+            }}
+          >
+            <div className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 relative">
               <img
-                src={book.cover_image_url}
+                src={book.cover_image_url!}
                 alt={book.title}
                 className="w-full h-full object-cover"
                 draggable={false}
               />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500
-                flex items-center justify-center p-3">
-                <span className="text-white text-xs font-semibold text-center leading-tight line-clamp-4">
-                  {book.title}
-                </span>
-              </div>
-            )}
-          </div>
-        </button>
-      ))}
+              {/* Add to My Books overlay — shown on hover */}
+              {hoveredIndex === i && (
+                <div
+                  className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 py-2 px-1"
+                  style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(2px)' }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    navigate(`/book/${book.id}`);
+                  }}
+                >
+                  <PlusCircle className="h-3.5 w-3.5 text-white shrink-0" />
+                  <span className="text-white text-[10px] font-semibold leading-tight whitespace-nowrap">
+                    Add to My Books
+                  </span>
+                </div>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Book info display — always shows nearest-to-center book; hover overrides */}
+      <div className="w-full flex flex-col items-center justify-center" style={{ minHeight: '4rem' }}>
+        <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
+          {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
+        </p>
+        <p className="text-primary-200 text-sm text-center px-8 drop-shadow transition-all duration-300 mt-0.5"
+          style={{ opacity: (hoveredTitle || featuredBook) ? 0.85 : 0 }}>
+          {hoveredIndex !== null
+            ? (items[hoveredIndex]?.author?.display_name ?? 'Unknown Author')
+            : (featuredBook?.author ?? '\u00A0')}
+        </p>
+      </div>
     </div>
   );
 }
