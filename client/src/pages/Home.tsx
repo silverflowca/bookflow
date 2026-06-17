@@ -302,9 +302,9 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
     const { w: bw, h: bh } = getBookSize(rect.width, count);
     return {
       rx: rect.width * 0.42,
-      ry: rect.height * 0.28,
+      ry: rect.height * 0.22,
       cx: rect.width / 2,
-      cy: rect.height * 0.52,
+      cy: rect.height * 0.42,
       bw,
       bh,
     };
@@ -440,12 +440,12 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
   }, []);
 
   return (
-    <div className="w-full pb-2 sm:pb-6">
-      {/* Orbit stage — books rotate within this container, cy centred so nothing clips above */}
+    <div className="w-full">
+      {/* Orbit stage — title overlay is inside so nothing adds space below */}
       <div
         ref={containerRef}
         className="relative w-full select-none"
-        style={{ height: 'clamp(260px, 52vw, 400px)', cursor: 'grab' }}
+        style={{ height: 'clamp(300px, 56vw, 440px)', cursor: 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -506,19 +506,19 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
             </div>
           </button>
         ))}
-      </div>
 
-      {/* Book info display — always shows nearest-to-center book; hover overrides */}
-      <div className="w-full flex flex-col items-center justify-center" style={{ minHeight: '3rem' }}>
-        <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
-          {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
-        </p>
-        <p className="text-primary-200 text-sm text-center px-8 drop-shadow transition-all duration-300 mt-0.5"
-          style={{ opacity: (hoveredTitle || featuredBook) ? 0.85 : 0 }}>
-          {hoveredIndex !== null
-            ? (items[hoveredIndex]?.author?.display_name ?? 'Unknown Author')
-            : (featuredBook?.author ?? '\u00A0')}
-        </p>
+        {/* Book title/author — absolute overlay at bottom of orbit stage */}
+        <div className="absolute bottom-3 inset-x-0 flex flex-col items-center pointer-events-none">
+          <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
+            {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
+          </p>
+          <p className="text-primary-200 text-sm text-center px-8 drop-shadow transition-all duration-300 mt-0.5"
+            style={{ opacity: (hoveredTitle || featuredBook) ? 0.85 : 0 }}>
+            {hoveredIndex !== null
+              ? (items[hoveredIndex]?.author?.display_name ?? 'Unknown Author')
+              : (featuredBook?.author ?? '\u00A0')}
+          </p>
+        </div>
       </div>
     </div>
   );
