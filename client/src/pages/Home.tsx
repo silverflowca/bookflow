@@ -46,7 +46,7 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary-600 to-primary-800 text-white overflow-hidden min-h-[520px]">
+      <section className="relative bg-gradient-to-br from-primary-600 to-primary-800 text-white overflow-hidden min-h-[640px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
@@ -187,9 +187,9 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
     const rect = el.getBoundingClientRect();
     return {
       rx: rect.width * 0.42,
-      ry: rect.height * 0.28,
+      ry: rect.height * 0.22,
       cx: rect.width / 2,
-      cy: rect.height * 0.48,
+      cy: rect.height * 0.62,
     };
   }, []);
 
@@ -293,8 +293,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
       <div className="absolute inset-y-0 right-0 w-24 z-[200] pointer-events-none"
         style={{ background: 'linear-gradient(to left, rgba(30,58,138,0.92), transparent)' }} />
 
-      {/* Hovered book title — centred below the orbit */}
-      <div className="absolute bottom-8 left-0 right-0 z-[202] pointer-events-none flex flex-col items-center gap-1">
+      {/* Hovered book title — pinned to very bottom of hero */}
+      <div className="absolute bottom-0 left-0 right-0 z-[202] pointer-events-none flex flex-col items-center gap-1 pb-5">
         <p
           className="text-white font-semibold text-xl text-center px-8 drop-shadow-lg transition-opacity duration-200"
           style={{ opacity: hoveredTitle ? 1 : 0, minHeight: '1.75rem' }}
