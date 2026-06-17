@@ -339,9 +339,9 @@ export default function Layout() {
   );
 
   return (
-    <div className="min-h-screen bg-theme">
+    <div className="h-screen flex flex-col overflow-hidden bg-theme">
       {/* Header */}
-      <header className="theme-header">
+      <header className="theme-header flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -515,8 +515,8 @@ export default function Layout() {
         )}
       </header>
 
-      {/* Main Content — extra bottom padding on mobile to clear bottom nav */}
-      <main className={user ? 'pb-20 md:pb-0' : ''}>
+      {/* Main Content — flex-1 so it fills remaining height; overflow-auto for normal pages */}
+      <main className={`flex-1 overflow-auto${user ? ' pb-20 md:pb-0' : ''}`}>
         <Outlet />
       </main>
 

@@ -740,7 +740,7 @@ export default function BookReader() {
   }
 
   return (
-    <div className="h-screen bg-surface-hover flex overflow-hidden">
+    <div className="h-full bg-surface-hover flex overflow-hidden">
       {/* Table of Contents Sidebar */}
       <aside id="bf-toc-sidebar" className={`fixed inset-y-0 left-0 w-72 bg-surface border-r border-theme transform transition-transform z-20 ${
         showToc ? 'translate-x-0' : '-translate-x-full'
