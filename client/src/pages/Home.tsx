@@ -491,7 +491,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
               {hoveredIndex === i && (
                 <div
                   className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-center gap-0.5 py-1 px-1 text-center"
-                  style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+                  style={{ background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(2px)' }}
                   onClick={e => {
                     e.stopPropagation();
                     navigate(`/book/${book.id}`);
