@@ -47,7 +47,7 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white overflow-hidden">
+      <section className="text-white overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.55) 0%, rgba(107,33,168,0.70) 100%)' }}>
         {/* Text block — sits above carousel, never overlapped */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8 text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-6">
