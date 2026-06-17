@@ -144,8 +144,15 @@ export default function Home() {
 // Auto-rotates at 1 full revolution per 10 s; drag/swipe scrubs the angle.
 // Books closer to the viewer (bottom of ellipse) are larger and rendered last (on top).
 
-const BOOK_W = 120;  // px width of each book card
-const BOOK_H = 160;  // px height (3:4 ratio)
+// Book size scales with screen — computed dynamically in getEllipse
+// Base: 10% of container width, clamped 60px–130px; height = width * 4/3
+function getBookSize(containerWidth: number, bookCount: number) {
+  // Arc length per book = circumference / count; book width = ~60% of that gap
+  const approxCircumference = 2 * Math.PI * containerWidth * 0.42;
+  const gapPerBook = approxCircumference / bookCount;
+  const w = Math.min(Math.max(gapPerBook * 0.55, 55), 125);
+  return { w: Math.round(w), h: Math.round(w * (4 / 3)) };
+}
 
 function SpiralCarousel({ books, settings }: { books: Book[]; settings: CarouselSettings }) {
   const navigate = useNavigate();
@@ -183,6 +190,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   // "Nearest to front-center" book — updated every rAF tick, drives always-on title display
   const [featuredBook, setFeaturedBook] = useState<{ title: string; author: string } | null>(null);
   const featuredIndexRef = useRef<number>(-1);
+  const bookSizeRef = useRef<{ w: number; h: number }>({ w: 100, h: 133 });
+  const [bookSize, setBookSize] = useState<{ w: number; h: number }>({ w: 100, h: 133 });
 
   // Track drag distance to distinguish click vs drag
   const dragDistRef = useRef(0);
@@ -191,15 +200,18 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
 
   const getEllipse = useCallback(() => {
     const el = containerRef.current;
-    if (!el) return { rx: 400, ry: 90, cx: 0, cy: 0 };
+    if (!el) return { rx: 400, ry: 90, cx: 0, cy: 0, bw: 100, bh: 133 };
     const rect = el.getBoundingClientRect();
+    const { w: bw, h: bh } = getBookSize(rect.width, count);
     return {
       rx: rect.width * 0.42,
       ry: rect.height * 0.30,
       cx: rect.width / 2,
-      cy: rect.height * 0.32,
+      cy: rect.height * 0.28,
+      bw,
+      bh,
     };
-  }, []);
+  }, [count]);
 
   // rAF loop
   useEffect(() => {
@@ -217,7 +229,12 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
       }
       velRef.current *= 0.88;
 
-      const { rx, ry, cx, cy } = getEllipse();
+      const { rx, ry, cx, cy, bw, bh } = getEllipse();
+      // Sync book size to state only when it changes (triggers JSX re-render for button dimensions)
+      if (bw !== bookSizeRef.current.w || bh !== bookSizeRef.current.h) {
+        bookSizeRef.current = { w: bw, h: bh };
+        setBookSize({ w: bw, h: bh });
+      }
 
       // Sort by depth for correct stacking
       const order = items
@@ -247,8 +264,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         const inner = innerRefs.current[i];
         if (!btn || !inner) return;
         const theta = angleRef.current + (i / count) * Math.PI * 2;
-        const x = cx + rx * Math.cos(theta) - BOOK_W / 2;
-        const y = cy + ry * Math.sin(theta) - BOOK_H / 2;
+        const x = cx + rx * Math.cos(theta) - bw / 2;
+        const y = cy + ry * Math.sin(theta) - bh / 2;
         const isHovered = hoveredIndexRef.current === i;
         const isFeatured = i === featuredIndexRef.current && hoveredIndexRef.current === null;
 
@@ -347,8 +364,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
             ref={el => { bookRefs.current[i] = el; }}
             className="absolute top-0 left-0 focus:outline-none"
             style={{
-              width: BOOK_W,
-              height: BOOK_H,
+              width: bookSize.w,
+              height: bookSize.h,
               willChange: 'transform, opacity',
               transformOrigin: 'center center',
             }}
