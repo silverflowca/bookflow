@@ -497,10 +497,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
                     navigate(`/book/${book.id}`);
                   }}
                 >
-                  <PlusCircle className="h-4 w-4 text-white" />
-                  <span className="text-white text-[9px] font-semibold leading-tight">
-                    Add to My Books
-                  </span>
+                  <span className="text-white text-xs font-bold leading-tight">+ Read</span>
                 </div>
               )}
             </div>
