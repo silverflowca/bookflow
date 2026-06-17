@@ -25,7 +25,7 @@ export default function AdminPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>('users');
+  const [tab, setTab] = useState<Tab>('settings');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<Profile[]>([]);
   const [books, setBooks] = useState<any[]>([]);
@@ -139,7 +139,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-surface-hover">
-        {(['users', 'books', 'clubs', 'carousel', 'settings'] as Tab[]).map(t => (
+        {(['settings', 'users', 'books', 'clubs', 'carousel'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => loadTab(t)}
