@@ -414,6 +414,20 @@ class ApiClient {
     return this.request('/settings/public');
   }
 
+  // Saved Books
+  async getSavedBooks(): Promise<any[]> {
+    return this.request('/saved-books');
+  }
+  async getSavedBooksCount(): Promise<{ count: number }> {
+    return this.request('/saved-books/count');
+  }
+  async saveBook(bookId: string): Promise<{ id: string; saved_at: string }> {
+    return this.request(`/saved-books/${bookId}`, { method: 'POST' });
+  }
+  async unsaveBook(bookId: string): Promise<{ ok: boolean }> {
+    return this.request(`/saved-books/${bookId}`, { method: 'DELETE' });
+  }
+
   async getRestreamStatus(): Promise<{ connected: boolean; has_credentials: boolean; has_token: boolean; expires_at: string | null }> {
     return this.request('/live/restream/status');
   }

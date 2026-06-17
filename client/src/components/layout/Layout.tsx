@@ -5,6 +5,7 @@ import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeCont
 import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
+import api from '../../lib/api';
 
 const TUTORIAL_BOOK_ID = 'f0c66a4a-ced2-4b75-ab42-84dafba9cd3d';
 // Chapter IDs from the seeded tutorial book
@@ -252,6 +253,23 @@ export default function Layout() {
     },
   ];
 
+  // Saved books count for badge
+  const [savedCount, setSavedCount] = useState(0);
+  useEffect(() => {
+    if (!user) { setSavedCount(0); return; }
+    api.getSavedBooksCount().then(r => setSavedCount(r.count)).catch(() => {});
+  }, [user]);
+
+  // Listen for saves triggered from elsewhere (e.g. carousel click)
+  useEffect(() => {
+    function onSave() {
+      if (!user) return;
+      api.getSavedBooksCount().then(r => setSavedCount(r.count)).catch(() => {});
+    }
+    window.addEventListener('bf-book-saved', onSave);
+    return () => window.removeEventListener('bf-book-saved', onSave);
+  }, [user]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/');
@@ -354,8 +372,16 @@ export default function Layout() {
             <nav className="hidden md:flex items-center gap-4">
               {user ? (
                 <>
-                  <Link to="/dashboard" className="text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                  <Link to="/dashboard" className="relative text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     My Books
+                    {savedCount > 0 && (
+                      <span
+                        key={savedCount}
+                        className="bf-wiggle absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none"
+                      >
+                        {savedCount > 99 ? '99+' : savedCount}
+                      </span>
+                    )}
                   </Link>
                   <Link id="bf-nav-clubs" to="/clubs" className="flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <Users className="h-4 w-4" /> Clubs
@@ -542,10 +568,18 @@ export default function Layout() {
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t-2 border-strong flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Link
             to="/dashboard"
-            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/edit') ? 'text-accent' : 'text-muted hover:text-theme'}`}
+            className={`relative flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/edit') ? 'text-accent' : 'text-muted hover:text-theme'}`}
           >
             <BookOpen className="h-5 w-5" />
             <span>Books</span>
+            {savedCount > 0 && (
+              <span
+                key={savedCount}
+                className="bf-wiggle absolute top-1.5 right-[calc(50%-16px)] min-w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none"
+              >
+                {savedCount > 99 ? '99+' : savedCount}
+              </span>
+            )}
           </Link>
           <Link
             to="/clubs"

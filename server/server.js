@@ -33,6 +33,7 @@ import ratingsRoutes from './routes/ratings.js';
 import liveRoutes from './routes/live.js';
 import profileRoutes from './routes/profile.js';
 import adminRoutes from './routes/admin.js';
+import savedBooksRoutes from './routes/saved-books.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { startStatusCron } from './services/chat-status.js';
 
@@ -103,6 +104,7 @@ app.use('/api', ratingsRoutes);
 app.use('/api/live', liveRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/saved-books', savedBooksRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);

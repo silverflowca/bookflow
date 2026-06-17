@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles } from 'lucide-react';
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
@@ -26,15 +27,36 @@ export function loadCarouselSettings(): CarouselSettings {
 const DEFAULT_TAGLINE = 'Authors, readers, book clubs, write: Read, Write, Publish, Chat, Audio, Video, Interactive books, Online Forms, questions and answers.';
 
 export default function Home() {
+  const { user } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [carouselSettings] = useState<CarouselSettings>(loadCarouselSettings);
   const [tagline, setTagline] = useState(DEFAULT_TAGLINE);
+  const [savedCount, setSavedCount] = useState(0);
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
   useEffect(() => {
     loadBooks();
     api.getPublicSettings().then(s => { if (s.home_tagline) setTagline(s.home_tagline); }).catch(() => {});
-  }, []);
+    if (user) api.getSavedBooksCount().then(r => setSavedCount(r.count)).catch(() => {});
+  }, [user]);
+
+  function showToast(msg: string, type: 'ok' | 'err' = 'ok') {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  }
+
+  async function handleSaveBook(book: Book) {
+    if (!user) { showToast('Sign in to save books', 'err'); return; }
+    try {
+      await api.saveBook(book.id);
+      setSavedCount(c => c + 1);
+      window.dispatchEvent(new CustomEvent('bf-book-saved'));
+      showToast(`"${book.title}" added to My Books`);
+    } catch {
+      showToast('Already in My Books', 'err');
+    }
+  }
 
   async function loadBooks() {
     try {
@@ -53,7 +75,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="text-white overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.55) 0%, rgba(107,33,168,0.70) 100%)' }}>
         {/* Text block — sits above carousel, never overlapped */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-16 pb-4 sm:pb-8 text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-8 pb-4 sm:pb-8 text-center">
           <h1 className="text-3xl md:text-5xl font-bold mb-3 sm:mb-6">
             Interactive Books, Engaged Readers
           </h1>
@@ -78,7 +100,14 @@ export default function Home() {
 
         {/* Carousel block — below text, never overlaps it */}
         {!loading && books.length > 0 && (
-          <SpiralCarousel books={books} settings={carouselSettings} />
+          <SpiralCarousel books={books} settings={carouselSettings} onSaveBook={handleSaveBook} />
+        )}
+
+        {/* Toast notification */}
+        {toast && (
+          <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white transition-all duration-300 ${toast.type === 'ok' ? 'bg-emerald-600' : 'bg-red-500'}`}>
+            {toast.msg}
+          </div>
         )}
       </section>
 
@@ -223,7 +252,7 @@ function getBookSize(containerWidth: number, bookCount: number) {
   return { w: Math.round(w), h: Math.round(w * (4 / 3)) };
 }
 
-function SpiralCarousel({ books, settings }: { books: Book[]; settings: CarouselSettings }) {
+function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settings: CarouselSettings; onSaveBook: (book: Book) => void }) {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef(settings);
@@ -265,7 +294,6 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   // Track drag distance to distinguish click vs drag
   const dragDistRef = useRef(0);
   const wasClickRef = useRef(true); // true if pointer-up had small drag distance
-  const clickPausedRef = useRef(false); // true after a click, cleared by drag
 
   const getEllipse = useCallback(() => {
     const el = containerRef.current;
@@ -274,9 +302,9 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
     const { w: bw, h: bh } = getBookSize(rect.width, count);
     return {
       rx: rect.width * 0.42,
-      ry: rect.height * 0.30,
+      ry: rect.height * 0.28,
       cx: rect.width / 2,
-      cy: rect.height * 0.28,
+      cy: rect.height * 0.52,
       bw,
       bh,
     };
@@ -290,8 +318,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
 
-      // Pause auto-rotation while hovering or after a click (until next drag)
-      const paused = hoveredIndexRef.current !== null || clickPausedRef.current;
+      // Pause auto-rotation only while hovering
+      const paused = hoveredIndexRef.current !== null;
       if (!draggingRef.current && !paused) {
         const autoSpeed = (Math.PI * 2) / settingsRef.current.secondsPerRev;
         angleRef.current += autoSpeed * dt + velRef.current;
@@ -394,8 +422,6 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;
-    // Drag resumes auto-rotation
-    clickPausedRef.current = false;
     const dx = e.clientX - lastXRef.current;
     dragDistRef.current += Math.abs(dx);
     const { rx } = getEllipse();
@@ -409,19 +435,17 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   }, [getEllipse]);
 
   const onPointerUp = useCallback(() => {
-    const isClick = dragDistRef.current < 8;
-    wasClickRef.current = isClick;
-    if (isClick) clickPausedRef.current = true; // click freezes scroll until next drag
+    wasClickRef.current = dragDistRef.current < 8;
     draggingRef.current = false;
   }, []);
 
   return (
-    <div className="w-full pb-4 sm:pb-8">
-      {/* Orbit stage — shorter on mobile so carousel + title fit on screen */}
+    <div className="w-full pb-2 sm:pb-6">
+      {/* Orbit stage — books rotate within this container, cy centred so nothing clips above */}
       <div
         ref={containerRef}
         className="relative w-full select-none"
-        style={{ height: 'clamp(220px, 45vw, 340px)', cursor: 'grab' }}
+        style={{ height: 'clamp(260px, 52vw, 400px)', cursor: 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -449,7 +473,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
               setHoveredIndex(null);
             }}
             onClick={() => {
-              if (wasClickRef.current) navigate(`/book/${book.id}`);
+              if (wasClickRef.current) onSaveBook(book);
             }}
           >
             <div
