@@ -75,7 +75,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="text-white overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.55) 0%, rgba(107,33,168,0.70) 100%)' }}>
         {/* Text block — sits above carousel, never overlapped */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-8 pb-3 text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-8 pb-0 text-center">
           <h1 className="text-3xl md:text-5xl font-bold mb-2 sm:mb-4">
             Interactive Books, Engaged Readers
           </h1>
@@ -304,7 +304,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
       rx: rect.width * 0.42,
       ry: rect.height * 0.22,
       cx: rect.width / 2,
-      cy: rect.height * 0.42,
+      cy: rect.height * 0.38,
       bw,
       bh,
     };
@@ -508,7 +508,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         ))}
 
         {/* Book title/author — absolute overlay at bottom of orbit stage */}
-        <div className="absolute bottom-0 inset-x-0 flex flex-col items-center pointer-events-none" style={{ transform: 'translateY(10px)' }}>
+        <div className="absolute bottom-4 inset-x-0 flex flex-col items-center pointer-events-none">
           <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
             {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
           </p>
