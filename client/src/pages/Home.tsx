@@ -54,7 +54,7 @@ export default function Home() {
             Interactive Books, Engaged Readers
           </h1>
           <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
-            Authors, readers, book clubs, write, read, create, chat, polls, surveys, Interactive books, audio, video, questions and answers.
+            Authors, readers, book clubs, write: Read, Write, Publish, Chat, forms, Interactive books, audio, video, questions and answers.
           </p>
           <div className="flex gap-4 justify-center">
             <Link
