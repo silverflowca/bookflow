@@ -1584,9 +1584,10 @@ function TipTapNode({
   assignmentMap?: Map<string, InlineContent[]>;
   nodeKeyPrefix?: string;
 }) {
+  const showHighlights = useContext(HighlightsContext);
+
   if (!node) return null;
 
-  const showHighlights = useContext(HighlightsContext);
   const childProps = { inlineContent, onContentClick, assignmentMap, nodeKeyPrefix };
 
   const renderChildren = (children: any[], keyPrefix: string) =>
