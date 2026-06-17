@@ -250,7 +250,8 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         const isHovered = hoveredIndexRef.current === i;
         // Depth scale: far=0.5, near=1.0; hovered gets a pop-up bonus
         const depthScale = 0.5 + 0.5 * ((z + 1) / 2);
-        const scale = isHovered ? 1.5 : depthScale;
+        const isFeaturedScale = i === featuredIndexRef.current && hoveredIndexRef.current === null;
+        const scale = isHovered ? 1.5 : isFeaturedScale ? depthScale * 1.18 : depthScale;
         // Front books that pass through the title zone get a transparency cap so text shows through
         const isFront = z > 0.5;
         const baseOpacity = isHovered ? 1 : (0.3 + 0.7 * ((z + 1) / 2));
@@ -267,15 +268,17 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
         btn.style.filter = isHovered
           ? 'drop-shadow(0 0 14px rgba(255,255,255,0.5))'
           : isFeatured
-            ? 'drop-shadow(0 0 3px rgba(255,255,255,0.6))'
+            ? 'drop-shadow(0 0 6px rgba(255,255,255,0.5))'
             : '';
-        // Thick white outline offset from the image — outline-offset pushes it 3px outside
-        btn.style.outline = isFeatured ? '3px solid rgba(255,255,255,0.9)' : '';
-        btn.style.outlineOffset = isFeatured ? '3px' : '';
-        btn.style.borderRadius = isFeatured ? '0.75rem' : '';
+        // White outline — fades in smoothly when book becomes featured
+        btn.style.outline = isFeatured ? '3px solid rgba(255,255,255,0.9)' : '3px solid rgba(255,255,255,0)';
+        btn.style.outlineOffset = isFeatured ? '3px' : '3px';
+        btn.style.borderRadius = '0.75rem';
         btn.style.transition = isHovered
-          ? 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s, filter 0.2s'
-          : 'none';
+          ? 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s, filter 0.2s, outline-color 0.4s'
+          : isFeatured
+            ? 'transform 0.4s ease, outline-color 0.5s ease, filter 0.5s ease, opacity 0.3s ease'
+            : 'outline-color 0.4s ease, filter 0.3s ease';
       });
 
       rafRef.current = requestAnimationFrame(tick);
