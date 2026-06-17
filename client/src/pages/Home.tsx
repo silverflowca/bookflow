@@ -326,7 +326,7 @@ function SpiralCarousel({ books, settings }: { books: Book[]; settings: Carousel
   const onPointerUp = useCallback(() => {
     const isClick = dragDistRef.current < 8;
     wasClickRef.current = isClick;
-    if (isClick) clickPausedRef.current = !clickPausedRef.current; // toggle pause on each click
+    if (isClick) clickPausedRef.current = true; // click freezes scroll until next drag
     draggingRef.current = false;
   }, []);
 
