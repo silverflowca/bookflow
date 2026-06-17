@@ -487,19 +487,19 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
                 className="w-full h-full object-cover"
                 draggable={false}
               />
-              {/* Read overlay — navigates to book, stops save from firing */}
+              {/* Read overlay — navigates to book */}
               {hoveredIndex === i && (
-                <div
-                  className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-center gap-0.5 py-1 px-1 text-center"
+                <button
+                  type="button"
+                  className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 py-1 px-1 w-full"
                   style={{ background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(2px)' }}
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (wasClickRef.current) navigate(`/book/${book.id}`);
-                  }}
+                  onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerUp={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); navigate(`/book/${book.id}`); }}
                 >
-                  <span className="flex items-center gap-1 text-white text-xs font-bold leading-tight"><PlusCircle className="h-3.5 w-3.5 shrink-0" /> Read</span>
-                </div>
+                  <PlusCircle className="h-3.5 w-3.5 text-white shrink-0" />
+                  <span className="text-white text-xs font-bold leading-tight">Read</span>
+                </button>
               )}
             </div>
           </button>
