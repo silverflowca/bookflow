@@ -54,8 +54,7 @@ export default function Home() {
             Interactive Books, Engaged Readers
           </h1>
           <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
-            Create multi-chapter books with embedded questions, polls, highlights, notes, and media.
-            Let your readers engage deeply with your content.
+            Authors, readers, book clubs, write, read, create, chat, polls, surveys, Interactive books, audio, video, questions and answers.
           </p>
           <div className="flex gap-4 justify-center">
             <Link
