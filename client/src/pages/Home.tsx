@@ -508,7 +508,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         ))}
 
         {/* Book title/author — absolute overlay at bottom of orbit stage */}
-        <div className="absolute bottom-3 inset-x-0 flex flex-col items-center pointer-events-none">
+        <div className="absolute bottom-0 inset-x-0 flex flex-col items-center pointer-events-none" style={{ transform: 'translateY(10px)' }}>
           <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
             {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
           </p>
