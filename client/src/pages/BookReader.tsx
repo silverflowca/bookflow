@@ -4,7 +4,8 @@ import {
   ChevronLeft, ChevronRight, Menu, X, BookOpen, MessageSquare, BarChart2,
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
-  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star
+  Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
+  Eye, EyeOff
 } from 'lucide-react';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
@@ -15,6 +16,9 @@ interface ProgressCtx {
   enabled: boolean;
 }
 const ProgressContext = createContext<ProgressCtx>({ completions: new Set(), markComplete: () => {}, markIncomplete: () => {}, enabled: false });
+
+// Context for toggling inline component highlight visibility
+const HighlightsContext = createContext<boolean>(true);
 
 // Context for coordinating media playback — enforces one playing + one PiP at a time
 interface MediaCtx {
@@ -60,6 +64,7 @@ export default function BookReader() {
   const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showReaderModal, setShowReaderModal] = useState<{ type: InlineContentType } | null>(null);
   const [contentFilter, setContentFilter] = useState<'all' | 'author' | 'mine'>('all');
+  const [showHighlights, setShowHighlights] = useState(true);
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -999,6 +1004,20 @@ export default function BookReader() {
                 completions={chapterCompletions}
                 showComponentPanel={settings?.show_component_panel ?? false}
               />
+
+              {/* Toggle component highlights visibility */}
+              {inlineContent.length > 0 && (
+                <button
+                  onClick={() => setShowHighlights(v => !v)}
+                  title={showHighlights ? 'Hide highlights' : 'Show highlights'}
+                  className={`ml-auto shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-colors ${
+                    showHighlights ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'text-muted hover:bg-surface-hover'
+                  }`}
+                >
+                  {showHighlights ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{showHighlights ? 'Highlights' : 'Highlights'}</span>
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -1030,6 +1049,7 @@ export default function BookReader() {
             </div>
           </article>
         ) : chapter ? (
+          <HighlightsContext.Provider value={showHighlights}>
           <MediaContext.Provider value={mediaCtx}>
           <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
@@ -1146,6 +1166,7 @@ export default function BookReader() {
           </article>
           </ProgressContext.Provider>
           </MediaContext.Provider>
+          </HighlightsContext.Provider>
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-8 text-center text-muted">
             Select a chapter to start reading
@@ -1565,6 +1586,7 @@ function TipTapNode({
 }) {
   if (!node) return null;
 
+  const showHighlights = useContext(HighlightsContext);
   const childProps = { inlineContent, onContentClick, assignmentMap, nodeKeyPrefix };
 
   const renderChildren = (children: any[], keyPrefix: string) =>
@@ -1642,7 +1664,7 @@ function TipTapNode({
         const rawPos = ic.position_in_chapter;
         const position = (!rawPos || (rawPos as string) === 'sidebar') ? 'inline' : rawPos;
         const segText = nodeText.slice(start, end);
-        const markerClass = getInlineContentClass(ic.content_type);
+        const markerClass = showHighlights ? getInlineContentClass(ic.content_type) : '';
         const icon = getInlineContentIcon(ic.content_type);
 
         if (!ic.is_author_content) {
@@ -1657,7 +1679,7 @@ function TipTapNode({
               title={`Click to view ${ic.content_type}`}
             >
               <TextWithMarks text={segText} marks={node.marks} />
-              {!isHighlight && (
+              {showHighlights && !isHighlight && (
                 <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
                   {icon}
                   <User className="h-2.5 w-2.5 text-blue-500" />
@@ -1677,12 +1699,14 @@ function TipTapNode({
           segments.push(
             isFullW2 ? (
               <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-2">
-                {segText && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                {segText && showHighlights && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                {segText && !showHighlights && <TextWithMarks text={segText} marks={node.marks} />}
                 <InlineFormElement content={ic} />
               </span>
             ) : (
               <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
-                {segText && <mark className={`${markerClass} px-0.5 rounded`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                {segText && showHighlights && <mark className={`${markerClass} px-0.5 rounded`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                {segText && !showHighlights && <TextWithMarks text={segText} marks={node.marks} />}
                 <InlineFormElement content={ic} />
               </span>
             )
@@ -1695,7 +1719,7 @@ function TipTapNode({
               title={`Click to go to ${ic.content_type} at ${dest} of chapter`}
               onClick={() => { const t = document.getElementById(`reader-block-${ic.id}`); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(t); } }}>
               <TextWithMarks text={segText} marks={node.marks} />
-              <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100">{icon}</span>
+              {showHighlights && <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100">{icon}</span>}
             </span>
           );
         } else {
@@ -1704,7 +1728,7 @@ function TipTapNode({
             <span key={`click-${ic.id}`} id={`reader-inline-${ic.id}`} className={`${markerClass} cursor-pointer group`}
               onClick={() => onContentClick(ic)} title={`Click to view ${ic.content_type}`}>
               <TextWithMarks text={segText} marks={node.marks} />
-              {!isHighlight && (
+              {showHighlights && !isHighlight && (
                 <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
                   {icon}
                   {ic.is_author_content ? <Crown className="h-2.5 w-2.5 text-amber-500" /> : <User className="h-2.5 w-2.5 text-blue-500" />}
