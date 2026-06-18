@@ -141,14 +141,11 @@ export default function Home() {
                 cta={{ label: 'Start Writing', to: '/dashboard' }}
                 loggedIn={!!user}
               />
-              <div className="flex flex-col gap-3">
-                <div className="rounded-2xl overflow-hidden shadow-sm flex-1">
-                  <img src="/authorcreatebooks.png" alt="Author creating a book" className="w-full h-full object-cover" />
-                </div>
-                <p className="text-center text-sm font-semibold text-muted tracking-wide">
-                  Authors: Write · Create · Audio · Video · Track · Progress · Questions · Answers · Share · Collaborate
-                </p>
-              </div>
+              <ExpandableImage
+                src="/authorcreatebooks.png"
+                alt="Author creating a book"
+                caption="Authors: Write · Create · Audio · Video · Track · Progress · Questions · Answers · Share · Collaborate"
+              />
             </div>
 
             {/* Divider 1 */}
@@ -582,6 +579,43 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
   );
 }
 
+
+// ─── Expandable Image ─────────────────────────────────────────────────────────
+function ExpandableImage({ src, alt, caption }: { src: string; alt: string; caption: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <>
+      <div className="flex flex-col gap-3">
+        <div
+          className="rounded-2xl overflow-hidden shadow-sm flex-1 cursor-zoom-in"
+          onMouseEnter={() => setExpanded(true)}
+          onMouseLeave={() => setExpanded(false)}
+          onClick={() => setExpanded(v => !v)}
+        >
+          <img src={src} alt={alt} className="w-full h-full object-cover" />
+        </div>
+        <p className="text-center text-sm font-semibold text-muted tracking-wide">{caption}</p>
+      </div>
+
+      {/* Lightbox overlay */}
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        style={{ background: 'rgba(0,0,0,0.82)' }}
+        onMouseLeave={() => setExpanded(false)}
+        onClick={() => setExpanded(false)}
+      >
+        <img
+          src={src}
+          alt={alt}
+          className={`rounded-2xl shadow-2xl object-contain transition-all duration-300 ${expanded ? 'scale-100' : 'scale-75'}`}
+          style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+          onClick={e => e.stopPropagation()}
+        />
+      </div>
+    </>
+  );
+}
 
 // ─── Role Card ────────────────────────────────────────────────────────────────
 
