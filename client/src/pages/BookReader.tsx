@@ -1001,7 +1001,7 @@ export default function BookReader() {
 
               {/* Component type filter icons */}
               <HeaderComponentIcons
-                inlineContent={inlineContent}
+                inlineContent={filteredInlineContent}
                 filterType={filterType}
                 onFilterChange={setFilterType}
                 onContentSelect={setActiveContent}
