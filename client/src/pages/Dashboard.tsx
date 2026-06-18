@@ -346,7 +346,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold text-theme">Book Clubs</h2>
+            <h2 className="text-lg font-semibold text-theme">Book Clubs & Study Groups</h2>
           </div>
           <Link to="/clubs" className="flex items-center gap-1 text-sm text-accent hover:underline">
             View all <ChevronRight className="h-4 w-4" />

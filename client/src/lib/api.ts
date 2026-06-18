@@ -885,22 +885,6 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/books/${clubBookId}`, { method: 'DELETE' });
   }
 
-  async getClubDiscussions(clubId: string, params?: { book_id?: string; chapter_id?: string; parent_id?: string | null }): Promise<any[]> {
-    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, v === null ? 'null' : String(v)])).toString() : '';
-    return this.request(`/clubs/${clubId}/discussions${qs}`);
-  }
-
-  async postClubDiscussion(clubId: string, data: { body: string; book_id?: string; chapter_id?: string; parent_id?: string }): Promise<any> {
-    return this.request(`/clubs/${clubId}/discussions`, { method: 'POST', body: JSON.stringify(data) });
-  }
-
-  async updateClubDiscussion(clubId: string, discussionId: string, body: string): Promise<any> {
-    return this.request(`/clubs/${clubId}/discussions/${discussionId}`, { method: 'PUT', body: JSON.stringify({ body }) });
-  }
-
-  async deleteClubDiscussion(clubId: string, discussionId: string): Promise<void> {
-    return this.request(`/clubs/${clubId}/discussions/${discussionId}`, { method: 'DELETE' });
-  }
 
   async getClubMemberProgress(clubId: string, memberUserId: string): Promise<any[]> {
     return this.request(`/clubs/${clubId}/members/${memberUserId}/progress`);

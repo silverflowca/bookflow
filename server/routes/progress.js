@@ -81,19 +81,37 @@ router.post('/complete', authenticate, async (req, res) => {
     // Check progress tracking is enabled at book or club level
     const isAuthor = book.author_id === req.user.id;
     if (!settings?.enable_progress_tracking && !isAuthor) {
-      // Also check club-level enable
-      const { data: clubMembership } = await supabase
+      // Check club-level enable: find clubs that have this book AND have progress tracking on
+      // AND the user is a member of
+      const { data: clubsWithBook } = await supabase
         .schema('bookflow')
-        .from('club_members')
-        .select('club_id, club:book_clubs(club_books(book_id), settings:club_settings(enable_progress_tracking))')
-        .eq('user_id', req.user.id)
-        .not('invite_accepted_at', 'is', null);
+        .from('club_books')
+        .select('club_id')
+        .eq('book_id', chapter.book_id);
 
-      const clubEnabled = (clubMembership || []).some(m => {
-        const cs = Array.isArray(m.club?.settings) ? m.club.settings[0] : m.club?.settings;
-        const hasBook = (m.club?.club_books || []).some(cb => cb.book_id === chapter.book_id);
-        return hasBook && cs?.enable_progress_tracking;
-      });
+      const clubIds = (clubsWithBook || []).map(cb => cb.club_id);
+      let clubEnabled = false;
+
+      if (clubIds.length > 0) {
+        const { data: userMembership } = await supabase
+          .schema('bookflow')
+          .from('club_members')
+          .select('club_id')
+          .eq('user_id', req.user.id)
+          .in('club_id', clubIds)
+          .not('invite_accepted_at', 'is', null)
+          .maybeSingle();
+
+        if (userMembership) {
+          const { data: clubSettingsRows } = await supabase
+            .schema('bookflow')
+            .from('club_settings')
+            .select('enable_progress_tracking')
+            .in('club_id', clubIds);
+
+          clubEnabled = (clubSettingsRows || []).some(cs => cs.enable_progress_tracking);
+        }
+      }
 
       if (!clubEnabled) {
         return res.status(403).json({ error: 'Progress tracking not enabled for this book' });

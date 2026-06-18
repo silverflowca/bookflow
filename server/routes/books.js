@@ -229,6 +229,42 @@ router.get('/:id', optionalAuth, async (req, res) => {
       }
     }
 
+    // For public books, still check if the authenticated user is in a club that has
+    // progress tracking enabled for this book — so the reader can record completions.
+    if (book.visibility === 'public' && req.user?.id && !book.club_progress_tracking_enabled) {
+      const { data: clubBooks } = await supabase
+        .schema('bookflow')
+        .from('club_books')
+        .select('club_id')
+        .eq('book_id', req.params.id);
+
+      const clubIds = (clubBooks || []).map(cb => cb.club_id);
+
+      if (clubIds.length > 0) {
+        const { data: clubMember } = await supabase
+          .schema('bookflow')
+          .from('club_members')
+          .select('club_id')
+          .eq('user_id', req.user.id)
+          .in('club_id', clubIds)
+          .not('invite_accepted_at', 'is', null)
+          .maybeSingle();
+
+        if (clubMember) {
+          const { data: clubSettingsRows } = await supabase
+            .schema('bookflow')
+            .from('club_settings')
+            .select('enable_progress_tracking')
+            .in('club_id', clubIds);
+
+          const clubProgressEnabled = (clubSettingsRows || []).some(cs => cs.enable_progress_tracking);
+          if (clubProgressEnabled) {
+            book.club_progress_tracking_enabled = true;
+          }
+        }
+      }
+    }
+
     // Sort chapters by order
     book.chapters = book.chapters.sort((a, b) => a.order_index - b.order_index);
 

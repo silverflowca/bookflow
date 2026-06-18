@@ -12,6 +12,7 @@ interface Club {
   max_members: number;
   created_at: string;
   member_count?: number;
+  allow_join_requests?: boolean;
   creator?: { id: string; display_name: string; avatar_url?: string };
   members?: { id: string; role: string; user_id: string; invite_accepted_at?: string }[];
   books?: { id: string; is_current: boolean; book?: { id: string; title: string; cover_image_url?: string } }[];
@@ -269,14 +270,15 @@ export default function ClubsPage() {
     navigate(`/clubs/${club.id}`);
   }
 
-  const displayedPublic = publicClubs.filter(c => !myClubs.find(m => m.id === c.id));
+  const myClubIds = new Set(myClubs.map(c => c.id));
+  const displayedPublic = publicClubs;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-theme theme-title">Book Clubs</h1>
+          <h1 className="text-2xl font-bold text-theme theme-title">Book Clubs & Study Groups</h1>
           <p className="text-muted mt-1">Read together, discuss together</p>
         </div>
         <button
@@ -352,21 +354,38 @@ export default function ClubsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {displayedPublic.map(club => (
-                <div key={club.id} className="flex flex-col">
-                  <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-                  <button
-                    onClick={() => setJoinRequestClub(club)}
-                    disabled={requestedClubIds.has(club.id)}
-                    className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
-                  >
-                    {requestedClubIds.has(club.id)
-                      ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
-                      : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
-                    }
-                  </button>
-                </div>
-              ))}
+              {displayedPublic.map(club => {
+                const isMember = myClubIds.has(club.id);
+                const canRequest = club.allow_join_requests !== false;
+                const requested = requestedClubIds.has(club.id);
+                return (
+                  <div key={club.id} className="flex flex-col">
+                    <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                    {isMember ? (
+                      <button
+                        onClick={() => navigate(`/clubs/${club.id}`)}
+                        className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Member — Open
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => canRequest && !requested && setJoinRequestClub(club)}
+                        disabled={requested || !canRequest}
+                        title={!canRequest ? 'This club is not accepting join requests' : undefined}
+                        className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
+                      >
+                        {requested
+                          ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                          : !canRequest
+                            ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
+                            : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
+                        }
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

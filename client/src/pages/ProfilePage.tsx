@@ -370,7 +370,7 @@ export default function ProfilePage() {
           {data.clubs.length > 0 && (
             <section className="bg-surface border-2 border-theme rounded-xl p-5">
               <h2 className="text-base font-semibold text-theme mb-4 flex items-center gap-2">
-                <Users className="h-4 w-4 text-accent" /> Book Clubs
+                <Users className="h-4 w-4 text-accent" /> Book Clubs & Study Groups
               </h2>
               <div className="space-y-2">
                 {data.clubs.map((club: any) => (

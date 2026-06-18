@@ -119,75 +119,123 @@ export default function Home() {
             Whether you write, read, lead, or teach — there's a place for you here.
           </p>
 
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
+          <div className="space-y-0 mb-8">
 
-            {/* Authors */}
-            <RoleCard
-              accent="from-purple-500 to-indigo-600"
-              icon={<PenLine className="h-7 w-7 text-white" />}
-              title="Authors"
-              tagline="Create books that breathe."
-              bullets={[
-                { icon: <BookOpen className="h-4 w-4" />, text: 'Write multi-chapter books with a rich editor' },
-                { icon: <HelpCircle className="h-4 w-4" />, text: 'Embed questions, polls, audio & video inline' },
-                { icon: <FileText className="h-4 w-4" />, text: 'Publish as interactive books or export to PDF' },
-                { icon: <Share2 className="h-4 w-4" />, text: 'Share publicly or with select readers & clubs' },
-                { icon: <Sparkles className="h-4 w-4" />, text: 'Self-publish and reach your audience directly' },
-              ]}
-              cta={{ label: 'Start Writing', to: '/dashboard' }}
-              loggedIn={!!user}
-            />
+            {/* Row 1: Authors card (left) | Authors photo (right) */}
+            <div className="grid md:grid-cols-2 gap-12 items-stretch px-4">
+              <RoleCard
+                accent="from-purple-500 to-indigo-600"
+                icon={<PenLine className="h-7 w-7 text-white" />}
+                title="Authors"
+                tagline="Create books that breathe."
+                bullets={[
+                  { icon: <BookOpen className="h-4 w-4" />, text: 'Write multi-chapter books with a rich editor' },
+                  { icon: <HelpCircle className="h-4 w-4" />, text: 'Embed questions, polls, audio & video inline' },
+                  { icon: <FileText className="h-4 w-4" />, text: 'Publish as interactive books or export to PDF' },
+                  { icon: <Share2 className="h-4 w-4" />, text: 'Share publicly or with select readers & clubs' },
+                  { icon: <Sparkles className="h-4 w-4" />, text: 'Self-publish and reach your audience directly' },
+                ]}
+                cta={{ label: 'Start Writing', to: '/dashboard' }}
+                loggedIn={!!user}
+              />
+              <div className="rounded-2xl overflow-hidden shadow-sm">
+                <img src="/authorcreatebooks.png" alt="Author creating a book" className="w-full h-full object-cover" />
+              </div>
+            </div>
 
-            {/* Readers */}
-            <RoleCard
-              accent="from-emerald-500 to-teal-600"
-              icon={<BookMarked className="h-7 w-7 text-white" />}
-              title="Readers"
-              tagline="Read. React. Connect."
-              bullets={[
-                { icon: <Highlighter className="h-4 w-4" />, text: 'Highlight passages and add personal notes' },
-                { icon: <MessageCircle className="h-4 w-4" />, text: 'Chat with fellow readers and spark discussions' },
-                { icon: <HelpCircle className="h-4 w-4" />, text: 'Answer embedded questions as you read' },
-                { icon: <Users className="h-4 w-4" />, text: 'Join book clubs and read together' },
-                { icon: <PenLine className="h-4 w-4" />, text: 'Dialogue directly with the author' },
-              ]}
-              cta={{ label: 'Browse Books', to: '/#books' }}
-              loggedIn={!!user}
-            />
+            {/* Divider 1 */}
+            <div className="flex items-center gap-4 py-10 px-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-purple-400/40 to-transparent" />
+              <svg viewBox="0 0 60 20" className="w-16 h-5 text-purple-400/50 shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 10 Q15 0 30 10 Q45 20 60 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+              </svg>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+            </div>
 
-            {/* Book Studies */}
-            <RoleCard
-              accent="from-amber-500 to-orange-600"
-              icon={<GraduationCap className="h-7 w-7 text-white" />}
-              title="Book Studies"
-              tagline="Learn together, grow together."
-              bullets={[
-                { icon: <BookOpen className="h-4 w-4" />, text: 'Study books chapter by chapter as a group' },
-                { icon: <Share2 className="h-4 w-4" />, text: 'Share your reading progress with others' },
-                { icon: <HelpCircle className="h-4 w-4" />, text: 'Work through study questions together' },
-                { icon: <MessageCircle className="h-4 w-4" />, text: 'Discuss insights and reflections in real time' },
-                { icon: <GraduationCap className="h-4 w-4" />, text: 'Track comprehension with built-in quizzes' },
-              ]}
-              cta={{ label: 'Join a Study', to: '/clubs' }}
-              loggedIn={!!user}
-            />
+            {/* Row 2: Readers photo (left) | Readers card (right) */}
+            <div className="grid md:grid-cols-2 gap-12 items-stretch px-4">
+              <div className="rounded-2xl overflow-hidden shadow-sm">
+                <img src="/scan_to_watch.png" alt="Readers" className="w-full h-full object-cover" />
+              </div>
+              <RoleCard
+                accent="from-emerald-500 to-teal-600"
+                icon={<BookMarked className="h-7 w-7 text-white" />}
+                title="Readers"
+                tagline="Read. React. Connect."
+                bullets={[
+                  { icon: <Highlighter className="h-4 w-4" />, text: 'Highlight passages and add personal notes' },
+                  { icon: <MessageCircle className="h-4 w-4" />, text: 'Chat with fellow readers and spark discussions' },
+                  { icon: <HelpCircle className="h-4 w-4" />, text: 'Answer embedded questions as you read' },
+                  { icon: <Users className="h-4 w-4" />, text: 'Join book clubs and read together' },
+                  { icon: <PenLine className="h-4 w-4" />, text: 'Dialogue directly with the author' },
+                ]}
+                cta={{ label: 'Browse Books', to: '/#books' }}
+                loggedIn={!!user}
+              />
+            </div>
 
-            {/* Book Club Leaders */}
-            <RoleCard
-              accent="from-rose-500 to-pink-600"
-              icon={<Crown className="h-7 w-7 text-white" />}
-              title="Book Club Leaders"
-              tagline="Lead your community."
-              bullets={[
-                { icon: <Users className="h-4 w-4" />, text: 'Create and manage your own book clubs' },
-                { icon: <BookMarked className="h-4 w-4" />, text: 'Assign books and set reading schedules' },
-                { icon: <MessageCircle className="h-4 w-4" />, text: 'Facilitate group discussions and polls' },
-                { icon: <HelpCircle className="h-4 w-4" />, text: 'Post study questions for your members' },
-                { icon: <Share2 className="h-4 w-4" />, text: 'Invite members with a shareable club link' },
-              ]}
-              cta={{ label: 'Start a Club', to: '/clubs' }}
-              loggedIn={!!user}
-            />
+            {/* Divider 2 */}
+            <div className="flex items-center gap-4 py-10 px-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+              <svg viewBox="0 0 60 20" className="w-16 h-5 text-emerald-400/50 shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 10 Q15 20 30 10 Q45 0 60 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+              </svg>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent" />
+            </div>
+
+            {/* Row 3: Book Studies card (left) | Students photo (right) */}
+            <div className="grid md:grid-cols-2 gap-12 items-stretch px-4">
+              <RoleCard
+                accent="from-amber-500 to-orange-600"
+                icon={<GraduationCap className="h-7 w-7 text-white" />}
+                title="Book Studies"
+                tagline="Learn together, grow together."
+                bullets={[
+                  { icon: <BookOpen className="h-4 w-4" />, text: 'Study books chapter by chapter as a group' },
+                  { icon: <Share2 className="h-4 w-4" />, text: 'Share your reading progress with others' },
+                  { icon: <HelpCircle className="h-4 w-4" />, text: 'Work through study questions together' },
+                  { icon: <MessageCircle className="h-4 w-4" />, text: 'Discuss insights and reflections in real time' },
+                  { icon: <GraduationCap className="h-4 w-4" />, text: 'Track comprehension with built-in quizzes' },
+                ]}
+                cta={{ label: 'Join a Study', to: '/clubs' }}
+                loggedIn={!!user}
+              />
+              <div className="rounded-2xl overflow-hidden shadow-sm">
+                <img src="/studentsstudy.png" alt="Students studying" className="w-full h-full object-cover" />
+              </div>
+            </div>
+
+            {/* Divider 3 */}
+            <div className="flex items-center gap-4 py-10 px-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent" />
+              <svg viewBox="0 0 60 20" className="w-16 h-5 text-amber-400/50 shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 10 Q15 0 30 10 Q45 20 60 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+              </svg>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-rose-400/40 to-transparent" />
+            </div>
+
+            {/* Row 4: Church photo (left) | Book Club Leaders card (right) */}
+            <div className="grid md:grid-cols-2 gap-12 items-stretch px-4">
+              <div className="rounded-2xl overflow-hidden shadow-sm">
+                <img src="/ChurchGroupBookRead.png" alt="Book club group" className="w-full h-full object-cover" />
+              </div>
+              <RoleCard
+                accent="from-rose-500 to-pink-600"
+                icon={<Crown className="h-7 w-7 text-white" />}
+                title="Book Club Leaders"
+                tagline="Lead your community."
+                bullets={[
+                  { icon: <Users className="h-4 w-4" />, text: 'Create and manage your own book clubs' },
+                  { icon: <BookMarked className="h-4 w-4" />, text: 'Assign books and set reading schedules' },
+                  { icon: <MessageCircle className="h-4 w-4" />, text: 'Facilitate group discussions and polls' },
+                  { icon: <HelpCircle className="h-4 w-4" />, text: 'Post study questions for your members' },
+                  { icon: <Share2 className="h-4 w-4" />, text: 'Invite members with a shareable club link' },
+                ]}
+                cta={{ label: 'Start a Club', to: '/clubs' }}
+                loggedIn={!!user}
+              />
+            </div>
+
           </div>
 
           {/* Bring Old Books Alive banner */}
@@ -543,11 +591,11 @@ function RoleCard({
   return (
     <div className="bg-surface rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
       {/* Header strip */}
-      <div className={`bg-gradient-to-r ${accent} px-6 py-5 flex items-center gap-4`}>
-        <div className="p-2.5 rounded-xl bg-white/20">{icon}</div>
+      <div className={`bg-gradient-to-r ${accent} px-6 py-7 flex items-center gap-4`}>
+        <div className="p-3 rounded-xl bg-white/20">{icon}</div>
         <div>
-          <h3 className="text-xl font-bold text-white">{title}</h3>
-          <p className="text-white/80 text-sm">{tagline}</p>
+          <h3 className="text-4xl font-bold text-white">{title}</h3>
+          <p className="text-white/80 text-sm mt-1">{tagline}</p>
         </div>
       </div>
       {/* Bullets */}

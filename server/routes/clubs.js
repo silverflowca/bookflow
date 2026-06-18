@@ -99,7 +99,8 @@ router.get('/public', authenticate, async (req, res) => {
       .from('book_clubs')
       .select(`
         id, name, description, cover_image_url, max_members, created_at,
-        creator:profiles!book_clubs_created_by_fkey(id, display_name, avatar_url)
+        creator:profiles!book_clubs_created_by_fkey(id, display_name, avatar_url),
+        settings:club_settings(allow_join_requests)
       `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
@@ -116,7 +117,10 @@ router.get('/public', authenticate, async (req, res) => {
         .select('id', { count: 'exact', head: true })
         .eq('club_id', club.id)
         .not('invite_accepted_at', 'is', null);
-      return { ...club, member_count: count || 0 };
+      const settings = Array.isArray(club.settings) ? club.settings[0] : club.settings;
+      // Public clubs default to allowing join requests unless explicitly disabled
+      const allow_join_requests = settings ? settings.allow_join_requests !== false : true;
+      return { ...club, member_count: count || 0, allow_join_requests };
     }));
 
     res.json(enriched);
@@ -146,8 +150,12 @@ router.post('/', authenticate, async (req, res) => {
       invite_accepted_at: new Date().toISOString(),
     });
 
-    // Default settings
-    await supabase.from('club_settings').insert({ club_id: club.id });
+    // Default settings — progress tracking and join requests on by default
+    await supabase.from('club_settings').insert({
+      club_id: club.id,
+      enable_progress_tracking: true,
+      allow_join_requests: true,
+    });
 
     // Default chat settings
     await supabase.schema('bookflow').from('club_chat_settings').insert({ club_id: club.id });
@@ -436,7 +444,8 @@ router.post('/:clubId/request-join', authenticate, async (req, res) => {
     if (club.visibility !== 'public') return res.status(403).json({ error: 'This club is invite-only' });
 
     const settings = Array.isArray(club.settings) ? club.settings[0] : club.settings;
-    if (!settings?.allow_join_requests) {
+    // Public clubs allow join requests by default; only block if explicitly disabled
+    if (settings && settings.allow_join_requests === false) {
       return res.status(403).json({ error: 'This club is not accepting join requests at this time' });
     }
 

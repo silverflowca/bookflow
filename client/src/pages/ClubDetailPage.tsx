@@ -34,16 +34,6 @@ interface ClubBook {
   book?: { id: string; title: string; cover_image_url?: string; author?: { display_name: string } };
 }
 
-interface Discussion {
-  id: string;
-  body: string;
-  created_at: string;
-  updated_at: string;
-  parent_id?: string;
-  book_id?: string;
-  author?: { id: string; display_name: string; avatar_url?: string };
-  replies?: Discussion[];
-}
 
 interface ClubSettings {
   show_member_reading_progress: boolean;
@@ -387,104 +377,6 @@ function AddBookModal({ clubId, existingBookIds, onClose, onAdded }: { clubId: s
   );
 }
 
-function DiscussionThread({
-  discussion,
-  clubId,
-  currentUserId,
-  myRole,
-  onReply,
-  onDeleted,
-}: {
-  discussion: Discussion;
-  clubId: string;
-  currentUserId: string;
-  myRole: string | null;
-  onReply: (parentId: string) => void;
-  onDeleted: (id: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [editBody, setEditBody] = useState(discussion.body);
-  const [saving, setSaving] = useState(false);
-
-  async function handleSaveEdit() {
-    setSaving(true);
-    try {
-      await api.updateClubDiscussion(clubId, discussion.id, editBody);
-      setEditing(false);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm('Delete this message?')) return;
-    try {
-      await api.deleteClubDiscussion(clubId, discussion.id);
-      onDeleted(discussion.id);
-    } catch (err: any) {
-      alert(err.message);
-    }
-  }
-
-  const canEdit = discussion.author?.id === currentUserId;
-  const canDelete = canEdit || myRole === 'owner' || myRole === 'admin';
-
-  return (
-    <div className="flex gap-3">
-      <Avatar profile={discussion.author} size="sm" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-theme">{discussion.author?.display_name ?? 'Unknown'}</span>
-          <span className="text-xs text-muted">{timeAgo(discussion.created_at)}</span>
-          {discussion.created_at !== discussion.updated_at && <span className="text-xs text-muted italic">(edited)</span>}
-        </div>
-        {editing ? (
-          <div className="space-y-2">
-            <textarea
-              value={editBody}
-              onChange={e => setEditBody(e.target.value)}
-              className="w-full px-3 py-2 theme-input rounded-lg text-sm resize-none"
-              rows={3}
-            />
-            <div className="flex gap-2">
-              <button onClick={handleSaveEdit} disabled={saving} className="text-xs theme-button-primary px-3 py-1 rounded-lg disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-              <button onClick={() => setEditing(false)} className="text-xs theme-button-secondary px-3 py-1 rounded-lg">Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-theme whitespace-pre-wrap break-words">{discussion.body}</p>
-            <div className="flex items-center gap-3 mt-1.5">
-              <button onClick={() => onReply(discussion.id)} className="text-xs text-muted hover:text-theme">Reply</button>
-              {canEdit && <button onClick={() => setEditing(true)} className="text-xs text-muted hover:text-theme">Edit</button>}
-              {canDelete && <button onClick={handleDelete} className="text-xs text-red-500 hover:text-red-400">Delete</button>}
-            </div>
-          </>
-        )}
-        {/* Replies */}
-        {discussion.replies && discussion.replies.length > 0 && (
-          <div className="mt-3 space-y-3 border-l-2 border-white/10 pl-3">
-            {discussion.replies.map(r => (
-              <DiscussionThread
-                key={r.id}
-                discussion={r}
-                clubId={clubId}
-                currentUserId={currentUserId}
-                myRole={myRole}
-                onReply={onReply}
-                onDeleted={onDeleted}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Pending Invite Row ────────────────────────────────────────────────────────
 
@@ -761,7 +653,7 @@ function JoinRequestRow({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type PanelTab = 'overview' | 'members' | 'books' | 'discussions' | 'chat' | 'settings' | 'progress';
+type PanelTab = 'overview' | 'members' | 'books' | 'chat' | 'settings' | 'progress';
 
 export default function ClubDetailPage() {
   const { clubId } = useParams<{ clubId: string }>();
@@ -771,11 +663,6 @@ export default function ClubDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<PanelTab>('overview');
   const { counts: chatUnread, clearClub: clearChatUnread } = useChatUnread();
-  const [discussions, setDiscussions] = useState<Discussion[]>([]);
-  const [discLoading, setDiscLoading] = useState(false);
-  const [postBody, setPostBody] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [posting, setPosting] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showAddBook, setShowAddBook] = useState(false);
   const [editingSettings, setEditingSettings] = useState(false);
@@ -786,7 +673,6 @@ export default function ClubDetailPage() {
   const [progressData, setProgressData] = useState<ClubProgressEntry[] | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressClubId, setProgressClubId] = useState<string | null>(null);
-  const postRef = useRef<HTMLTextAreaElement>(null);
 
   const myRole = club?.my_role ?? null;
   const currentUserId = user?.id ?? '';
@@ -797,7 +683,6 @@ export default function ClubDetailPage() {
   }, [clubId]);
 
   useEffect(() => {
-    if (tab === 'discussions' && clubId) loadDiscussions();
     if (tab === 'progress' && clubId && !progressData) loadProgress();
   }, [tab]);
 
@@ -823,64 +708,6 @@ export default function ClubDetailPage() {
     }
   }
 
-  async function loadDiscussions() {
-    setDiscLoading(true);
-    try {
-      const raw: Discussion[] = await api.getClubDiscussions(clubId!);
-      // Build threaded tree
-      const map = new Map<string, Discussion>();
-      const roots: Discussion[] = [];
-      raw.forEach(d => { d.replies = []; map.set(d.id, d); });
-      raw.forEach(d => {
-        if (d.parent_id && map.has(d.parent_id)) {
-          map.get(d.parent_id)!.replies!.push(d);
-        } else if (!d.parent_id) {
-          roots.push(d);
-        }
-      });
-      setDiscussions(roots);
-    } catch (err) {
-      console.error('Failed to load discussions:', err);
-    } finally {
-      setDiscLoading(false);
-    }
-  }
-
-  async function handlePost(e: React.FormEvent) {
-    e.preventDefault();
-    if (!postBody.trim()) return;
-    setPosting(true);
-    try {
-      const msg = await api.postClubDiscussion(clubId!, {
-        body: postBody.trim(),
-        parent_id: replyingTo ?? undefined,
-      });
-      if (replyingTo) {
-        // Append reply to tree
-        setDiscussions(prev => prev.map(d => addReply(d, replyingTo, msg)));
-      } else {
-        setDiscussions(prev => [msg, ...prev]);
-      }
-      setPostBody('');
-      setReplyingTo(null);
-    } catch (err: any) {
-      alert(err.message || 'Failed to post');
-    } finally {
-      setPosting(false);
-    }
-  }
-
-  function addReply(d: Discussion, parentId: string, reply: Discussion): Discussion {
-    if (d.id === parentId) return { ...d, replies: [...(d.replies ?? []), reply] };
-    return { ...d, replies: d.replies?.map(r => addReply(r, parentId, reply)) };
-  }
-
-  function handleDiscussionDeleted(id: string) {
-    function removeById(list: Discussion[]): Discussion[] {
-      return list.filter(d => d.id !== id).map(d => ({ ...d, replies: removeById(d.replies ?? []) }));
-    }
-    setDiscussions(prev => removeById(prev));
-  }
 
   async function handleRemoveMember(memberId: string) {
     if (!confirm('Remove this member from the club?')) return;
@@ -985,7 +812,6 @@ export default function ClubDetailPage() {
     { key: 'overview', label: 'Overview', icon: <BookOpen className="h-4 w-4" /> },
     { key: 'members', label: `Members (${memberCount})${isAdmin && allPending.length > 0 ? ` · ${allPending.length} pending` : ''}`, icon: <Users className="h-4 w-4" /> },
     { key: 'books', label: `Books (${club.books?.length ?? 0})`, icon: <BookOpen className="h-4 w-4" /> },
-    { key: 'discussions', label: 'Discussions', icon: <MessageSquare className="h-4 w-4" /> },
     {
       key: 'chat' as PanelTab,
       label: chatUnread[clubId!] > 0 ? `Chat (${chatUnread[clubId!]})` : 'Chat',
@@ -1299,67 +1125,6 @@ export default function ClubDetailPage() {
         </div>
       )}
 
-      {/* ── Discussions ── */}
-      {tab === 'discussions' && (
-        <div className="space-y-4">
-          {/* Post form */}
-          <div className="theme-section rounded-xl p-4">
-            <form onSubmit={handlePost} className="space-y-2">
-              <textarea
-                ref={postRef}
-                value={postBody}
-                onChange={e => setPostBody(e.target.value)}
-                placeholder={replyingTo ? 'Write a reply…' : 'Start a discussion…'}
-                className="w-full px-3 py-2 theme-input rounded-lg text-sm resize-none"
-                rows={2}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost(e as any); } }}
-              />
-              <div className="flex items-center justify-between">
-                {replyingTo ? (
-                  <div className="flex items-center gap-1.5 text-xs text-muted">
-                    <span>Replying to a message</span>
-                    <button type="button" onClick={() => setReplyingTo(null)} className="text-red-400 hover:text-red-300">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : <span />}
-                <button
-                  type="submit"
-                  disabled={posting || !postBody.trim()}
-                  className="flex items-center gap-1.5 theme-button-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-                >
-                  {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {replyingTo ? 'Reply' : 'Post'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {discLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted" /></div>
-          ) : discussions.length === 0 ? (
-            <div className="text-center py-10 text-muted">
-              <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No discussions yet. Start one!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {discussions.map(d => (
-                <div key={d.id} className="theme-section rounded-xl p-4">
-                  <DiscussionThread
-                    discussion={d}
-                    clubId={clubId!}
-                    currentUserId={currentUserId}
-                    myRole={myRole}
-                    onReply={id => { setReplyingTo(id); postRef.current?.focus(); }}
-                    onDeleted={handleDiscussionDeleted}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Chat ── */}
       {tab === 'chat' && clubId && (
@@ -1536,7 +1301,7 @@ export default function ClubDetailPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => { setEditingSettings(true); setSettingsDraft(club.settings ?? { show_member_reading_progress: true, show_member_answers: false, show_member_highlights: true, show_member_media: true, enable_progress_tracking: false, allow_join_requests: false }); }}
+                  onClick={() => { setEditingSettings(true); setSettingsDraft(club.settings ?? { show_member_reading_progress: true, show_member_answers: false, show_member_highlights: true, show_member_media: true, enable_progress_tracking: true, allow_join_requests: true }); }}
                   className="text-sm theme-button-secondary px-3 py-1.5 rounded-lg"
                 >
                   Edit

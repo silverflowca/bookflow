@@ -485,7 +485,7 @@ export default function Layout() {
                     <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> Books
                   </Link>
                   <Link to="/clubs" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
-                    <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs
+                    <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs & Study Groups
                   </Link>
                   <span className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted/40 cursor-not-allowed select-none">
                     <Video className="h-5 w-5 flex-shrink-0" /> Live <span className="ml-1 text-xs">(coming soon)</span>
