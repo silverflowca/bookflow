@@ -32,7 +32,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [carouselSettings] = useState<CarouselSettings>(loadCarouselSettings);
   const [tagline, setTagline] = useState(DEFAULT_TAGLINE);
-  const [savedCount, setSavedCount] = useState(0);
+  const [, setSavedCount] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
   useEffect(() => {

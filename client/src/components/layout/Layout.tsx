@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, Radio, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 import api from '../../lib/api';
