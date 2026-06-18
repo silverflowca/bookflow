@@ -141,8 +141,13 @@ export default function Home() {
                 cta={{ label: 'Start Writing', to: '/dashboard' }}
                 loggedIn={!!user}
               />
-              <div className="rounded-2xl overflow-hidden shadow-sm">
-                <img src="/authorcreatebooks.png" alt="Author creating a book" className="w-full h-full object-cover" />
+              <div className="flex flex-col gap-3">
+                <div className="rounded-2xl overflow-hidden shadow-sm flex-1">
+                  <img src="/authorcreatebooks.png" alt="Author creating a book" className="w-full h-full object-cover" />
+                </div>
+                <p className="text-center text-sm font-semibold text-muted tracking-wide">
+                  Authors: Write · Create · Audio · Video · Track · Progress · Questions · Answers · Share · Collaborate
+                </p>
               </div>
             </div>
 
