@@ -240,29 +240,30 @@ export default function BookReader() {
     return () => document.removeEventListener('mouseup', handleTextSelection);
   }, [handleTextSelection]);
 
-  // Filter inline content based on selected filter
-  const filteredInlineContent = useMemo(() => {
+  // Visibility filter (no position exclusion) — used for icon strip counts
+  const visibleInlineContent = useMemo(() => {
     return inlineContent.filter(ic => {
-      // Exclude items positioned at start/end of chapter — rendered separately
-      if (ic.position_in_chapter === 'start_of_chapter' || ic.position_in_chapter === 'end_of_chapter') return false;
-
-      // Always show all to author
       if (isAuthor) {
         if (contentFilter === 'author') return ic.is_author_content;
         if (contentFilter === 'mine') return ic.created_by === user?.id;
         return true;
       }
-
-      // For readers: only show visible content
-      if (ic.visibility === 'author_only' && !isAuthor) return false;
+      if (ic.visibility === 'author_only') return false;
       if (ic.visibility === 'private' && ic.created_by !== user?.id) return false;
-
-      // Apply filter
       if (contentFilter === 'author') return ic.is_author_content;
       if (contentFilter === 'mine') return ic.created_by === user?.id;
       return true;
     });
   }, [inlineContent, contentFilter, isAuthor, user?.id]);
+
+  // Filter inline content based on selected filter
+  const filteredInlineContent = useMemo(() => {
+    return visibleInlineContent.filter(ic => {
+      // Exclude items positioned at start/end of chapter — rendered separately
+      if (ic.position_in_chapter === 'start_of_chapter' || ic.position_in_chapter === 'end_of_chapter') return false;
+      return true;
+    });
+  }, [visibleInlineContent]);
 
   useEffect(() => {
     if (bookId) {
@@ -1001,7 +1002,7 @@ export default function BookReader() {
 
               {/* Component type filter icons */}
               <HeaderComponentIcons
-                inlineContent={filteredInlineContent}
+                inlineContent={visibleInlineContent}
                 filterType={filterType}
                 onFilterChange={setFilterType}
                 onContentSelect={setActiveContent}
