@@ -114,7 +114,10 @@ export default function Home() {
       {/* Role Promo Section */}
       <section className="py-20 bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-4">Who Is This For?</h2>
+          <h2 className="text-sm text-center mb-3 text-muted uppercase tracking-widest">Who Is This For?</h2>
+          <p className="text-center font-bold text-2xl mb-3 max-w-3xl mx-auto">
+            BookFlow is for Authors, Writers, Readers, Teachers, Students, Group Leaders, Bible Study Groups, Recovery Teams and more.
+          </p>
           <p className="text-center text-muted mb-14 max-w-2xl mx-auto">
             Whether you write, read, lead, or teach — there's a place for you here.
           </p>
@@ -601,7 +604,7 @@ function RoleCard({
       {/* Bullets */}
       <ul className="flex-1 px-6 py-5 space-y-3">
         {bullets.map((b, i) => (
-          <li key={i} className="flex items-start gap-3 text-sm text-theme">
+          <li key={i} className="flex items-start gap-3 text-base text-theme">
             <span className="mt-0.5 text-muted shrink-0">{b.icon}</span>
             {b.text}
           </li>
