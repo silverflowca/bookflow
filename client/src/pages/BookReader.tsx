@@ -243,13 +243,14 @@ export default function BookReader() {
   // Visibility filter (no position exclusion) — used for icon strip counts
   const visibleInlineContent = useMemo(() => {
     return inlineContent.filter(ic => {
+      // Never count other users' private items (even for author)
+      if (ic.visibility === 'private' && ic.created_by !== user?.id) return false;
       if (isAuthor) {
         if (contentFilter === 'author') return ic.is_author_content;
         if (contentFilter === 'mine') return ic.created_by === user?.id;
         return true;
       }
       if (ic.visibility === 'author_only') return false;
-      if (ic.visibility === 'private' && ic.created_by !== user?.id) return false;
       if (contentFilter === 'author') return ic.is_author_content;
       if (contentFilter === 'mine') return ic.created_by === user?.id;
       return true;
