@@ -570,7 +570,7 @@ export default function Layout() {
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t-2 border-strong flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Link
             to="/dashboard"
-            className={`relative flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/edit') ? 'text-accent' : 'text-muted hover:text-theme'}`}
+            className={`relative flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/edit') ? 'text-accent' : 'text-gray-900 dark:text-white hover:text-accent'}`}
           >
             <BookOpen className="h-5 w-5" />
             <span>Books</span>
@@ -585,7 +585,7 @@ export default function Layout() {
           </Link>
           <Link
             to="/clubs"
-            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/clubs') ? 'text-accent' : 'text-muted hover:text-theme'}`}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/clubs') ? 'text-accent' : 'text-gray-900 dark:text-white hover:text-accent'}`}
           >
             <Users className="h-5 w-5" />
             <span>Clubs</span>
@@ -605,7 +605,7 @@ export default function Layout() {
           </span>
           <Link
             to="/profile"
-            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/profile' ? 'text-accent' : 'text-muted hover:text-theme'}`}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/profile' ? 'text-accent' : 'text-gray-900 dark:text-white hover:text-accent'}`}
           >
             {profile?.avatar_url
               ? <img src={profile.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover" />
