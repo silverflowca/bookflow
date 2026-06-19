@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, Database, CheckCircle2, Clock, Play, RefreshCw } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -19,14 +19,7 @@ interface AdminStats {
   super_admins: number;
 }
 
-type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'migrations';
-
-interface Migration {
-  filename: string;
-  status: 'ran' | 'pending' | 'error';
-  ran_at: string | null;
-  error_msg: string | null;
-}
+type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings';
 
 export default function AdminPage() {
   const { profile } = useAuth();
@@ -42,10 +35,6 @@ export default function AdminPage() {
   const [roleActionId, setRoleActionId] = useState<string | null>(null);
   const [carousel, setCarousel] = useState<CarouselSettings>(loadCarouselSettings);
   const [carouselSaved, setCarouselSaved] = useState(false);
-  const [migrations, setMigrations] = useState<Migration[]>([]);
-  const [migrationsLoading, setMigrationsLoading] = useState(false);
-  const [runningMigration, setRunningMigration] = useState<string | null>(null);
-  const [runningAll, setRunningAll] = useState(false);
 
   // Guard — non super-admins bounced to dashboard
   useEffect(() => {
@@ -87,47 +76,6 @@ export default function AdminPage() {
       } catch (err: any) {
         setError(err.message);
       }
-    }
-    if (t === 'migrations') {
-      loadMigrations();
-    }
-  }
-
-  async function loadMigrations() {
-    setMigrationsLoading(true);
-    try {
-      const { migrations: m } = await api.adminGetMigrations();
-      setMigrations(m);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setMigrationsLoading(false);
-    }
-  }
-
-  async function runMigration(filename: string) {
-    setRunningMigration(filename);
-    try {
-      await api.adminRunMigration(filename);
-      await loadMigrations();
-    } catch (err: any) {
-      setError(err.message);
-      await loadMigrations();
-    } finally {
-      setRunningMigration(null);
-    }
-  }
-
-  async function runAllPending() {
-    setRunningAll(true);
-    try {
-      await api.adminRunPendingMigrations();
-      await loadMigrations();
-    } catch (err: any) {
-      setError(err.message);
-      await loadMigrations();
-    } finally {
-      setRunningAll(false);
     }
   }
 
@@ -191,7 +139,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-surface-hover">
-        {(['settings', 'users', 'books', 'clubs', 'carousel', 'migrations'] as Tab[]).map(t => (
+        {(['settings', 'users', 'books', 'clubs', 'carousel'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => loadTab(t)}
@@ -203,7 +151,6 @@ export default function AdminPage() {
           >
             {t === 'carousel' && <Clapperboard className="h-3.5 w-3.5" />}
             {t === 'settings' && <Settings className="h-3.5 w-3.5" />}
-            {t === 'migrations' && <Database className="h-3.5 w-3.5" />}
             {t}
           </button>
         ))}
@@ -324,78 +271,6 @@ export default function AdminPage() {
           {tab === 'settings' && (
             <div className="-mx-4">
               <SettingsPage />
-            </div>
-          )}
-
-          {/* ── Migrations tab ────────────────────────────────────────────────── */}
-          {tab === 'migrations' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-sm text-muted">
-                  Run SQL migration files directly against the production database. Only pending migrations are shown as runnable.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={loadMigrations}
-                    disabled={migrationsLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs theme-button-secondary rounded-lg"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${migrationsLoading ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </button>
-                  <button
-                    onClick={runAllPending}
-                    disabled={runningAll || migrations.filter(m => m.status === 'pending').length === 0}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white rounded-lg font-medium transition-colors"
-                  >
-                    {runningAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                    Run All Pending ({migrations.filter(m => m.status === 'pending').length})
-                  </button>
-                </div>
-              </div>
-
-              {migrationsLoading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {migrations.map(m => (
-                    <div
-                      key={m.filename}
-                      className={`theme-section rounded-xl px-4 py-3 flex items-start gap-3 ${m.status === 'error' ? 'border border-red-300 dark:border-red-700' : ''}`}
-                    >
-                      {m.status === 'ran' && <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />}
-                      {m.status === 'pending' && <Clock className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />}
-                      {m.status === 'error' && <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-mono text-theme truncate">{m.filename}</p>
-                        {m.status === 'ran' && m.ran_at && (
-                          <p className="text-xs text-muted">Ran {new Date(m.ran_at).toLocaleString()}</p>
-                        )}
-                        {m.status === 'error' && (
-                          <p className="text-xs text-red-500 mt-0.5 break-words">{m.error_msg}</p>
-                        )}
-                      </div>
-                      {(m.status === 'pending' || m.status === 'error') && (
-                        <button
-                          onClick={() => runMigration(m.filename)}
-                          disabled={runningMigration === m.filename || runningAll}
-                          className="shrink-0 flex items-center gap-1 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white rounded-lg font-medium transition-colors"
-                        >
-                          {runningMigration === m.filename
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : <Play className="h-3 w-3" />}
-                          Run
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {migrations.length === 0 && (
-                    <p className="text-muted text-sm py-8 text-center">No migration files found.</p>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
