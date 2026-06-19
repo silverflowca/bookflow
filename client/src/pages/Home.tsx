@@ -712,10 +712,9 @@ function QrCodeSection() {
         <div style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)', width: '80vw', height: '60vw', maxWidth: 900, maxHeight: 600, background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)', borderRadius: '50%' }} />
       </div>
 
+      {/* ── Headline ── */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-        {/* ── Headline ── */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-400 mb-4">Scan. Read. Engage.</p>
           <h2 className="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-5">
             Update Your Books with{' '}
@@ -728,11 +727,15 @@ function QrCodeSection() {
             Print a QR code in any physical book, flyer, or church bulletin and readers land straight inside your interactive BookFlow edition — no app download required.
           </p>
         </div>
+      </div>
 
-        {/* ── Full-width QR image ── */}
+      {/* ── Full-viewport-width QR image ── */}
+      <div className="relative z-10 w-full px-4 sm:px-8">
         <QrExpandable />
+      </div>
 
-        {/* ── Pillar cards ── */}
+      {/* ── Pillar cards + stat bar ── */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14">
           {pillars.map((p, i) => (
             <div
@@ -774,7 +777,6 @@ function QrCodeSection() {
             </div>
           ))}
         </div>
-
       </div>
     </section>
   );
