@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles, Mic, Video, BarChart2, CheckSquare, ListChecks, AlignLeft, Image, X, Play } from 'lucide-react';
@@ -640,28 +641,26 @@ function QrExpandable() {
         </Link>
       </div>
 
-      {/* Fullscreen overlay — true full-screen, image fills the view */}
-      <div
-        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        style={{ background: 'rgba(0,0,0,0.97)', cursor: 'zoom-out' }}
-        onClick={() => setExpanded(false)}
-      >
-        <img
-          src="/qr_code_3.png"
-          alt="BookFlow QR Code"
-          className={`transition-transform duration-300 ${expanded ? 'scale-100' : 'scale-95'}`}
-          style={{
-            width: '100vw',
-            height: '100vh',
-            objectFit: 'contain',
-            display: 'block',
-          }}
-          onClick={e => e.stopPropagation()}
-        />
-        <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs tracking-wide">
-          Scan QR codes with your phone camera · tap anywhere to close
-        </p>
-      </div>
+      {/* Fullscreen overlay — portalled to body to escape any stacking context */}
+      {createPortal(
+        <div
+          className={`fixed inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{ background: 'rgba(0,0,0,0.97)', cursor: 'zoom-out', zIndex: 999999 }}
+          onClick={() => setExpanded(false)}
+        >
+          <img
+            src="/qr_code_3.png"
+            alt="BookFlow QR Code"
+            className={`transition-transform duration-300 ${expanded ? 'scale-100' : 'scale-95'}`}
+            style={{ width: '100vw', height: '100vh', objectFit: 'contain', display: 'block' }}
+            onClick={e => e.stopPropagation()}
+          />
+          <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs tracking-wide">
+            Scan QR codes with your phone camera · tap anywhere to close
+          </p>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
