@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles } from 'lucide-react';
+import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles, Mic, Video, BarChart2, CheckSquare, ListChecks, AlignLeft, Image, X, Play } from 'lucide-react';
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
@@ -337,7 +337,259 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {/* Editor Features Section */}
+      <EditorFeaturesSection />
     </div>
+  );
+}
+
+// ─── Editor Features Section ──────────────────────────────────────────────────
+const EDITOR_FEATURES = [
+  {
+    id: 'rich-text',
+    icon: <AlignLeft className="h-5 w-5" />,
+    color: 'from-violet-500 to-purple-600',
+    badge: 'Editor',
+    badgeColor: 'bg-violet-100 text-violet-700',
+    title: 'Rich Text Editor',
+    short: 'Bold, headings, lists, quotes — a full writing studio in your browser.',
+    description: 'Write with the same power as a desktop word processor. Headings, bold, italic, bullet lists, numbered lists, block quotes, and more — all at your fingertips. Your work auto-saves every few seconds so you never lose a word.',
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'inline-questions',
+    icon: <HelpCircle className="h-5 w-5" />,
+    color: 'from-blue-500 to-cyan-500',
+    badge: 'Interactive',
+    badgeColor: 'bg-blue-100 text-blue-700',
+    title: 'Reflection Questions',
+    short: 'Drop a thought-provoking question anywhere in your chapter.',
+    description: "Highlight any sentence and embed a free-response or multiple-choice question right beside it. Readers answer inline — no forms, no tabs — turning passive reading into active learning. You'll see every response in your author dashboard.",
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'polls',
+    icon: <BarChart2 className="h-5 w-5" />,
+    color: 'from-emerald-500 to-teal-500',
+    badge: 'Interactive',
+    badgeColor: 'bg-emerald-100 text-emerald-700',
+    title: 'Live Polls',
+    short: 'Gauge your readers in real time with instant voting.',
+    description: 'Insert a poll with 2–6 options anywhere in a chapter. Readers tap their answer and immediately see how other readers voted — creating a shared, live experience inside your book. Results update in real time.',
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'audio',
+    icon: <Mic className="h-5 w-5" />,
+    color: 'from-pink-500 to-rose-500',
+    badge: 'Media',
+    badgeColor: 'bg-pink-100 text-pink-700',
+    title: 'Audio & Text-to-Speech',
+    short: 'Let your book be heard — record or generate narration instantly.',
+    description: "Embed your own audio recordings or activate AI text-to-speech and let BookFlow narrate your chapters aloud. Perfect for audiobook creators, accessibility-first publishing, and readers who learn better by listening.",
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'video',
+    icon: <Video className="h-5 w-5" />,
+    color: 'from-orange-500 to-amber-500',
+    badge: 'Media',
+    badgeColor: 'bg-orange-100 text-orange-700',
+    title: 'Embedded Video',
+    short: 'Bring your content to life with YouTube or Vimeo right inside the chapter.',
+    description: "Paste any YouTube or Vimeo link and it embeds directly into the reading flow — no new tabs, no distractions. Use it for welcome messages, demonstrations, teaching moments, or testimonials that deepen reader engagement.",
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'images',
+    icon: <Image className="h-5 w-5" />,
+    color: 'from-indigo-500 to-blue-500',
+    badge: 'Media',
+    badgeColor: 'bg-indigo-100 text-indigo-700',
+    title: 'Images & Covers',
+    short: 'A picture is worth a thousand words — embed as many as you like.',
+    description: 'Upload images directly into your chapters or set a stunning cover that draws readers in. Images are optimised automatically for fast loading on all screen sizes — desktop, tablet, and mobile.',
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'highlights',
+    icon: <Highlighter className="h-5 w-5" />,
+    color: 'from-yellow-400 to-orange-400',
+    badge: 'Reader Tools',
+    badgeColor: 'bg-yellow-100 text-yellow-700',
+    title: 'Highlights & Notes',
+    short: 'Readers mark what matters and leave notes like sticky tabs.',
+    description: 'Readers select any passage to highlight it in their favourite colour and attach a personal note. All highlights are private by default, making every copy of your book uniquely theirs. Authors can choose to share their own highlights with all readers.',
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'progress',
+    icon: <CheckSquare className="h-5 w-5" />,
+    color: 'from-green-500 to-emerald-600',
+    badge: 'Progress',
+    badgeColor: 'bg-green-100 text-green-700',
+    title: 'Progress Tracking',
+    short: 'Watch your readers level up chapter by chapter.',
+    description: "Enable progress tracking and every question answered, poll voted, and form filled advances the reader's progress bar. Authors and club leaders see completion stats across their whole audience — instant accountability.",
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'forms',
+    icon: <ListChecks className="h-5 w-5" />,
+    color: 'from-teal-500 to-cyan-600',
+    badge: 'Interactive',
+    badgeColor: 'bg-teal-100 text-teal-700',
+    title: 'Inline Forms',
+    short: 'Collect typed answers, checkboxes, dropdowns — all inside the book.',
+    description: 'Drop text fields, text areas, dropdowns, multi-selects, radio buttons, and checkboxes right into your chapters. Use them for workbooks, study guides, sign-up flows, or reader surveys — without ever leaving the reading experience.',
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'clubs',
+    icon: <Users className="h-5 w-5" />,
+    color: 'from-rose-500 to-pink-600',
+    badge: 'Community',
+    badgeColor: 'bg-rose-100 text-rose-700',
+    title: 'Book Clubs & Study Groups',
+    short: 'Read together, grow together — one click to start a group.',
+    description: "Create a club, add your book, and invite members with a single link. Club leaders can post study questions, track group progress, and manage membership. Perfect for churches, classrooms, recovery groups, and corporate teams.",
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'collaborate',
+    icon: <Share2 className="h-5 w-5" />,
+    color: 'from-purple-500 to-indigo-600',
+    badge: 'Collaboration',
+    badgeColor: 'bg-purple-100 text-purple-700',
+    title: 'Co-Authors & Collaborators',
+    short: 'Write with a team — assign roles and edit in real time.',
+    description: 'Invite co-authors, editors, or reviewers to your book. Assign roles to control who can write, who can comment, and who can publish. Perfect for ministry teams, co-writing projects, and educational institutions.',
+    demoLabel: 'See it in action',
+  },
+  {
+    id: 'publish',
+    icon: <FileText className="h-5 w-5" />,
+    color: 'from-slate-600 to-slate-800',
+    badge: 'Publishing',
+    badgeColor: 'bg-slate-100 text-slate-700',
+    title: 'Publish & Export',
+    short: 'Go live with one click — or export to PDF anytime.',
+    description: 'When your book is ready, flip it to Public and it appears in the BookFlow library immediately. Or export a clean PDF at any time for printing, emailing, or archiving. Your book, your choice.',
+    demoLabel: 'See it in action',
+  },
+];
+
+function EditorFeaturesSection() {
+  const [active, setActive] = useState<typeof EDITOR_FEATURES[0] | null>(null);
+
+  return (
+    <section className="py-20 bg-surface">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <p className="text-sm text-center text-muted uppercase tracking-widest mb-3">What Can You Do?</p>
+        <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-3">
+          Every Feature You Need to{' '}
+          <span style={{ background: 'linear-gradient(90deg,#7c3aed,#2563eb,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+            Publish Something Remarkable
+          </span>
+        </h2>
+        <p className="text-center text-muted mb-12 max-w-2xl mx-auto">
+          Click any feature to see a live demo of it working inside the real BookFlow editor.
+        </p>
+
+        {/* Feature grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {EDITOR_FEATURES.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setActive(f)}
+              className="group relative text-left rounded-2xl p-5 border transition-all duration-200 hover:scale-[1.03] hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+              style={{ background: 'var(--color-surface-hover, #f9fafb)', borderColor: 'var(--color-border, #e5e7eb)' }}
+            >
+              {/* Coloured icon circle */}
+              <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br ${f.color} text-white mb-3 shadow-sm`}>
+                {f.icon}
+              </div>
+              {/* Badge */}
+              <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${f.badgeColor}`}>
+                {f.badge}
+              </span>
+              <h3 className="font-bold text-sm text-theme mb-1 leading-snug">{f.title}</h3>
+              <p className="text-xs text-muted leading-relaxed">{f.short}</p>
+              {/* Play hint */}
+              <div className={`mt-3 inline-flex items-center gap-1 text-xs font-semibold bg-gradient-to-r ${f.color} bg-clip-text`}
+                style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <Play className="h-3 w-3 shrink-0" style={{ color: 'currentColor', WebkitTextFillColor: 'initial' }} />
+                {f.demoLabel}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal overlay */}
+      {active && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setActive(null)}
+        >
+          <div
+            className="relative w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ background: 'var(--color-surface, #fff)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Gradient header bar */}
+            <div className={`bg-gradient-to-r ${active.color} p-6 flex items-center gap-4`}>
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                {active.icon}
+              </div>
+              <div className="flex-1">
+                <span className="text-white/70 text-xs font-bold uppercase tracking-widest">{active.badge}</span>
+                <h3 className="text-white text-xl font-extrabold leading-tight">{active.title}</h3>
+              </div>
+              <button onClick={() => setActive(null)} className="text-white/80 hover:text-white transition-colors">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Demo placeholder */}
+            <div
+              className="mx-6 mt-6 rounded-xl flex flex-col items-center justify-center gap-3 cursor-pointer group"
+              style={{ background: 'var(--color-surface-hover, #f3f4f6)', height: 220, border: '2px dashed var(--color-border, #d1d5db)' }}
+            >
+              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${active.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
+                <Play className="h-7 w-7" />
+              </div>
+              <p className="text-sm text-muted font-medium">Live demo coming soon</p>
+              <p className="text-xs text-muted opacity-60">A video or interactive walkthrough will appear here</p>
+            </div>
+
+            {/* Description */}
+            <div className="px-6 py-5">
+              <p className="text-sm text-theme leading-relaxed">{active.description}</p>
+              <div className="mt-4 flex gap-3">
+                <Link
+                  to="/register"
+                  className={`flex-1 text-center py-3 rounded-xl font-bold text-white text-sm transition-all hover:opacity-90 bg-gradient-to-r ${active.color}`}
+                  onClick={() => setActive(null)}
+                >
+                  Try it Free
+                </Link>
+                <button
+                  onClick={() => setActive(null)}
+                  className="px-5 py-3 rounded-xl text-sm font-semibold text-muted border transition-colors hover:bg-surface-hover"
+                  style={{ borderColor: 'var(--color-border, #e5e7eb)' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
