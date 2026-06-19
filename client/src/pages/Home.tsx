@@ -89,9 +89,17 @@ export default function Home() {
         {/* Wavy bottom edge — matches the bg-surface section below */}
         <div className="pointer-events-none absolute bottom-0 inset-x-0" style={{ lineHeight: 0 }}>
           <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: 72 }}>
+            {/* Fill */}
             <path
-              d="M0,40 C180,80 360,0 540,40 C720,80 900,0 1080,40 C1260,80 1380,20 1440,40 L1440,80 L0,80 Z"
+              d="M0,50 C180,70 360,30 540,50 C720,70 900,30 1080,50 C1260,70 1380,40 1440,50 L1440,80 L0,80 Z"
               fill="var(--color-surface)"
+            />
+            {/* Stroke line following the wave */}
+            <path
+              d="M0,50 C180,70 360,30 540,50 C720,70 900,30 1080,50 C1260,70 1380,40 1440,50"
+              fill="none"
+              stroke="var(--color-border)"
+              strokeWidth="1.5"
             />
           </svg>
         </div>
@@ -130,12 +138,12 @@ export default function Home() {
             >
               Browse Books
             </a>
-            <a
-              href="#features"
+            <button
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
               className="text-sm font-medium self-center text-gray-400 transition-colors duration-200 hover:text-gray-600"
             >
               Feature List ↓
-            </a>
+            </button>
           </div>
         </div>
 
@@ -904,7 +912,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         btn.style.transition = 'none';
 
         // Scale multiplier on inner div — CSS transition handles smooth grow/shrink
-        const innerScale = isHovered ? 1.4 : isFeatured ? 1.18 : 1.0;
+        const innerScale = isHovered ? 1.75 : isFeatured ? 1.22 : 1.0;
         inner.style.transform = `scale(${innerScale})`;
         inner.style.transition = isHovered
           ? 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)'   // ease-out, smooth
