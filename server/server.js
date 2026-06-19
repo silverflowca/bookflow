@@ -107,6 +107,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/saved-books', savedBooksRoutes);
 app.use('/api/book-landing', bookLandingRoutes);
+app.use('/api/bl', bookLandingRoutes); // short alias: /bl/:slug
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);

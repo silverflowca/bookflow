@@ -75,6 +75,7 @@ function AppRoutes() {
 
         {/* Book landing page — QR code destination, no auth required */}
         <Route path="book-landing/:slug" element={<BookLandingPage />} />
+        <Route path="bl/:slug" element={<BookLandingPage />} />
 
         {/* Invite acceptance — works with or without auth */}
         <Route path="invite/:token" element={<AcceptInvitePage />} />

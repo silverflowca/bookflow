@@ -319,6 +319,28 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
+// Slug helpers (reused from publish.js logic)
+function generateBookSlug(title) {
+  return (title || 'untitled')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 80);
+}
+
+async function uniqueBookSlug(base, bookId) {
+  let slug = base;
+  let attempt = 0;
+  while (true) {
+    const { data } = await supabase.from('books').select('id').eq('slug', slug).neq('id', bookId).maybeSingle();
+    if (!data) return slug;
+    attempt++;
+    slug = `${base}-${attempt}`;
+  }
+}
+
 // Update book
 router.put('/:id', authenticate, requireAuthor, async (req, res) => {
   const { title, subtitle, description, cover_image_url, status, visibility } = req.body;
@@ -343,6 +365,19 @@ router.put('/:id', authenticate, requireAuthor, async (req, res) => {
 
       if (!current?.published_at) {
         updateData.published_at = new Date().toISOString();
+      }
+    }
+
+    // Auto-generate human-readable slug when making book public (if no slug yet)
+    if (visibility === 'public') {
+      const { data: current } = await supabase
+        .from('books')
+        .select('slug, title')
+        .eq('id', req.params.id)
+        .single();
+      if (!current?.slug) {
+        const base = generateBookSlug(title || current?.title || 'untitled');
+        updateData.slug = await uniqueBookSlug(base, req.params.id);
       }
     }
 
