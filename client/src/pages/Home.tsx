@@ -75,22 +75,25 @@ export default function Home() {
     <div>
       {/* Hero Section */}
       <section
-        className="overflow-hidden relative bg-white"
+        className="overflow-hidden relative pb-16"
+        style={{ background: 'linear-gradient(160deg, #faf9ff 0%, #f3f0ff 40%, #eff6ff 70%, #fdf2f8 100%)' }}
       >
-        {/* Soft accent orbs */}
+        {/* Subtle diagonal gradient wash — no blobs or circles */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div style={{
-            position: 'absolute', top: '-10%', left: '20%',
-            width: '55vw', height: '55vw', maxWidth: 700, maxHeight: 700,
-            background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)',
-            borderRadius: '50%', filter: 'blur(8px)',
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(99,102,241,0.04) 40%, rgba(236,72,153,0.04) 100%)',
           }} />
-          <div style={{
-            position: 'absolute', top: '10%', right: '-5%',
-            width: '35vw', height: '35vw', maxWidth: 450, maxHeight: 450,
-            background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)',
-            borderRadius: '50%', filter: 'blur(12px)',
-          }} />
+        </div>
+
+        {/* Wavy bottom edge — matches the bg-surface section below */}
+        <div className="pointer-events-none absolute bottom-0 inset-x-0" style={{ lineHeight: 0 }}>
+          <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: 72 }}>
+            <path
+              d="M0,40 C180,80 360,0 540,40 C720,80 900,0 1080,40 C1260,80 1380,20 1440,40 L1440,80 L0,80 Z"
+              fill="var(--color-surface)"
+            />
+          </svg>
         </div>
 
         {/* Text block — sits above carousel, never overlapped */}
@@ -319,7 +322,7 @@ export default function Home() {
               <p>No published books yet. Be the first to create one!</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 gap-8">
               {books.map((book) => (
                 <BookCard key={book.id} book={book} />
               ))}
@@ -889,10 +892,9 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         const depthScale = 0.5 + 0.5 * ((z + 1) / 2);
         const tilt = isHovered ? 0 : Math.cos(theta) * 8;
 
-        // Front books that pass through the title zone get a transparency cap
-        const isFront = z > 0.5;
-        const baseOpacity = isHovered ? 1 : (0.3 + 0.7 * ((z + 1) / 2));
-        const opacity = (!isHovered && isFront) ? Math.min(baseOpacity, 0.75) : baseOpacity;
+        // All books fully opaque — depth shown via scale only
+        const baseOpacity = isHovered ? 1 : (0.55 + 0.45 * ((z + 1) / 2));
+        const opacity = baseOpacity;
         const zIndex = isHovered ? 150 : Math.round((z + 1) * 50);
 
         // Position + depth on the outer button (no transition — runs every rAF)
@@ -910,11 +912,11 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
 
         // Glow + outline on button (CSS transition handles fade)
         btn.style.filter = isHovered
-          ? 'drop-shadow(0 0 14px rgba(255,255,255,0.5))'
+          ? 'drop-shadow(0 8px 20px rgba(124,58,237,0.35))'
           : isFeatured
-            ? 'drop-shadow(0 0 6px rgba(255,255,255,0.5))'
+            ? 'drop-shadow(0 4px 12px rgba(124,58,237,0.22))'
             : '';
-        btn.style.outline = isFeatured ? '3px solid rgba(255,255,255,0.9)' : '3px solid rgba(255,255,255,0)';
+        btn.style.outline = isFeatured ? '3px solid rgba(124,58,237,0.7)' : '3px solid rgba(124,58,237,0)';
         btn.style.outlineOffset = '3px';
         btn.style.borderRadius = '0.75rem';
         // Allow outline/filter to animate — but not transform (that's the rAF position)
@@ -997,7 +999,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
           >
             <div
               ref={el => { innerRefs.current[i] = el; }}
-              className="w-full h-full rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 relative"
+              className="w-full h-full rounded-xl overflow-hidden shadow-xl ring-1 ring-black/10 relative"
               style={{ transformOrigin: 'center center' }}
             >
               <img
@@ -1026,10 +1028,10 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
 
         {/* Book title/author — absolute overlay at bottom of orbit stage */}
         <div className="absolute bottom-6 inset-x-0 flex flex-col items-center pointer-events-none">
-          <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg transition-all duration-300">
+          <p className="text-gray-800 font-bold text-2xl text-center px-8 transition-all duration-300">
             {hoveredTitle ?? featuredBook?.title ?? '\u00A0'}
           </p>
-          <p className="text-primary-200 text-sm text-center px-8 drop-shadow transition-all duration-300 mt-0.5"
+          <p className="text-gray-500 text-sm text-center px-8 transition-all duration-300 mt-0.5"
             style={{ opacity: (hoveredTitle || featuredBook) ? 0.85 : 0 }}>
             {hoveredIndex !== null
               ? (items[hoveredIndex]?.author?.display_name ?? 'Unknown Author')
