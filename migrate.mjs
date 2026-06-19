@@ -1,23 +1,26 @@
 #!/usr/bin/env node
 /**
  * BookFlow Migration Runner
- * Runs SQL migration files directly against Supabase production DB.
+ * Runs SQL migration files against Supabase Cloud production DB.
  *
- * SETUP (one time):
- *   Set DB_PASSWORD env var to your Supabase DB password:
- *     Windows:  set DB_PASSWORD=your-password-here
- *     PowerShell: $env:DB_PASSWORD="your-password-here"
+ * SETUP (one time — pick ONE option):
  *
- *   Or create a .env.migrate file next to this script:
- *     DB_PASSWORD=your-password-here
+ *   Option A — Supabase Personal Access Token (easiest, no DB password needed):
+ *     1. Go to https://supabase.com/dashboard/account/tokens
+ *     2. Click "Generate new token", copy it
+ *     3. Create .env.migrate next to this file:
+ *          SUPABASE_ACCESS_TOKEN=sbp_xxxxxxxxxxxxxxxxxxxxxxxx
  *
- *   Password location: Supabase Dashboard → Settings → Database → Database password → Reset
+ *   Option B — DB password:
+ *     1. Supabase Dashboard → Settings → Database → Reset database password
+ *     2. Create .env.migrate next to this file:
+ *          DB_PASSWORD=your-db-password-here
  *
  * USAGE:
  *   node migrate.mjs                           — run all pending
  *   node migrate.mjs 029_chapter_slugs_qr.sql  — run one file
  *   node migrate.mjs --list                    — show status of all files
- *   node migrate.mjs --force 029_...sql        — re-run even if already ran
+ *   node migrate.mjs --force 029_...sql        — re-run already-ran migration
  */
 
 import pg from 'pg';
@@ -28,42 +31,52 @@ import { fileURLToPath } from 'url';
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
+const PROJECT_REF = 'mladgojbfyofgauiylxw';
 
-// ── Load .env.migrate if present ──────────────────────────────────────────────
+// ── Load .env.migrate ─────────────────────────────────────────────────────────
 const envFile = path.join(__dirname, '.env.migrate');
 if (fs.existsSync(envFile)) {
   for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z_]+)=(.+)$/);
-    if (m) process.env[m[1]] = m[2].trim();
+    const m = line.trim().match(/^([A-Z_]+)=(.+)$/);
+    if (m) process.env[m[1]] = m[2];
   }
 }
 
-// ── Connection ────────────────────────────────────────────────────────────────
-const DB_PASSWORD = process.env.DB_PASSWORD;
-if (!DB_PASSWORD) {
+// ── Build connection string ───────────────────────────────────────────────────
+function getConnectionString() {
+  const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+  const dbPassword  = process.env.DB_PASSWORD;
+
+  if (accessToken) {
+    // Personal access token — use as DB password via session pooler
+    return `postgresql://postgres.${PROJECT_REF}:${accessToken}@aws-0-us-east-1.pooler.supabase.com:5432/postgres`;
+  }
+  if (dbPassword) {
+    // DB password — transaction pooler (port 6543)
+    return `postgresql://postgres.${PROJECT_REF}:${dbPassword}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`;
+  }
+
   console.error(`
-  ERROR: DB_PASSWORD not set.
+  ERROR: No credentials found.
 
-  Get your password from:
-    Supabase Dashboard → Settings → Database → Database password → Reset
+  Create a file called .env.migrate in the bookflow/ folder with ONE of:
 
-  Then either:
-    1. Create a file called .env.migrate next to migrate.mjs with:
-         DB_PASSWORD=your-password-here
-
-    2. Or set it inline:
-         Windows cmd:   set DB_PASSWORD=your-password && node migrate.mjs
-         PowerShell:    $env:DB_PASSWORD="your-password" ; node migrate.mjs
+    SUPABASE_ACCESS_TOKEN=sbp_xxxx   ← get from https://supabase.com/dashboard/account/tokens
+    DB_PASSWORD=your-db-password     ← get from Supabase Dashboard → Settings → Database
 `);
   process.exit(1);
 }
 
-const pool = new Pool({
-  connectionString: `postgresql://postgres.mladgojbfyofgauiylxw:${DB_PASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`,
-  ssl: { rejectUnauthorized: false },
-});
+// ── Pool ──────────────────────────────────────────────────────────────────────
+function makePool() {
+  return new Pool({
+    connectionString: getConnectionString(),
+    ssl: { rejectUnauthorized: false },
+    max: 1,
+  });
+}
 
-// ── Ensure tracking table ─────────────────────────────────────────────────────
+// ── Tracking table ────────────────────────────────────────────────────────────
 async function ensureTrackingTable(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS bookflow.schema_migrations (
@@ -75,7 +88,6 @@ async function ensureTrackingTable(client) {
   `);
 }
 
-// ── Get already-ran migrations ────────────────────────────────────────────────
 async function getRanMigrations(client) {
   try {
     const { rows } = await client.query(
@@ -87,21 +99,18 @@ async function getRanMigrations(client) {
   }
 }
 
-// ── Record result ─────────────────────────────────────────────────────────────
 async function recordResult(client, filename, success, errorMsg = null) {
   await client.query(
     `INSERT INTO bookflow.schema_migrations (filename, success, error_msg)
      VALUES ($1, $2, $3)
      ON CONFLICT (filename) DO UPDATE SET success=$2, ran_at=NOW(), error_msg=$3`,
     [filename, success, errorMsg]
-  );
+  ).catch(() => {}); // don't crash if tracking fails
 }
 
-// ── Sorted .sql files ─────────────────────────────────────────────────────────
+// ── Files ─────────────────────────────────────────────────────────────────────
 function getMigrationFiles() {
-  return fs.readdirSync(MIGRATIONS_DIR)
-    .filter(f => f.endsWith('.sql'))
-    .sort();
+  return fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort();
 }
 
 // ── Run one file ──────────────────────────────────────────────────────────────
@@ -120,7 +129,7 @@ async function runFile(client, filename) {
     return true;
   } catch (err) {
     console.log(`✗\n    ${err.message}`);
-    await recordResult(client, filename, false, err.message).catch(() => {});
+    await recordResult(client, filename, false, err.message);
     return false;
   }
 }
@@ -131,21 +140,28 @@ async function main() {
   const force = args.includes('--force');
   const files = getMigrationFiles();
 
-  const client = await pool.connect();
+  const pool = makePool();
+  const client = await pool.connect().catch(err => {
+    console.error(`\n  Connection failed: ${err.message}\n`);
+    process.exit(1);
+  });
+
   try {
-    await ensureTrackingTable(client);
+    await ensureTrackingTable(client).catch(() => {}); // may fail if schema_migrations already exists with different structure
 
     // --list
     if (args.includes('--list')) {
       const { rows } = await client.query(
         `SELECT filename, ran_at, success, error_msg FROM bookflow.schema_migrations`
-      );
+      ).catch(() => ({ rows: [] }));
       const byFile = Object.fromEntries(rows.map(r => [r.filename, r]));
       console.log(`\nBookFlow migrations (${files.length} total):\n`);
       for (const f of files) {
         const row = byFile[f];
-        const icon = !row ? '○' : row.success ? '✓' : '✗';
-        const label = !row ? 'pending' : row.success ? `ran ${new Date(row.ran_at).toLocaleString()}` : `error: ${row.error_msg}`;
+        const icon  = !row ? '○' : row.success ? '✓' : '✗';
+        const label = !row ? 'pending'
+          : row.success ? `ran ${new Date(row.ran_at).toLocaleString()}`
+          : `error: ${row.error_msg}`;
         console.log(`  ${icon}  ${f}  —  ${label}`);
       }
       console.log('');
