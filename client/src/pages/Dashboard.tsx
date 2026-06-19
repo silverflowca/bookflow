@@ -493,9 +493,9 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
   const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
 
   // If no cover yet: hover-to-upload on the cover itself
-  // If cover exists: cover is just a display; upload is in the ⋮ menu
+  // If cover exists: cover links to editor; upload is in the ⋮ menu
   const coverLabel = book.cover_image_url ? (
-    <div className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative overflow-hidden">
+    <Link to={`/edit/book/${book.id}`} className="block w-full h-full bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative overflow-hidden">
       <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
       <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
       {uploadingCover && (
@@ -503,7 +503,7 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
           <Loader2 className="h-5 w-5 text-white animate-spin" />
         </div>
       )}
-    </div>
+    </Link>
   ) : (
     <label
       className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block overflow-hidden"
