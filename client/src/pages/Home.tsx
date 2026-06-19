@@ -340,6 +340,9 @@ export default function Home() {
 
       {/* Editor Features Section */}
       <EditorFeaturesSection />
+
+      {/* QR Code Section */}
+      <QrCodeSection />
     </div>
   );
 }
@@ -589,6 +592,150 @@ function EditorFeaturesSection() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+// ─── QR Code Section ──────────────────────────────────────────────────────────
+function QrCodeSection() {
+  const pillars = [
+    {
+      icon: <Video className="h-6 w-6" />,
+      gradient: 'from-violet-600 to-indigo-600',
+      glow: 'rgba(124,58,237,0.35)',
+      label: 'Multimedia',
+      title: 'Audio. Video. Images.',
+      body: 'Embed narration, walkthroughs, and visuals directly into your chapters. Turn every page into a rich, immersive experience that readers can hear, watch, and feel.',
+    },
+    {
+      icon: <BarChart2 className="h-6 w-6" />,
+      gradient: 'from-emerald-500 to-teal-600',
+      glow: 'rgba(16,185,129,0.32)',
+      label: 'Engagement',
+      title: 'Polls. Surveys. Questionnaires.',
+      body: 'Collect real responses right inside the reading experience. Know exactly what your audience thinks — chapter by chapter — with live polls, custom forms, and reflection questions.',
+    },
+    {
+      icon: <Users className="h-6 w-6" />,
+      gradient: 'from-rose-500 to-pink-600',
+      glow: 'rgba(244,63,94,0.30)',
+      label: 'Community',
+      title: 'Build an Online Community.',
+      body: 'Create reading clubs, study groups, and recovery teams. Members read together, answer together, and grow together — all inside BookFlow. One link. One community. Unlimited potential.',
+    },
+  ];
+
+  return (
+    <section
+      className="relative overflow-hidden py-24"
+      style={{ background: 'linear-gradient(160deg, #0f0c29 0%, #1e1245 40%, #0d1b3e 100%)' }}
+    >
+      {/* Background glow */}
+      <div className="pointer-events-none absolute inset-0">
+        <div style={{ position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)', width: '80vw', height: '60vw', maxWidth: 900, maxHeight: 600, background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)', borderRadius: '50%' }} />
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* ── Headline ── */}
+        <div className="text-center mb-16">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-400 mb-4">Scan. Read. Engage.</p>
+          <h2 className="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-5">
+            Update Your Books with{' '}
+            <span style={{ background: 'linear-gradient(90deg,#a78bfa,#60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              QR Codes
+            </span>{' '}
+            &amp; Interactive Content
+          </h2>
+          <p className="text-white/60 text-lg max-w-2xl mx-auto leading-relaxed">
+            Print a QR code in any physical book, flyer, or church bulletin and readers land straight inside your interactive BookFlow edition — no app download required.
+          </p>
+        </div>
+
+        {/* ── Main content: QR + pillars ── */}
+        <div className="flex flex-col lg:flex-row items-center gap-14">
+
+          {/* QR Code card */}
+          <div className="flex-shrink-0 flex flex-col items-center gap-5">
+            <div
+              className="rounded-3xl p-6 shadow-2xl"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 0 60px rgba(139,92,246,0.25), 0 20px 60px rgba(0,0,0,0.5)',
+              }}
+            >
+              <img
+                src="/qr_code_3.png"
+                alt="BookFlow QR Code"
+                className="w-56 h-56 rounded-2xl object-contain"
+                style={{ imageRendering: 'pixelated' }}
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Scan with your phone</p>
+              <p className="text-white font-semibold text-sm">Opens your interactive book instantly</p>
+            </div>
+            <Link
+              to="/register"
+              className="px-7 py-3 rounded-xl font-bold text-white text-sm transition-all hover:scale-105 hover:shadow-lg"
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.45)' }}
+            >
+              Generate Your QR Code
+            </Link>
+          </div>
+
+          {/* Pillar cards */}
+          <div className="flex-1 flex flex-col gap-6 w-full">
+            {pillars.map((p, i) => (
+              <div
+                key={i}
+                className="rounded-2xl p-6 flex items-start gap-5 transition-all duration-300 hover:scale-[1.02]"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: `0 4px 30px ${p.glow}`,
+                }}
+              >
+                {/* Icon */}
+                <div
+                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${p.gradient} shadow-lg`}
+                >
+                  {p.icon}
+                </div>
+                <div>
+                  <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 bg-gradient-to-r ${p.gradient} text-white`}>
+                    {p.label}
+                  </span>
+                  <h3 className="text-white font-extrabold text-lg mb-1 leading-snug">{p.title}</h3>
+                  <p className="text-white/60 text-sm leading-relaxed">{p.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Bottom stat bar ── */}
+        <div
+          className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          {[
+            { value: '1 Click', label: 'QR code generated' },
+            { value: 'No App', label: 'readers need to install' },
+            { value: 'Live', label: 'updates, instantly' },
+            { value: '∞', label: 'scans, forever free' },
+          ].map((s, i) => (
+            <div key={i} className="flex flex-col items-center py-6 px-4 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <span className="text-3xl font-extrabold text-white mb-1">{s.value}</span>
+              <span className="text-white/50 text-xs uppercase tracking-wide">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+      </div>
     </section>
   );
 }
