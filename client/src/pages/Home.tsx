@@ -915,8 +915,8 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         const innerScale = isHovered ? 1.75 : isFeatured ? 1.75 : 1.0;
         inner.style.transform = `scale(${innerScale})`;
         inner.style.transition = isHovered
-          ? 'transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)'   // slow ease-out expand
-          : 'transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)';   // slow ease-out contract
+          ? 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)'   // fast start, smooth finish
+          : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';   // fast start, smooth finish
 
         // Glow + outline on button (CSS transition handles fade)
         btn.style.filter = isHovered
@@ -924,11 +924,10 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
           : isFeatured
             ? 'drop-shadow(0 4px 12px rgba(124,58,237,0.22))'
             : '';
-        btn.style.outline = isFeatured ? '3px solid rgba(124,58,237,0.7)' : '3px solid rgba(124,58,237,0)';
-        btn.style.outlineOffset = '3px';
+        btn.style.outline = 'none';
         btn.style.borderRadius = '0.75rem';
-        // Allow outline/filter to animate — but not transform (that's the rAF position)
-        btn.style.transition = 'outline-color 0.4s ease, filter 0.4s ease, opacity 0.35s ease';
+        // Allow filter to animate — but not transform (that's the rAF position)
+        btn.style.transition = 'filter 0.4s ease, opacity 0.35s ease';
       });
 
       rafRef.current = requestAnimationFrame(tick);
