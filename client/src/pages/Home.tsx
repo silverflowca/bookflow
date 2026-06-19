@@ -604,6 +604,72 @@ function EditorFeaturesSection() {
 }
 
 // ─── QR Code Section ──────────────────────────────────────────────────────────
+function QrExpandable() {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="flex-shrink-0 flex flex-col items-center gap-5">
+      <div
+        className="rounded-3xl p-6 shadow-2xl cursor-zoom-in transition-transform duration-200 hover:scale-105"
+        style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 0 60px rgba(139,92,246,0.25), 0 20px 60px rgba(0,0,0,0.5)',
+        }}
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <img
+          src="/qr_code_3.png"
+          alt="BookFlow QR Code"
+          className="w-56 h-56 rounded-2xl object-contain"
+          style={{ imageRendering: 'pixelated' }}
+        />
+      </div>
+      <div className="text-center">
+        <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Scan with your phone</p>
+        <p className="text-white font-semibold text-sm">Opens your interactive book instantly</p>
+      </div>
+      <Link
+        to="/register"
+        className="px-7 py-3 rounded-xl font-bold text-white text-sm transition-all hover:scale-105 hover:shadow-lg"
+        style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.45)' }}
+      >
+        Generate Your QR Code
+      </Link>
+
+      {/* Fullscreen overlay */}
+      {expanded && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.90)', backdropFilter: 'blur(6px)', cursor: 'zoom-out' }}
+          onMouseLeave={() => setExpanded(false)}
+          onClick={() => setExpanded(false)}
+        >
+          <div
+            className="rounded-3xl p-8 shadow-2xl transition-all duration-300 scale-100"
+            style={{
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 0 120px rgba(139,92,246,0.4)',
+            }}
+            onClick={e => e.stopPropagation()}
+            onMouseLeave={() => setExpanded(false)}
+          >
+            <img
+              src="/qr_code_3.png"
+              alt="BookFlow QR Code"
+              style={{ width: '80vmin', height: '80vmin', maxWidth: 600, maxHeight: 600, imageRendering: 'pixelated', borderRadius: 16 }}
+            />
+            <p className="text-center text-white/60 text-sm mt-4 tracking-wide">Scan with your phone camera</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QrCodeSection() {
   const pillars = [
     {
@@ -663,35 +729,7 @@ function QrCodeSection() {
         <div className="flex flex-col lg:flex-row items-center gap-14">
 
           {/* QR Code card */}
-          <div className="flex-shrink-0 flex flex-col items-center gap-5">
-            <div
-              className="rounded-3xl p-6 shadow-2xl"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                backdropFilter: 'blur(12px)',
-                boxShadow: '0 0 60px rgba(139,92,246,0.25), 0 20px 60px rgba(0,0,0,0.5)',
-              }}
-            >
-              <img
-                src="/qr_code_3.png"
-                alt="BookFlow QR Code"
-                className="w-56 h-56 rounded-2xl object-contain"
-                style={{ imageRendering: 'pixelated' }}
-              />
-            </div>
-            <div className="text-center">
-              <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Scan with your phone</p>
-              <p className="text-white font-semibold text-sm">Opens your interactive book instantly</p>
-            </div>
-            <Link
-              to="/register"
-              className="px-7 py-3 rounded-xl font-bold text-white text-sm transition-all hover:scale-105 hover:shadow-lg"
-              style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.45)' }}
-            >
-              Generate Your QR Code
-            </Link>
-          </div>
+          <QrExpandable />
 
           {/* Pillar cards */}
           <div className="flex-1 flex flex-col gap-6 w-full">
