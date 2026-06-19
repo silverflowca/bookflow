@@ -277,4 +277,91 @@ router.delete('/chapters/:id', authenticate, async (req, res) => {
   }
 });
 
+// ── Slug helpers (reuse same logic as publish.js) ──────────────────────────
+function generateSlug(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 80);
+}
+
+async function uniqueChapterSlug(base, bookId, excludeChapterId) {
+  let slug = base;
+  let attempt = 0;
+  while (true) {
+    let q = supabase.from('chapters').select('id').eq('book_id', bookId).eq('slug', slug);
+    if (excludeChapterId) q = q.neq('id', excludeChapterId);
+    const { data } = await q.maybeSingle();
+    if (!data) return slug;
+    attempt++;
+    slug = `${base}-${attempt}`;
+  }
+}
+
+// PATCH /api/chapters/:id/slug — update chapter slug
+router.patch('/chapters/:id/slug', authenticate, async (req, res) => {
+  const { slug: rawSlug } = req.body;
+  if (!rawSlug) return res.status(400).json({ error: 'slug is required' });
+
+  try {
+    const { data: chapter, error: chErr } = await supabase
+      .from('chapters')
+      .select('book_id, book:books(author_id)')
+      .eq('id', req.params.id)
+      .single();
+    if (chErr) throw chErr;
+    if (chapter.book.author_id !== req.user.id)
+      return res.status(403).json({ error: 'Not authorized' });
+
+    const base = generateSlug(rawSlug);
+    if (!base) return res.status(400).json({ error: 'Invalid slug' });
+    const slug = await uniqueChapterSlug(base, chapter.book_id, req.params.id);
+
+    const { data, error } = await supabase
+      .from('chapters')
+      .update({ slug })
+      .eq('id', req.params.id)
+      .select('id, slug')
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Patch chapter slug error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/books/:bookId/chapters/:chapterId/generate-slug — auto-generate from title
+router.post('/books/:bookId/chapters/:chapterId/generate-slug', authenticate, async (req, res) => {
+  try {
+    const { data: chapter, error: chErr } = await supabase
+      .from('chapters')
+      .select('title, book_id, book:books(author_id)')
+      .eq('id', req.params.chapterId)
+      .eq('book_id', req.params.bookId)
+      .single();
+    if (chErr) throw chErr;
+    if (chapter.book.author_id !== req.user.id)
+      return res.status(403).json({ error: 'Not authorized' });
+
+    const base = generateSlug(chapter.title || 'chapter');
+    const slug = await uniqueChapterSlug(base, req.params.bookId, req.params.chapterId);
+
+    const { data, error } = await supabase
+      .from('chapters')
+      .update({ slug })
+      .eq('id', req.params.chapterId)
+      .select('id, slug')
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Generate chapter slug error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

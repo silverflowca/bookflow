@@ -66,6 +66,22 @@ export interface BookSettings {
   enable_progress_tracking?: boolean;
   show_ratings?: boolean;
   show_component_panel?: boolean;
+  enable_chapter_qr_codes?: boolean;
+}
+
+export interface BookLanding {
+  id: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  cover_image_url?: string;
+  visibility: 'private' | 'public';
+  published_at?: string;
+  slug?: string;
+  in_club: boolean;
+  author?: { id: string; display_name: string; avatar_url?: string };
+  settings?: Partial<BookSettings>;
+  chapters: Pick<Chapter, 'id' | 'title' | 'slug' | 'order_index' | 'word_count' | 'estimated_read_time_minutes'>[];
 }
 
 // Chapter types
@@ -79,6 +95,7 @@ export interface Chapter {
   status: 'draft' | 'published';
   word_count: number;
   estimated_read_time_minutes: number;
+  slug?: string;
   last_edited_by?: string;
   created_at: string;
   updated_at: string;

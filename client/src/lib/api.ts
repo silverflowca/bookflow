@@ -15,6 +15,7 @@ import type {
   ActivityEvent,
   FormResponse,
   AllFormResponsesResult,
+  BookLanding,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -1085,6 +1086,29 @@ class ApiClient {
 
   async adminGetClubs(): Promise<any[]> {
     return this.request('/admin/clubs');
+  }
+
+  // ── Book Landing & QR ────────────────────────────────────────────────────────
+  async getBookLanding(slugOrId: string): Promise<BookLanding> {
+    return this.request(`/book-landing/${slugOrId}`);
+  }
+
+  async patchBookSlug(bookId: string, slug: string): Promise<{ id: string; slug: string }> {
+    return this.request(`/book-landing/${bookId}/slug`, {
+      method: 'PATCH',
+      body: JSON.stringify({ slug }),
+    });
+  }
+
+  async patchChapterSlug(chapterId: string, slug: string): Promise<{ id: string; slug: string }> {
+    return this.request(`/chapters/${chapterId}/slug`, {
+      method: 'PATCH',
+      body: JSON.stringify({ slug }),
+    });
+  }
+
+  async generateChapterSlug(bookId: string, chapterId: string): Promise<{ id: string; slug: string }> {
+    return this.request(`/books/${bookId}/chapters/${chapterId}/generate-slug`, { method: 'POST' });
   }
 }
 

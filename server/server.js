@@ -34,6 +34,7 @@ import liveRoutes from './routes/live.js';
 import profileRoutes from './routes/profile.js';
 import adminRoutes from './routes/admin.js';
 import savedBooksRoutes from './routes/saved-books.js';
+import bookLandingRoutes from './routes/book-landing.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { startStatusCron } from './services/chat-status.js';
 
@@ -105,6 +106,7 @@ app.use('/api/live', liveRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/saved-books', savedBooksRoutes);
+app.use('/api/book-landing', bookLandingRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);

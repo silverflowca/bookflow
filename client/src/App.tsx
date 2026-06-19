@@ -31,6 +31,7 @@ import LiveBible from './pages/live/LiveBible';
 import LiveQueue from './pages/live/LiveQueue';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
+import BookLandingPage from './pages/BookLandingPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -71,6 +72,9 @@ function AppRoutes() {
         {/* Public reader — no auth required */}
         <Route path="read/:slug" element={<PublicBookPage />} />
         <Route path="read/share/:token" element={<PublicBookPage />} />
+
+        {/* Book landing page — QR code destination, no auth required */}
+        <Route path="book-landing/:slug" element={<BookLandingPage />} />
 
         {/* Invite acceptance — works with or without auth */}
         <Route path="invite/:token" element={<AcceptInvitePage />} />
