@@ -616,9 +616,10 @@ function QrExpandable() {
   }, [expanded]);
 
   return (
-    <div className="flex-shrink-0 flex flex-col items-center gap-5">
+    <div className="w-full flex flex-col items-center gap-5">
+      {/* Full-width image card */}
       <div
-        className="rounded-3xl p-6 shadow-2xl cursor-zoom-in transition-transform duration-200 hover:scale-105"
+        className="w-full rounded-3xl overflow-hidden cursor-zoom-in shadow-2xl transition-transform duration-200 hover:scale-[1.01]"
         style={{
           background: 'rgba(255,255,255,0.06)',
           border: '1px solid rgba(255,255,255,0.12)',
@@ -630,21 +631,20 @@ function QrExpandable() {
         <img
           src="/qr_code_3.png"
           alt="BookFlow QR Code"
-          className="w-56 h-56 rounded-2xl object-contain"
-          style={{ imageRendering: 'pixelated' }}
+          className="w-full h-auto object-contain rounded-3xl"
+          style={{ imageRendering: 'pixelated', display: 'block' }}
         />
       </div>
-      <div className="text-center">
-        <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Tap to enlarge · Scan with your phone</p>
-        <p className="text-white font-semibold text-sm">Opens your interactive book instantly</p>
+      <div className="flex items-center gap-6 flex-wrap justify-center">
+        <p className="text-white/50 text-xs uppercase tracking-widest">Tap to enlarge · Scan with your phone</p>
+        <Link
+          to="/register"
+          className="px-7 py-3 rounded-xl font-bold text-white text-sm transition-all hover:scale-105 hover:shadow-lg"
+          style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.45)' }}
+        >
+          Generate Your QR Code
+        </Link>
       </div>
-      <Link
-        to="/register"
-        className="px-7 py-3 rounded-xl font-bold text-white text-sm transition-all hover:scale-105 hover:shadow-lg"
-        style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.45)' }}
-      >
-        Generate Your QR Code
-      </Link>
 
       {/* Fullscreen overlay — click backdrop to close, no mouse-leave triggers */}
       <div
@@ -729,41 +729,32 @@ function QrCodeSection() {
           </p>
         </div>
 
-        {/* ── Main content: QR + pillars ── */}
-        <div className="flex flex-col lg:flex-row items-center gap-14">
+        {/* ── Full-width QR image ── */}
+        <QrExpandable />
 
-          {/* QR Code card */}
-          <QrExpandable />
-
-          {/* Pillar cards */}
-          <div className="flex-1 flex flex-col gap-6 w-full">
-            {pillars.map((p, i) => (
-              <div
-                key={i}
-                className="rounded-2xl p-6 flex items-start gap-5 transition-all duration-300 hover:scale-[1.02]"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  backdropFilter: 'blur(8px)',
-                  boxShadow: `0 4px 30px ${p.glow}`,
-                }}
-              >
-                {/* Icon */}
-                <div
-                  className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${p.gradient} shadow-lg`}
-                >
-                  {p.icon}
-                </div>
-                <div>
-                  <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 bg-gradient-to-r ${p.gradient} text-white`}>
-                    {p.label}
-                  </span>
-                  <h3 className="text-white font-extrabold text-lg mb-1 leading-snug">{p.title}</h3>
-                  <p className="text-white/60 text-sm leading-relaxed">{p.body}</p>
-                </div>
+        {/* ── Pillar cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14">
+          {pillars.map((p, i) => (
+            <div
+              key={i}
+              className="rounded-2xl p-6 flex flex-col gap-4 transition-all duration-300 hover:scale-[1.02]"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(8px)',
+                boxShadow: `0 4px 30px ${p.glow}`,
+              }}
+            >
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${p.gradient} shadow-lg`}>
+                {p.icon}
               </div>
-            ))}
-          </div>
+              <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full w-fit bg-gradient-to-r ${p.gradient} text-white`}>
+                {p.label}
+              </span>
+              <h3 className="text-white font-extrabold text-xl leading-snug">{p.title}</h3>
+              <p className="text-white/60 text-sm leading-relaxed">{p.body}</p>
+            </div>
+          ))}
         </div>
 
         {/* ── Bottom stat bar ── */}
