@@ -161,7 +161,7 @@ export default function Home() {
       </section>
 
       {/* Role Promo Section */}
-      <section className="py-20 bg-surface">
+      <section className="pt-6 pb-20 bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-sm text-center mb-3 text-muted uppercase tracking-widest">Who Is This For?</h2>
           <p className="text-center font-bold text-2xl mb-3 max-w-3xl mx-auto">
