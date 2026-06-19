@@ -617,17 +617,16 @@ function QrExpandable() {
 
   return (
     <div className="w-full flex flex-col items-center gap-5">
-      {/* Full-width image — no padding, edge to edge */}
+      {/* ~75% wide image, centered, click to enlarge */}
       <div
-        className="w-full cursor-zoom-in overflow-hidden"
-        style={{ boxShadow: '0 0 80px rgba(139,92,246,0.3), 0 20px 60px rgba(0,0,0,0.6)' }}
+        className="cursor-zoom-in overflow-hidden rounded-2xl"
+        style={{ width: '75%', boxShadow: '0 0 80px rgba(139,92,246,0.3), 0 20px 60px rgba(0,0,0,0.6)' }}
         onClick={() => setExpanded(true)}
       >
         <img
           src="/qr_code_3.png"
           alt="BookFlow QR Code — scan to access interactive content"
           className="w-full h-auto block"
-          style={{ minHeight: 220 }}
         />
       </div>
       <div className="flex items-center gap-6 flex-wrap justify-center px-4">
