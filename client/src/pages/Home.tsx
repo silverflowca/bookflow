@@ -915,8 +915,8 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         const innerScale = isHovered ? 1.75 : isFeatured ? 1.75 : 1.0;
         inner.style.transform = `scale(${innerScale})`;
         inner.style.transition = isHovered
-          ? 'transform 0.7s cubic-bezier(0.08, 0.9, 0.15, 1)'   // immediate surge, long tail
-          : 'transform 0.75s cubic-bezier(0.08, 0.9, 0.15, 1)'; // immediate surge, long tail
+          ? 'transform 1.1s cubic-bezier(0.02, 0.95, 0.1, 1)'   // instant start, very long slow tail
+          : 'transform 1.2s cubic-bezier(0.02, 0.95, 0.1, 1)';  // instant start, very long slow tail
 
         // Glow + outline on button (CSS transition handles fade)
         btn.style.filter = isHovered
