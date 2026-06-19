@@ -412,12 +412,19 @@ export default function BookSettings() {
             </div>
           )}
 
-          {/* QR Code Section — only when public */}
-          {book.visibility === 'public' && (
-            <div className="mt-6 pt-5 border-t border-[var(--color-border)]">
+          {/* QR Code Section — always visible, disabled when private */}
+          {(() => {
+            const isPublic = book.visibility === 'public';
+            return (
+            <div className={`mt-6 pt-5 border-t border-[var(--color-border)] ${!isPublic ? 'opacity-50 pointer-events-none select-none' : ''}`}>
               <div className="flex items-center gap-2 mb-1">
                 <QrCode className="h-5 w-5 text-accent" />
                 <h3 className="text-base font-semibold text-theme">QR Codes</h3>
+                {!isPublic && (
+                  <span className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <Lock className="h-3 w-3" /> Make book public to use
+                  </span>
+                )}
               </div>
               <p className="text-sm text-muted mb-4">
                 Print these QR codes in your physical book, flyers, or bulletins to link readers to this interactive BookFlow edition.
@@ -583,7 +590,8 @@ export default function BookSettings() {
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Book Cover */}
