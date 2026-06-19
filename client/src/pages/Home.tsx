@@ -642,7 +642,7 @@ function QrExpandable() {
 
       {/* Fullscreen overlay — true full-screen, image fills the view */}
       <div
-        className={`fixed inset-0 z-50 flex flex-col items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         style={{ background: 'rgba(0,0,0,0.97)', cursor: 'zoom-out' }}
         onClick={() => setExpanded(false)}
       >
