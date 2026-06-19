@@ -912,7 +912,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         btn.style.transition = 'none';
 
         // Scale multiplier on inner div — CSS transition handles smooth grow/shrink
-        const innerScale = isHovered ? 2.2 : isFeatured ? 1.22 : 1.0;
+        const innerScale = isHovered ? 2.2 : isFeatured ? 2.2 : 1.0;
         inner.style.transform = `scale(${innerScale})`;
         inner.style.transition = isHovered
           ? 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)'   // ease-out, smooth
