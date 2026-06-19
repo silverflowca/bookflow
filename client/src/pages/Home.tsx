@@ -145,8 +145,8 @@ export default function Home() {
             </a>
             <a
               href="#features"
-              className="text-sm font-semibold transition-colors duration-200 hover:text-white"
-              style={{ color: 'rgba(196,181,253,0.85)' }}
+              className="text-sm font-semibold self-center transition-colors duration-200 hover:text-white/70"
+              style={{ color: '#ffffff' }}
             >
               Feature List ↓
             </a>
@@ -606,6 +606,15 @@ function EditorFeaturesSection() {
 // ─── QR Code Section ──────────────────────────────────────────────────────────
 function QrExpandable() {
   const [expanded, setExpanded] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!expanded) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [expanded]);
+
   return (
     <div className="flex-shrink-0 flex flex-col items-center gap-5">
       <div
@@ -616,9 +625,7 @@ function QrExpandable() {
           backdropFilter: 'blur(12px)',
           boxShadow: '0 0 60px rgba(139,92,246,0.25), 0 20px 60px rgba(0,0,0,0.5)',
         }}
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
-        onClick={() => setExpanded(v => !v)}
+        onClick={() => setExpanded(true)}
       >
         <img
           src="/qr_code_3.png"
@@ -628,7 +635,7 @@ function QrExpandable() {
         />
       </div>
       <div className="text-center">
-        <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Scan with your phone</p>
+        <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Tap to enlarge · Scan with your phone</p>
         <p className="text-white font-semibold text-sm">Opens your interactive book instantly</p>
       </div>
       <Link
@@ -639,33 +646,30 @@ function QrExpandable() {
         Generate Your QR Code
       </Link>
 
-      {/* Fullscreen overlay */}
-      {expanded && (
+      {/* Fullscreen overlay — click backdrop to close, no mouse-leave triggers */}
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(6px)', cursor: 'zoom-out' }}
+        onClick={() => setExpanded(false)}
+      >
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.90)', backdropFilter: 'blur(6px)', cursor: 'zoom-out' }}
-          onMouseLeave={() => setExpanded(false)}
-          onClick={() => setExpanded(false)}
+          className={`rounded-3xl p-8 shadow-2xl transition-transform duration-300 ${expanded ? 'scale-100' : 'scale-90'}`}
+          style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            boxShadow: '0 0 120px rgba(139,92,246,0.4)',
+            cursor: 'default',
+          }}
+          onClick={e => e.stopPropagation()}
         >
-          <div
-            className="rounded-3xl p-8 shadow-2xl transition-all duration-300 scale-100"
-            style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              boxShadow: '0 0 120px rgba(139,92,246,0.4)',
-            }}
-            onClick={e => e.stopPropagation()}
-            onMouseLeave={() => setExpanded(false)}
-          >
-            <img
-              src="/qr_code_3.png"
-              alt="BookFlow QR Code"
-              style={{ width: '80vmin', height: '80vmin', maxWidth: 600, maxHeight: 600, imageRendering: 'pixelated', borderRadius: 16 }}
-            />
-            <p className="text-center text-white/60 text-sm mt-4 tracking-wide">Scan with your phone camera</p>
-          </div>
+          <img
+            src="/qr_code_3.png"
+            alt="BookFlow QR Code"
+            style={{ width: '80vmin', height: '80vmin', maxWidth: 600, maxHeight: 600, imageRendering: 'pixelated', borderRadius: 16, display: 'block' }}
+          />
+          <p className="text-center text-white/60 text-sm mt-4 tracking-wide">Scan with your phone camera · click anywhere to close</p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
