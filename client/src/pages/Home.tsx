@@ -989,7 +989,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
               width: bookSize.w,
               height: bookSize.h,
               willChange: 'transform, opacity',
-              transformOrigin: 'center center',
+              transformOrigin: 'center bottom',
             }}
             onMouseEnter={() => {
               hoveredIndexRef.current = i;
@@ -1008,7 +1008,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
             <div
               ref={el => { innerRefs.current[i] = el; }}
               className="w-full h-full rounded-xl overflow-hidden shadow-xl ring-1 ring-black/10 relative"
-              style={{ transformOrigin: 'center center' }}
+              style={{ transformOrigin: 'center bottom' }}
             >
               <img
                 src={book.cover_image_url!}
