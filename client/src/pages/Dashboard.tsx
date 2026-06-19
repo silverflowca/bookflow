@@ -492,18 +492,26 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
 
   const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
 
-  const coverLabel = (
+  // If no cover yet: hover-to-upload on the cover itself
+  // If cover exists: cover is just a display; upload is in the ⋮ menu
+  const coverLabel = book.cover_image_url ? (
+    <div className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative overflow-hidden">
+      <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+      <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+      {uploadingCover && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+          <Loader2 className="h-5 w-5 text-white animate-spin" />
+        </div>
+      )}
+    </div>
+  ) : (
     <label
       className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block overflow-hidden"
-      style={{ borderRadius: coverSize === 'small' ? undefined : undefined }}
       onMouseEnter={() => setShowCoverUpload(true)}
       onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
     >
       <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
-      {book.cover_image_url
-        ? <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
-        : <BookOpen className={coverSize === 'large' ? 'h-16 w-16 text-accent opacity-30' : 'h-8 w-8 text-accent opacity-30'} />
-      }
+      <BookOpen className={coverSize === 'large' ? 'h-16 w-16 text-accent opacity-30' : 'h-8 w-8 text-accent opacity-30'} />
       {(showCoverUpload || uploadingCover) && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
           {uploadingCover ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white opacity-80" />}
@@ -520,6 +528,11 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
       <Link to={`/edit/book/${book.id}/settings`} onClick={() => setShowMenu(false)} className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover">
         <Settings className="h-3.5 w-3.5" /> Settings
       </Link>
+      {book.cover_image_url && (
+        <button onClick={() => { setShowMenu(false); coverInputRef.current?.click(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover">
+          <Upload className="h-3.5 w-3.5" /> Change Cover
+        </button>
+      )}
       {book.visibility === 'public' && (
         <button onClick={() => { setShowMenu(false); handleCopyUrl(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover">
           {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
