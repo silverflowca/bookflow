@@ -75,36 +75,21 @@ export default function Home() {
     <div>
       {/* Hero Section */}
       <section
-        className="text-white overflow-hidden relative"
-        style={{
-          background: 'linear-gradient(135deg, #0f0c29 0%, #1a1040 35%, #24243e 65%, #0d1b3e 100%)',
-        }}
+        className="overflow-hidden relative bg-white"
       >
-        {/* Ambient glow orbs */}
+        {/* Soft accent orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div style={{
             position: 'absolute', top: '-10%', left: '20%',
             width: '55vw', height: '55vw', maxWidth: 700, maxHeight: 700,
-            background: 'radial-gradient(circle, rgba(139,92,246,0.28) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)',
             borderRadius: '50%', filter: 'blur(8px)',
           }} />
           <div style={{
             position: 'absolute', top: '10%', right: '-5%',
             width: '35vw', height: '35vw', maxWidth: 450, maxHeight: 450,
-            background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)',
             borderRadius: '50%', filter: 'blur(12px)',
-          }} />
-          <div style={{
-            position: 'absolute', bottom: '0', left: '-5%',
-            width: '30vw', height: '30vw', maxWidth: 380, maxHeight: 380,
-            background: 'radial-gradient(circle, rgba(236,72,153,0.12) 0%, transparent 70%)',
-            borderRadius: '50%', filter: 'blur(16px)',
-          }} />
-          {/* Subtle grid lines */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
-            backgroundSize: '60px 60px',
           }} />
         </div>
 
@@ -112,20 +97,19 @@ export default function Home() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-16 pb-0 text-center">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 mb-5 px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase"
-            style={{ background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.4)', color: '#c4b5fd' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} />
+            style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', color: '#7c3aed' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
             The Interactive Book Platform
           </div>
 
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight tracking-tight"
-            style={{ textShadow: '0 2px 40px rgba(139,92,246,0.4)' }}>
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight tracking-tight text-gray-900">
             Interactive Books,<br className="hidden sm:block" />{' '}
-            <span style={{ background: 'linear-gradient(90deg, #a78bfa, #60a5fa, #f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+            <span style={{ background: 'linear-gradient(90deg, #7c3aed, #4f46e5, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
               Engaged Readers
             </span>
           </h1>
 
-          <p className="text-base sm:text-lg text-white/70 mb-6 sm:mb-8 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-lg text-gray-500 mb-6 sm:mb-8 max-w-2xl mx-auto leading-relaxed">
             {tagline}
           </p>
 
@@ -133,21 +117,19 @@ export default function Home() {
             <Link
               to="/register"
               className="px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg"
-              style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.45)' }}
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.30)' }}
             >
               Start Writing
             </Link>
             <a
               href="#books"
-              className="px-8 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-105"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#e2e8f0', backdropFilter: 'blur(8px)' }}
+              className="px-8 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-105 text-gray-700 border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
             >
               Browse Books
             </a>
             <a
               href="#features"
-              className="text-sm font-semibold self-center transition-colors duration-200 hover:text-white/70"
-              style={{ color: '#ffffff' }}
+              className="text-sm font-semibold self-center text-gray-500 transition-colors duration-200 hover:text-gray-700"
             >
               Feature List ↓
             </a>

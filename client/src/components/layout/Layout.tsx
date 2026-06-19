@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield, Sparkles } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 import api from '../../lib/api';
@@ -583,6 +583,13 @@ export default function Layout() {
               </span>
             )}
           </Link>
+          <a
+            href="/#features"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/' && location.hash === '#features' ? 'text-accent' : 'text-gray-900 dark:text-white hover:text-accent'}`}
+          >
+            <Sparkles className="h-5 w-5" />
+            <span>Features</span>
+          </a>
           <Link
             to="/clubs"
             className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/clubs') ? 'text-accent' : 'text-gray-900 dark:text-white hover:text-accent'}`}
@@ -590,19 +597,6 @@ export default function Layout() {
             <Users className="h-5 w-5" />
             <span>Clubs</span>
           </Link>
-          <Link
-            to="/dashboard"
-            onClick={() => navigate('/dashboard')}
-            className="flex flex-col items-center justify-center flex-shrink-0 -mt-4 mx-2"
-          >
-            <div className="theme-button-primary rounded-full h-12 w-12 flex items-center justify-center shadow-lg border-2 border-surface">
-              <Plus className="h-6 w-6" />
-            </div>
-          </Link>
-          <span className="flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium text-muted/40 cursor-not-allowed select-none">
-            <Video className="h-5 w-5" />
-            <span>Live</span>
-          </span>
           <Link
             to="/profile"
             className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/profile' ? 'text-accent' : 'text-gray-900 dark:text-white hover:text-accent'}`}
