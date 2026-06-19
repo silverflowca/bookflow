@@ -1088,6 +1088,18 @@ class ApiClient {
     return this.request('/admin/clubs');
   }
 
+  async adminGetMigrations(): Promise<{ migrations: { filename: string; status: 'ran' | 'pending' | 'error'; ran_at: string | null; error_msg: string | null }[] }> {
+    return this.request('/admin/migrations');
+  }
+
+  async adminRunMigration(filename: string): Promise<{ filename: string; status: string; error?: string }> {
+    return this.request(`/admin/migrations/${encodeURIComponent(filename)}`, { method: 'POST' });
+  }
+
+  async adminRunPendingMigrations(): Promise<{ results: { filename: string; status: string; error?: string }[]; pending_count: number }> {
+    return this.request('/admin/migrations/run-pending', { method: 'POST' });
+  }
+
   // ── Book Landing & QR ────────────────────────────────────────────────────────
   async getBookLanding(slugOrId: string): Promise<BookLanding> {
     return this.request(`/book-landing/${slugOrId}`);

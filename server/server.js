@@ -33,6 +33,7 @@ import ratingsRoutes from './routes/ratings.js';
 import liveRoutes from './routes/live.js';
 import profileRoutes from './routes/profile.js';
 import adminRoutes from './routes/admin.js';
+import migrationsRoutes from './routes/migrations.js';
 import savedBooksRoutes from './routes/saved-books.js';
 import bookLandingRoutes from './routes/book-landing.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
@@ -105,6 +106,7 @@ app.use('/api', ratingsRoutes);
 app.use('/api/live', liveRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/migrations', migrationsRoutes);
 app.use('/api/saved-books', savedBooksRoutes);
 app.use('/api/book-landing', bookLandingRoutes);
 

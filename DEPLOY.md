@@ -41,6 +41,12 @@ JWT_SECRET=<generate with: openssl rand -base64 32>
 CLIENT_URL=https://your-app.up.railway.app
 ```
 
+**Required for Migration Runner (Admin → Migrations tab):**
+```
+DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+```
+Get this from Supabase Dashboard → Settings → Database → Connection string (Transaction mode / port 6543).
+
 **Optional Integrations:**
 ```
 FILEFLOW_URL=https://your-fileflow.up.railway.app
