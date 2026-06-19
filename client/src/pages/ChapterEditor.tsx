@@ -37,6 +37,7 @@ export default function ChapterEditor() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [inlineContents, setInlineContents] = useState<InlineContent[]>([]);
   const inlineContentsRef = useRef<InlineContent[]>([]);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInlineModal, setShowInlineModal] = useState<{
     type: InlineContent['content_type'];
     selection?: { from: number; to: number; text: string };
@@ -112,8 +113,8 @@ export default function ChapterEditor() {
     },
     onUpdate: ({ editor }) => {
       // Auto-save after 2 seconds of inactivity
-      if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
-      autoSaveTimeout = setTimeout(() => {
+      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = setTimeout(() => {
         handleSave(editor.getJSON(), editor.getText());
       }, 2000);
 
@@ -158,8 +159,6 @@ export default function ChapterEditor() {
     },
   });
 
-  let autoSaveTimeout: ReturnType<typeof setTimeout>;
-
   useEffect(() => {
     if (chapterId) {
       loadChapter();
@@ -170,7 +169,7 @@ export default function ChapterEditor() {
       api.getBook(bookId).then(b => setBookSettings(b.settings ?? null)).catch(() => {});
     }
     return () => {
-      if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
     };
   }, [chapterId, bookId]);
 
