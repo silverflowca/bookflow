@@ -143,6 +143,13 @@ export default function Home() {
             >
               Browse Books
             </a>
+            <a
+              href="#features"
+              className="text-sm font-semibold transition-colors duration-200 hover:text-white"
+              style={{ color: 'rgba(196,181,253,0.85)' }}
+            >
+              Feature List ↓
+            </a>
           </div>
         </div>
 
@@ -487,7 +494,7 @@ function EditorFeaturesSection() {
   const [active, setActive] = useState<typeof EDITOR_FEATURES[0] | null>(null);
 
   return (
-    <section className="py-20 bg-surface">
+    <section id="features" className="py-20 bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <p className="text-sm text-center text-muted uppercase tracking-widest mb-3">What Can You Do?</p>
