@@ -116,20 +116,20 @@ export default function Home() {
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               to="/register"
-              className="px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg"
+              className="px-8 py-3 rounded-xl font-medium text-white transition-all duration-200 hover:scale-105 hover:shadow-lg"
               style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 24px rgba(124,58,237,0.30)' }}
             >
               Start Writing
             </Link>
             <a
               href="#books"
-              className="px-8 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-105 text-gray-700 border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              className="px-8 py-3 rounded-xl font-medium transition-all duration-200 hover:scale-105 text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
             >
               Browse Books
             </a>
             <a
               href="#features"
-              className="text-sm font-semibold self-center text-gray-500 transition-colors duration-200 hover:text-gray-700"
+              className="text-sm font-medium self-center text-gray-400 transition-colors duration-200 hover:text-gray-600"
             >
               Feature List ↓
             </a>
