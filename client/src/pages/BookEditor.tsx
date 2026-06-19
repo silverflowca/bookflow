@@ -18,6 +18,7 @@ function BookShareDropdown({ book, bookId, onClose }: {
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [qrCopied, setQrCopied] = useState(false);
   const [editingSlug, setEditingSlug] = useState(false);
   const [slugInput, setSlugInput] = useState(book.slug || '');
   const [savingSlug, setSavingSlug] = useState(false);
@@ -53,6 +54,21 @@ function BookShareDropdown({ book, bookId, onClose }: {
     a.href = qrDataUrl;
     a.download = `qr-book-${currentSlug || bookId}.png`;
     a.click();
+  };
+
+  const copyQr = async (url: string) => {
+    if (!qrDataUrl) return;
+    try {
+      const res = await fetch(qrDataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob, 'text/plain': new Blob([url], { type: 'text/plain' }) }),
+      ]);
+    } catch {
+      await navigator.clipboard.writeText(url).catch(() => {});
+    }
+    setQrCopied(true);
+    setTimeout(() => setQrCopied(false), 2000);
   };
 
   const nativeShare = async () => {
@@ -109,7 +125,12 @@ function BookShareDropdown({ book, bookId, onClose }: {
         {/* QR + cover */}
         <div className="flex items-start gap-4">
           {qrDataUrl ? (
-            <img src={qrDataUrl} alt="Book QR" className="w-24 h-24 rounded-lg border border-[var(--color-border)] shrink-0" />
+            <button onClick={() => copyQr(currentBookUrl)} title="Click to copy QR + URL" className="relative group shrink-0 rounded-lg overflow-hidden border border-[var(--color-border)] focus:outline-none">
+              <img src={qrDataUrl} alt="Book QR" className="w-24 h-24 block" />
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium">
+                {qrCopied ? <><Check className="h-4 w-4 mr-1" />Copied!</> : 'Copy'}
+              </div>
+            </button>
           ) : (
             <div className="w-24 h-24 rounded-lg border border-[var(--color-border)] flex items-center justify-center bg-surface-hover shrink-0">
               <Loader2 className="h-5 w-5 animate-spin text-muted" />
@@ -211,6 +232,7 @@ function ChapterShareDropdown({ chapter, chapterIndex, book, bookId, onClose }: 
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [qrCopied, setQrCopied] = useState(false);
   const [editingSlug, setEditingSlug] = useState(false);
   const [slugInput, setSlugInput] = useState(chapter.slug || '');
   const [savingSlug, setSavingSlug] = useState(false);
@@ -250,6 +272,21 @@ function ChapterShareDropdown({ chapter, chapterIndex, book, bookId, onClose }: 
     a.href = qrDataUrl;
     a.download = `qr-ch${chapterIndex + 1}-${currentSlug || chapter.id}.png`;
     a.click();
+  };
+
+  const copyQr = async (url: string) => {
+    if (!qrDataUrl) return;
+    try {
+      const res = await fetch(qrDataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob, 'text/plain': new Blob([url], { type: 'text/plain' }) }),
+      ]);
+    } catch {
+      await navigator.clipboard.writeText(url).catch(() => {});
+    }
+    setQrCopied(true);
+    setTimeout(() => setQrCopied(false), 2000);
   };
 
   const nativeShare = async () => {
@@ -323,7 +360,12 @@ function ChapterShareDropdown({ chapter, chapterIndex, book, bookId, onClose }: 
         {/* QR code */}
         <div className="flex items-start gap-4">
           {qrDataUrl ? (
-            <img src={qrDataUrl} alt="Chapter QR" className="w-24 h-24 rounded-lg border border-[var(--color-border)] shrink-0" />
+            <button onClick={() => copyQr(currentChapterUrl)} title="Click to copy QR + URL" className="relative group shrink-0 rounded-lg overflow-hidden border border-[var(--color-border)] focus:outline-none">
+              <img src={qrDataUrl} alt="Chapter QR" className="w-24 h-24 block" />
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium">
+                {qrCopied ? <><Check className="h-4 w-4 mr-1" />Copied!</> : 'Copy'}
+              </div>
+            </button>
           ) : (
             <div className="w-24 h-24 rounded-lg border border-[var(--color-border)] flex items-center justify-center bg-surface-hover shrink-0">
               <Loader2 className="h-5 w-5 animate-spin text-muted" />

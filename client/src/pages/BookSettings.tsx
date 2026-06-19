@@ -30,6 +30,7 @@ export default function BookSettings() {
 
   // QR code for book URL
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrCopied, setQrCopied] = useState(false);
 
 
   useEffect(() => {
@@ -173,6 +174,22 @@ export default function BookSettings() {
     a.href = qrDataUrl;
     a.download = `qr-book-${slugValue || bookId}.png`;
     a.click();
+  }
+
+  async function copyQr(url: string) {
+    if (!qrDataUrl) return;
+    try {
+      const res = await fetch(qrDataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob, 'text/plain': new Blob([url], { type: 'text/plain' }) }),
+      ]);
+    } catch {
+      // Fallback: copy URL as text
+      await navigator.clipboard.writeText(url).catch(() => {});
+    }
+    setQrCopied(true);
+    setTimeout(() => setQrCopied(false), 2000);
   }
 
   function updateSetting(key: keyof BookSettingsType, value: boolean | number) {
@@ -395,10 +412,19 @@ export default function BookSettings() {
               {/* QR Code */}
               {qrDataUrl && (
                 <div className="flex items-start gap-4 p-4 bg-surface-hover border-2 border-theme rounded-xl">
-                  <img src={qrDataUrl} alt="Book QR Code" className="w-28 h-28 rounded-lg border border-[var(--color-border)] shrink-0" />
+                  <button
+                    onClick={() => copyQr(`${window.location.origin}/bl/${slugValue || bookId}`)}
+                    title="Click to copy QR + URL"
+                    className="relative group shrink-0 rounded-lg overflow-hidden border border-[var(--color-border)] focus:outline-none"
+                  >
+                    <img src={qrDataUrl} alt="Book QR Code" className="w-28 h-28 block" />
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-medium">
+                      {qrCopied ? <><Check className="h-4 w-4 mr-1" />Copied!</> : 'Copy'}
+                    </div>
+                  </button>
                   <div className="flex-1 space-y-2">
                     <p className="text-sm font-medium text-theme">Book QR Code</p>
-                    <p className="text-xs text-muted">Scan to open this book. Print in bulletins, flyers, or physical books.</p>
+                    <p className="text-xs text-muted">Click QR to copy image + URL. Scan to open this book.</p>
                     <button
                       onClick={downloadQr}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium theme-button-secondary rounded-lg"
