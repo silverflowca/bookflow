@@ -617,26 +617,21 @@ function QrExpandable() {
 
   return (
     <div className="w-full flex flex-col items-center gap-5">
-      {/* Full-width image card */}
+      {/* Full-width image — no padding, edge to edge */}
       <div
-        className="w-full rounded-3xl overflow-hidden cursor-zoom-in shadow-2xl transition-transform duration-200 hover:scale-[1.01]"
-        style={{
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 0 60px rgba(139,92,246,0.25), 0 20px 60px rgba(0,0,0,0.5)',
-        }}
+        className="w-full cursor-zoom-in overflow-hidden"
+        style={{ boxShadow: '0 0 80px rgba(139,92,246,0.3), 0 20px 60px rgba(0,0,0,0.6)' }}
         onClick={() => setExpanded(true)}
       >
         <img
           src="/qr_code_3.png"
-          alt="BookFlow QR Code"
-          className="w-full h-auto object-contain rounded-3xl"
-          style={{ imageRendering: 'pixelated', display: 'block' }}
+          alt="BookFlow QR Code — scan to access interactive content"
+          className="w-full h-auto block"
+          style={{ minHeight: 220 }}
         />
       </div>
-      <div className="flex items-center gap-6 flex-wrap justify-center">
-        <p className="text-white/50 text-xs uppercase tracking-widest">Tap to enlarge · Scan with your phone</p>
+      <div className="flex items-center gap-6 flex-wrap justify-center px-4">
+        <p className="text-white/50 text-xs uppercase tracking-widest">Tap image to enlarge · Scan QR with your phone</p>
         <Link
           to="/register"
           className="px-7 py-3 rounded-xl font-bold text-white text-sm transition-all hover:scale-105 hover:shadow-lg"
@@ -646,29 +641,27 @@ function QrExpandable() {
         </Link>
       </div>
 
-      {/* Fullscreen overlay — click backdrop to close, no mouse-leave triggers */}
+      {/* Fullscreen overlay — true full-screen, image fills the view */}
       <div
-        className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(6px)', cursor: 'zoom-out' }}
+        className={`fixed inset-0 z-50 flex flex-col items-center justify-center transition-opacity duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        style={{ background: 'rgba(0,0,0,0.97)', cursor: 'zoom-out' }}
         onClick={() => setExpanded(false)}
       >
-        <div
-          className={`rounded-3xl p-8 shadow-2xl transition-transform duration-300 ${expanded ? 'scale-100' : 'scale-90'}`}
+        <img
+          src="/qr_code_3.png"
+          alt="BookFlow QR Code"
+          className={`transition-transform duration-300 ${expanded ? 'scale-100' : 'scale-95'}`}
           style={{
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            boxShadow: '0 0 120px rgba(139,92,246,0.4)',
-            cursor: 'default',
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'contain',
+            display: 'block',
           }}
           onClick={e => e.stopPropagation()}
-        >
-          <img
-            src="/qr_code_3.png"
-            alt="BookFlow QR Code"
-            style={{ width: '80vmin', height: '80vmin', maxWidth: 600, maxHeight: 600, imageRendering: 'pixelated', borderRadius: 16, display: 'block' }}
-          />
-          <p className="text-center text-white/60 text-sm mt-4 tracking-wide">Scan with your phone camera · click anywhere to close</p>
-        </div>
+        />
+        <p className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs tracking-wide">
+          Scan QR codes with your phone camera · tap anywhere to close
+        </p>
       </div>
     </div>
   );
@@ -730,7 +723,7 @@ function QrCodeSection() {
       </div>
 
       {/* ── Full-viewport-width QR image ── */}
-      <div className="relative z-10 w-full px-4 sm:px-8">
+      <div className="relative z-10 w-full">
         <QrExpandable />
       </div>
 
