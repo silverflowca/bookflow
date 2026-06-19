@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2, QrCode, Download, Edit2, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2, Download, Edit, ExternalLink } from 'lucide-react';
 import QRCode from 'qrcode';
 import api from '../lib/api';
-import type { Book, BookSettings as BookSettingsType, Chapter } from '../types';
+import type { Book, BookSettings as BookSettingsType } from '../types';
 
 export default function BookSettings() {
   const { bookId } = useParams<{ bookId: string }>();
@@ -21,16 +21,16 @@ export default function BookSettings() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
-  // QR code state
-  const [bookQrDataUrl, setBookQrDataUrl] = useState<string | null>(null);
-  const [chapterQrUrls, setChapterQrUrls] = useState<Record<string, string>>({});
-  const [editingBookSlug, setEditingBookSlug] = useState(false);
-  const [bookSlugInput, setBookSlugInput] = useState('');
-  const [savingBookSlug, setSavingBookSlug] = useState(false);
-  const [editingChapterSlug, setEditingChapterSlug] = useState<string | null>(null);
-  const [chapterSlugInput, setChapterSlugInput] = useState('');
-  const [savingChapterSlug, setSavingChapterSlug] = useState(false);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  // Slug editor
+  const [slugValue, setSlugValue] = useState('');
+  const [editingSlug, setEditingSlug] = useState(false);
+  const [slugInput, setSlugInput] = useState('');
+  const [savingSlug, setSavingSlug] = useState(false);
+  const [slugSaved, setSlugSaved] = useState(false);
+
+  // QR code for book URL
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (bookId) {
@@ -47,8 +47,10 @@ export default function BookSettings() {
       setTitle(data.title || '');
       setSubtitle(data.subtitle || '');
       setDescription(data.description || '');
-      if (data.visibility === 'public') {
-        loadChaptersAndQr(data);
+      if (data.slug) {
+        setSlugValue(data.slug);
+        const url = `${window.location.origin}/read/${data.slug}`;
+        QRCode.toDataURL(url, { width: 512, margin: 2 }).then(setQrDataUrl);
       }
     } catch (err) {
       console.error('Failed to load book:', err);
@@ -57,80 +59,6 @@ export default function BookSettings() {
     }
   }
 
-  const loadChaptersAndQr = useCallback(async (b: typeof book) => {
-    if (!b || !bookId) return;
-    try {
-      const chs = await api.getChapters(bookId);
-      setChapters(chs);
-      // Generate book QR
-      const landingUrl = `${window.location.origin}/book-landing/${b.slug || b.id}`;
-      const bookQr = await QRCode.toDataURL(landingUrl, { width: 512, margin: 2 });
-      setBookQrDataUrl(bookQr);
-      // Generate chapter QRs
-      const chUrls: Record<string, string> = {};
-      for (const ch of chs) {
-        const chUrl = `${window.location.origin}/book-landing/${b.slug || b.id}?chapter=${ch.slug || ch.id}`;
-        chUrls[ch.id] = await QRCode.toDataURL(chUrl, { width: 256, margin: 2 });
-      }
-      setChapterQrUrls(chUrls);
-    } catch (err) {
-      console.error('Failed to load chapters/QR:', err);
-    }
-  }, [bookId]);
-
-  async function handleSaveBookSlug() {
-    if (!bookId || !book || !bookSlugInput.trim()) return;
-    setSavingBookSlug(true);
-    try {
-      const updated = await api.patchBookSlug(bookId, bookSlugInput.trim());
-      setBook(prev => prev ? { ...prev, slug: updated.slug } : null);
-      setEditingBookSlug(false);
-      // Regenerate QR with new slug
-      const landingUrl = `${window.location.origin}/book-landing/${updated.slug}`;
-      const bookQr = await QRCode.toDataURL(landingUrl, { width: 512, margin: 2 });
-      setBookQrDataUrl(bookQr);
-    } catch (err: any) {
-      alert(err?.message || 'Failed to save slug');
-    } finally {
-      setSavingBookSlug(false);
-    }
-  }
-
-  async function handleSaveChapterSlug(chapterId: string) {
-    if (!bookId || !chapterSlugInput.trim()) return;
-    setSavingChapterSlug(true);
-    try {
-      const updated = await api.patchChapterSlug(chapterId, chapterSlugInput.trim());
-      setChapters(prev => prev.map(c => c.id === chapterId ? { ...c, slug: updated.slug } : c));
-      setEditingChapterSlug(null);
-    } catch (err: any) {
-      alert(err?.message || 'Failed to save chapter slug');
-    } finally {
-      setSavingChapterSlug(false);
-    }
-  }
-
-  async function handleGenerateChapterSlug(chapterId: string) {
-    if (!bookId) return;
-    try {
-      const updated = await api.generateChapterSlug(bookId, chapterId);
-      setChapters(prev => prev.map(c => c.id === chapterId ? { ...c, slug: updated.slug } : c));
-      // Regenerate QR for this chapter
-      const bookSlug = book?.slug || book?.id || '';
-      const chUrl = `${window.location.origin}/book-landing/${bookSlug}?chapter=${updated.slug}`;
-      const qr = await QRCode.toDataURL(chUrl, { width: 256, margin: 2 });
-      setChapterQrUrls(prev => ({ ...prev, [chapterId]: qr }));
-    } catch (err: any) {
-      alert(err?.message || 'Failed to generate slug');
-    }
-  }
-
-  function downloadQr(dataUrl: string, filename: string) {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = filename;
-    a.click();
-  }
 
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -217,6 +145,34 @@ export default function BookSettings() {
     navigator.clipboard.writeText(`${window.location.origin}/book/${bookId}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSaveSlug() {
+    if (!slugInput.trim() || !bookId) return;
+    setSavingSlug(true);
+    try {
+      const updated = await api.patchBookSlug(bookId, slugInput.trim());
+      setSlugValue(updated.slug);
+      setBook(prev => prev ? { ...prev, slug: updated.slug } : null);
+      const url = `${window.location.origin}/read/${updated.slug}`;
+      const qr = await QRCode.toDataURL(url, { width: 512, margin: 2 });
+      setQrDataUrl(qr);
+      setEditingSlug(false);
+      setSlugSaved(true);
+      setTimeout(() => setSlugSaved(false), 3000);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to save slug');
+    } finally {
+      setSavingSlug(false);
+    }
+  }
+
+  function downloadQr() {
+    if (!qrDataUrl) return;
+    const a = document.createElement('a');
+    a.href = qrDataUrl;
+    a.download = `qr-book-${slugValue || bookId}.png`;
+    a.click();
   }
 
   function updateSetting(key: keyof BookSettingsType, value: boolean | number) {
@@ -393,14 +349,66 @@ export default function BookSettings() {
           )}
 
           {/* Public slug + share token (set by publish flow) */}
-          {book.slug && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <Globe className="h-4 w-4 text-green-600 flex-shrink-0" />
-                <span className="text-sm text-green-800 flex-1 truncate">
-                  {window.location.origin}/read/{book.slug}
-                </span>
+          {(book.slug || book.visibility === 'public') && (
+            <div className="mt-4 space-y-3">
+              {/* Slug editor */}
+              <div>
+                <label className="block text-xs font-medium text-muted mb-1">Public URL slug</label>
+                {editingSlug ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted shrink-0">{window.location.origin}/read/</span>
+                    <input
+                      type="text"
+                      value={slugInput}
+                      onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-surface border-2 border-theme rounded-lg focus:outline-none focus:border-accent text-theme"
+                      autoFocus
+                      placeholder="my-book-slug"
+                    />
+                    <button onClick={handleSaveSlug} disabled={savingSlug} className="px-3 py-1.5 text-sm theme-button-primary rounded-lg shrink-0 flex items-center gap-1">
+                      {savingSlug ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Save
+                    </button>
+                    <button onClick={() => setEditingSlug(false)} className="text-muted hover:text-theme p-1.5 shrink-0">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                    <Globe className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    <span className="text-sm text-green-800 dark:text-green-300 flex-1 truncate">
+                      {slugValue ? `${window.location.origin}/read/${slugValue}` : <span className="italic text-muted">No slug yet — click Edit to set one</span>}
+                    </span>
+                    {slugValue && (
+                      <a href={`/read/${slugValue}`} target="_blank" rel="noopener noreferrer" className="shrink-0 p-1 text-green-600 hover:text-green-800">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    <button onClick={() => { setSlugInput(slugValue); setEditingSlug(true); }} className="shrink-0 p-1 text-muted hover:text-theme" title="Edit slug">
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+                {slugSaved && <p className="text-xs text-green-600 mt-1">Slug saved!</p>}
               </div>
+
+              {/* QR Code */}
+              {qrDataUrl && (
+                <div className="flex items-start gap-4 p-4 bg-surface-hover border-2 border-theme rounded-xl">
+                  <img src={qrDataUrl} alt="Book QR Code" className="w-28 h-28 rounded-lg border border-[var(--color-border)] shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm font-medium text-theme">Book QR Code</p>
+                    <p className="text-xs text-muted">Scan to open this book. Print in bulletins, flyers, or physical books.</p>
+                    <button
+                      onClick={downloadQr}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium theme-button-secondary rounded-lg"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download PNG
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {book.share_token && (
                 <div className="flex items-center gap-2 p-3 bg-surface-hover border-2 border-theme rounded-lg">
                   <Lock className="h-4 w-4 text-muted flex-shrink-0" />
@@ -412,186 +420,14 @@ export default function BookSettings() {
             </div>
           )}
 
-          {/* QR Code Section — always visible, disabled when private */}
-          {(() => {
-            const isPublic = book.visibility === 'public';
-            return (
-            <div className={`mt-6 pt-5 border-t border-[var(--color-border)] ${!isPublic ? 'opacity-50 pointer-events-none select-none' : ''}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <QrCode className="h-5 w-5 text-accent" />
-                <h3 className="text-base font-semibold text-theme">QR Codes</h3>
-                {!isPublic && (
-                  <span className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                    <Lock className="h-3 w-3" /> Make book public to use
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-muted mb-4">
-                Print these QR codes in your physical book, flyers, or bulletins to link readers to this interactive BookFlow edition.
-              </p>
-
-              {/* Book QR */}
-              <div className="p-4 bg-surface-hover border border-[var(--color-border)] rounded-xl mb-4">
-                <p className="text-sm font-semibold text-theme mb-3">Book Landing Page</p>
-                <div className="flex flex-col sm:flex-row items-center gap-5">
-                  {bookQrDataUrl ? (
-                    <img src={bookQrDataUrl} alt="Book QR code" className="w-36 h-36 rounded-lg border border-[var(--color-border)]" />
-                  ) : (
-                    <div className="w-36 h-36 rounded-lg border border-[var(--color-border)] flex items-center justify-center bg-surface">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {/* Book slug editor */}
-                    <div>
-                      <p className="text-xs text-muted mb-1">Landing page URL</p>
-                      {editingBookSlug ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted shrink-0">{window.location.origin}/book-landing/</span>
-                          <input
-                            type="text"
-                            value={bookSlugInput}
-                            onChange={e => setBookSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                            className="flex-1 px-2 py-1 text-sm bg-surface border border-[var(--color-border)] rounded focus:outline-none focus:border-accent text-theme"
-                            autoFocus
-                          />
-                          <button
-                            onClick={handleSaveBookSlug}
-                            disabled={savingBookSlug}
-                            className="px-3 py-1 text-xs theme-button-primary rounded"
-                          >
-                            {savingBookSlug ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-                          </button>
-                          <button onClick={() => setEditingBookSlug(false)} className="px-2 py-1 text-xs text-muted hover:text-theme">Cancel</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs text-theme bg-surface px-2 py-1 rounded border border-[var(--color-border)] flex-1 truncate">
-                            {window.location.origin}/book-landing/{book.slug || book.id}
-                          </code>
-                          <button
-                            onClick={() => { setBookSlugInput(book.slug || ''); setEditingBookSlug(true); }}
-                            className="flex items-center gap-1 px-2 py-1 text-xs text-muted hover:text-theme theme-button-secondary rounded"
-                          >
-                            <Edit2 className="h-3 w-3" /> Edit
-                          </button>
-                          <a
-                            href={`/book-landing/${book.slug || book.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 px-2 py-1 text-xs text-muted hover:text-theme theme-button-secondary rounded"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                    {/* Download */}
-                    {bookQrDataUrl && (
-                      <button
-                        onClick={() => downloadQr(bookQrDataUrl, `qr-${book.slug || book.id}.png`)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs theme-button-secondary rounded-lg"
-                      >
-                        <Download className="h-3.5 w-3.5" /> Download QR PNG
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Chapter QR codes */}
-              <div className="p-4 bg-surface-hover border border-[var(--color-border)] rounded-xl">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-semibold text-theme">Chapter QR Codes</p>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings?.enable_chapter_qr_codes ?? true}
-                      onChange={e => updateSetting('enable_chapter_qr_codes', e.target.checked)}
-                      className="w-4 h-4 accent-[var(--color-accent)]"
-                    />
-                    <span className="text-xs text-muted">Enabled</span>
-                  </label>
-                </div>
-
-                {(settings?.enable_chapter_qr_codes ?? true) && (
-                  <div className="space-y-4">
-                    {chapters.length === 0 && (
-                      <p className="text-sm text-muted italic">No chapters yet.</p>
-                    )}
-                    {chapters.map((ch, i) => (
-                      <div key={ch.id} className="flex flex-col sm:flex-row items-start gap-4 p-3 bg-surface rounded-lg border border-[var(--color-border)]">
-                        {/* QR thumbnail */}
-                        {chapterQrUrls[ch.id] ? (
-                          <img src={chapterQrUrls[ch.id]} alt={`QR for ${ch.title}`} className="w-20 h-20 rounded border border-[var(--color-border)] shrink-0" />
-                        ) : (
-                          <div className="w-20 h-20 rounded border border-[var(--color-border)] flex items-center justify-center bg-surface-hover shrink-0">
-                            <Loader2 className="h-4 w-4 animate-spin text-muted" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <p className="text-sm font-medium text-theme truncate">
-                            <span className="text-muted mr-1">Ch {i + 1}:</span> {ch.title}
-                          </p>
-                          {/* Chapter slug editor */}
-                          {editingChapterSlug === ch.id ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <input
-                                type="text"
-                                value={chapterSlugInput}
-                                onChange={e => setChapterSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                                placeholder="chapter-slug"
-                                className="flex-1 min-w-0 px-2 py-1 text-xs bg-surface border border-[var(--color-border)] rounded focus:outline-none focus:border-accent text-theme"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => handleSaveChapterSlug(ch.id)}
-                                disabled={savingChapterSlug}
-                                className="px-2 py-1 text-xs theme-button-primary rounded"
-                              >
-                                {savingChapterSlug ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-                              </button>
-                              <button onClick={() => setEditingChapterSlug(null)} className="text-xs text-muted hover:text-theme">Cancel</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <code className="text-xs text-muted bg-surface-hover px-1.5 py-0.5 rounded border border-[var(--color-border)] truncate max-w-[180px]">
-                                {ch.slug || <span className="italic">no slug</span>}
-                              </code>
-                              <button
-                                onClick={() => { setChapterSlugInput(ch.slug || ''); setEditingChapterSlug(ch.id); }}
-                                className="flex items-center gap-1 text-xs text-muted hover:text-theme"
-                              >
-                                <Edit2 className="h-3 w-3" /> Edit
-                              </button>
-                              {!ch.slug && (
-                                <button
-                                  onClick={() => handleGenerateChapterSlug(ch.id)}
-                                  className="text-xs text-accent hover:underline"
-                                >
-                                  Auto-generate
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          {/* Download button */}
-                          {chapterQrUrls[ch.id] && (
-                            <button
-                              onClick={() => downloadQr(chapterQrUrls[ch.id], `qr-ch${i + 1}-${ch.slug || ch.id}.png`)}
-                              className="flex items-center gap-1 text-xs text-muted hover:text-theme"
-                            >
-                              <Download className="h-3 w-3" /> Download PNG
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            );
-          })()}
+          {/* Chapter QR tip */}
+          <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+            <p className="text-xs text-muted">
+              <strong className="text-theme">Chapter QR codes:</strong> Go to the{' '}
+              <Link to={`/edit/book/${bookId}`} className="text-accent hover:underline">Chapter List</Link>{' '}
+              and click the Share button on any chapter to get its QR code.
+            </p>
+          </div>
         </div>
 
         {/* Book Cover */}
