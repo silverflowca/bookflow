@@ -585,8 +585,16 @@ export default function Layout() {
           </Link>
           <button
             onClick={() => {
+              const scrollToFeatures = () => {
+                const el = document.getElementById('features');
+                if (el) {
+                  const top = el.getBoundingClientRect().top + window.scrollY - 64;
+                  window.scrollTo({ top, behavior: 'smooth' });
+                }
+              };
               if (location.pathname === '/') {
-                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                // Defer past the current rAF tick so carousel doesn't interrupt
+                setTimeout(scrollToFeatures, 50);
               } else {
                 window.location.href = '/#features';
               }
