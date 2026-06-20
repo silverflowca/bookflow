@@ -324,7 +324,7 @@ export default function Home() {
               <p>No published books yet. Be the first to create one!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {books.map((book) => (
                 <BookCard key={book.id} book={book} />
               ))}
@@ -1139,43 +1139,35 @@ function RoleCard({
 
 function BookCard({ book }: { book: Book }) {
   return (
-    <Link to={`/book/${book.id}`} className="block bg-surface rounded-lg shadow-sm hover:shadow-md transition-shadow">
-      <div className="aspect-[3/4] bg-gradient-to-br from-primary-100 to-primary-200 rounded-t-lg flex items-center justify-center">
+    <Link to={`/book/${book.id}`} className="block bg-surface rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <div className="aspect-[2/3] bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
         {book.cover_image_url ? (
           <img
             src={book.cover_image_url}
             alt={book.title}
-            className="w-full h-full object-cover rounded-t-lg"
+            className="w-full h-full object-cover"
           />
         ) : (
-          <BookOpen className="h-16 w-16 text-primary-400" />
+          <BookOpen className="h-10 w-10 text-primary-400" />
         )}
       </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-lg mb-1 line-clamp-2">{book.title}</h3>
-        {book.subtitle && (
-          <p className="text-sm text-muted mb-2 line-clamp-1">{book.subtitle}</p>
-        )}
-        <p className="text-sm text-muted">
+      <div className="p-2.5">
+        <h3 className="font-semibold text-sm leading-snug mb-0.5 line-clamp-2">{book.title}</h3>
+        <p className="text-xs text-muted line-clamp-1">
           by {book.author?.display_name || 'Unknown Author'}
         </p>
         {book.settings?.show_ratings !== false && book.rating_count! > 0 && (
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center gap-0.5 mt-1 flex-wrap">
             {[1, 2, 3, 4, 5].map(s => (
               <Star
                 key={s}
-                className={`h-3.5 w-3.5 ${s <= Math.round(book.rating_average!) ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-muted'}`}
+                className={`h-3 w-3 ${s <= Math.round(book.rating_average!) ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-muted'}`}
               />
             ))}
             <span className="text-xs text-muted ml-0.5">
-              {book.rating_average?.toFixed(1)} ({book.rating_count})
+              {book.rating_average?.toFixed(1)}
             </span>
           </div>
-        )}
-        {book.chapters && (
-          <p className="text-xs text-muted mt-1">
-            {book.chapters.length} chapters
-          </p>
         )}
       </div>
     </Link>
