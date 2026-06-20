@@ -899,28 +899,34 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         const opacity = baseOpacity;
         const zIndex = isHovered ? 150 : Math.round((z + 1) * 50);
 
-        // Position + depth on the outer button — smooth transition for surrounding books
+        // Position + depth on the outer button — no transition, rAF drives orbit smoothly
         btn.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${depthScale.toFixed(3)}) rotateY(${tilt.toFixed(1)}deg)`;
         btn.style.opacity = isFeatured ? '1' : opacity.toFixed(3);
         btn.style.zIndex = isHovered ? '150' : String(zIndex);
-        btn.style.transition = isHovered ? 'none' : 'transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.35s ease';
+        btn.style.outline = 'none';
+        btn.style.borderRadius = '0.75rem';
 
-        // Scale multiplier on inner div — fast open, fast close
-        const innerScale = isHovered ? 1.75 : isFeatured ? 1.75 : 1.0;
-        inner.style.transform = `scale(${innerScale})`;
-        inner.style.transition = isHovered
-          ? 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)'  // fast snap open
-          : 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';  // fast snap close
+        // Inner scale:
+        //   hover → fast snap to 1.75
+        //   orbit → continuously driven by depth (z: -1..1 → 1.0..1.75), slow CSS transition
+        if (isHovered) {
+          // Fast snap open on hover
+          inner.style.transition = 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+          inner.style.transform = 'scale(1.75)';
+        } else {
+          // Orbit-driven scale: rAF updates z every frame so it's naturally smooth
+          // Use a short transition only for the snap-back from hover → orbit
+          const orbitScale = 1.0 + 0.75 * ((z + 1) / 2);
+          inner.style.transition = 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+          inner.style.transform = `scale(${orbitScale.toFixed(3)})`;
+        }
 
-        // Glow + outline on button (CSS transition handles fade)
+        // Glow on inner (via filter on btn — separate from transform)
         btn.style.filter = isHovered
           ? 'drop-shadow(0 8px 20px rgba(124,58,237,0.35))'
           : isFeatured
             ? 'drop-shadow(0 4px 12px rgba(124,58,237,0.22))'
             : '';
-        btn.style.outline = 'none';
-        btn.style.borderRadius = '0.75rem';
-        // Allow filter to animate — but not transform (that's the rAF position)
         btn.style.transition = 'filter 0.4s ease, opacity 0.35s ease';
       });
 
