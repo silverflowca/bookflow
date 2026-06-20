@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles, Mic, Video, BarChart2, CheckSquare, ListChecks, AlignLeft, Image, X, Play } from 'lucide-react';
+import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles, Mic, Video, BarChart2, CheckSquare, ListChecks, AlignLeft, Image, X, Play, Maximize2 } from 'lucide-react';
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
@@ -208,9 +208,7 @@ export default function Home() {
 
             {/* Row 2: Readers photo (left) | Readers card (right) */}
             <div className="grid md:grid-cols-2 gap-12 items-stretch px-4">
-              <div className="rounded-2xl overflow-hidden shadow-sm">
-                <img src="/scan_to_watch.png" alt="Readers" className="w-full h-full object-cover" />
-              </div>
+              <ExpandableImage src="/scan_to_watch.png" alt="Readers" caption="" />
               <RoleCard
                 accent="from-emerald-500 to-teal-600"
                 icon={<BookMarked className="h-7 w-7 text-white" />}
@@ -254,9 +252,7 @@ export default function Home() {
                 cta={{ label: 'Join a Study', to: '/clubs' }}
                 loggedIn={!!user}
               />
-              <div className="rounded-2xl overflow-hidden shadow-sm">
-                <img src="/studentsstudy.png" alt="Students studying" className="w-full h-full object-cover" />
-              </div>
+              <ExpandableImage src="/studentsstudy.png" alt="Students studying" caption="" />
             </div>
 
             {/* Divider 3 */}
@@ -270,9 +266,7 @@ export default function Home() {
 
             {/* Row 4: Church photo (left) | Book Club Leaders card (right) */}
             <div className="grid md:grid-cols-2 gap-12 items-stretch px-4">
-              <div className="rounded-2xl overflow-hidden shadow-sm">
-                <img src="/ChurchGroupBookRead.png" alt="Book club group" className="w-full h-full object-cover" />
-              </div>
+              <ExpandableImage src="/ChurchGroupBookRead.png" alt="Book club group" caption="" />
               <RoleCard
                 accent="from-rose-500 to-pink-600"
                 icon={<Crown className="h-7 w-7 text-white" />}
@@ -1058,13 +1052,16 @@ function ExpandableImage({ src, alt, caption }: { src: string; alt: string; capt
   return (
     <>
       <div className="flex flex-col gap-3">
-        <div
-          className="rounded-2xl overflow-hidden shadow-sm flex-1 cursor-zoom-in"
-          onMouseEnter={() => setExpanded(true)}
-          onMouseLeave={() => setExpanded(false)}
-          onClick={() => setExpanded(v => !v)}
-        >
+        <div className="relative rounded-2xl overflow-hidden shadow-sm flex-1">
           <img src={src} alt={alt} className="w-full h-full object-cover" />
+          {/* Expand button — bottom right, click/tap only */}
+          <button
+            onClick={() => setExpanded(true)}
+            className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/50 text-white hover:bg-black/70 transition-colors"
+            title="Expand image"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
         </div>
         <p className="text-center text-sm font-semibold text-muted tracking-wide">{caption}</p>
       </div>
@@ -1073,7 +1070,6 @@ function ExpandableImage({ src, alt, caption }: { src: string; alt: string; capt
       <div
         className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         style={{ background: 'rgba(0,0,0,0.82)' }}
-        onMouseLeave={() => setExpanded(false)}
         onClick={() => setExpanded(false)}
       >
         <img
@@ -1083,6 +1079,12 @@ function ExpandableImage({ src, alt, caption }: { src: string; alt: string; capt
           style={{ maxWidth: '90vw', maxHeight: '90vh' }}
           onClick={e => e.stopPropagation()}
         />
+        <button
+          onClick={() => setExpanded(false)}
+          className="absolute top-4 right-4 p-2 rounded-lg bg-black/50 text-white hover:bg-black/70 transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
     </>
   );
