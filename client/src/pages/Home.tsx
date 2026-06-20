@@ -913,8 +913,8 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
           inner.style.transition = 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
           inner.style.transform = 'scale(1.75)';
         } else {
-          // Sharp peak at front: use z^6 so only the very front book reaches max size
-          const peak = Math.pow(Math.max(0, z), 6);
+          // Peak at front: z^3 — reaches max size faster as it approaches
+          const peak = Math.pow(Math.max(0, z), 3);
           const orbitScale = 1.0 + 0.75 * peak;
           inner.style.transition = 'none';
           inner.style.transform = `scale(${orbitScale.toFixed(3)})`;
