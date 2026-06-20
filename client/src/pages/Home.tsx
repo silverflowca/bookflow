@@ -983,7 +983,7 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
               height: bookSize.h,
               willChange: 'transform, opacity',
               transformOrigin: 'center bottom',
-              cursor: 'zoom-in',
+              cursor: 'pointer',
             }}
             onMouseEnter={() => {
               hoveredIndexRef.current = i;
