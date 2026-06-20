@@ -899,17 +899,17 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         const opacity = baseOpacity;
         const zIndex = isHovered ? 150 : Math.round((z + 1) * 50);
 
-        // Position + depth on the outer button (no transition — runs every rAF)
+        // Position + depth on the outer button — smooth transition for surrounding books
         btn.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${depthScale.toFixed(3)}) rotateY(${tilt.toFixed(1)}deg)`;
         btn.style.opacity = isFeatured ? '1' : opacity.toFixed(3);
         btn.style.zIndex = isHovered ? '150' : String(zIndex);
-        btn.style.transition = 'none';
+        btn.style.transition = isHovered ? 'none' : 'transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.35s ease';
 
-        // Scale multiplier on inner div — CSS transition handles smooth grow/shrink
+        // Scale multiplier on inner div — fast open, fast close
         const innerScale = isHovered ? 1.75 : isFeatured ? 1.75 : 1.0;
         inner.style.transform = `scale(${innerScale})`;
         inner.style.transition = isHovered
-          ? 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)'   // fast snap open
+          ? 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)'  // fast snap open
           : 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';  // fast snap close
 
         // Glow + outline on button (CSS transition handles fade)
