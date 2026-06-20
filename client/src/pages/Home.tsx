@@ -1139,7 +1139,10 @@ function RoleCard({
 
 function BookCard({ book }: { book: Book }) {
   return (
-    <Link to={`/book/${book.id}`} className="block bg-surface rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+    <Link
+      to={`/book/${book.id}`}
+      className="block bg-surface rounded-xl shadow-sm hover:shadow-lg overflow-hidden hover:[transition:transform_0.15s_ease,box-shadow_0.15s_ease] [transition:transform_1.2s_cubic-bezier(0.45,0.05,0.55,0.95),box-shadow_1.2s_ease] hover:scale-[1.04] will-change-transform"
+    >
       <div className="aspect-[2/3] bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
         {book.cover_image_url ? (
           <img
