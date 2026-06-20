@@ -906,19 +906,13 @@ function SpiralCarousel({ books, settings, onSaveBook }: { books: Book[]; settin
         btn.style.outline = 'none';
         btn.style.borderRadius = '0.75rem';
 
-        // Inner scale:
-        //   hover → fast snap to 1.75
-        //   orbit → continuously driven by depth (z: -1..1 → 1.0..1.75), slow CSS transition
+        // Inner scale: hover=1.75 (fast), orbit=1.0 (depth handled by outer depthScale)
         if (isHovered) {
-          // Fast snap open on hover
           inner.style.transition = 'transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
           inner.style.transform = 'scale(1.75)';
         } else {
-          // Orbit-driven scale: rAF updates z every frame so it's naturally smooth
-          // Use a short transition only for the snap-back from hover → orbit
-          const orbitScale = 1.0 + 0.75 * ((z + 1) / 2);
           inner.style.transition = 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-          inner.style.transform = `scale(${orbitScale.toFixed(3)})`;
+          inner.style.transform = 'scale(1.0)';
         }
 
         // Glow on inner (via filter on btn — separate from transform)
