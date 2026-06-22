@@ -144,7 +144,8 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   const location = useLocation();
   const tooltipRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
-  const elevatedElRef = useRef<{ el: Element; prevZ: string; prevPos: string } | null>(null);
+  // Each entry: element + its original inline z-index + position so we can restore them
+  const elevatedElRef = useRef<{ el: HTMLElement; prevZ: string; prevPos: string }[]>([]);
   const tabsRowRef = useRef<HTMLDivElement>(null);
   const activePillRef = useRef<HTMLButtonElement>(null);
 
@@ -209,6 +210,57 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   }
 
   // ── Measure target + scroll into view ───────────────────────────────────────
+  // ── Elevate target element (+ stacking-context ancestors) above the overlay ──
+  // A single element can't escape a lower-z stacking context (e.g. a sidebar with
+  // z-index:20).  We walk up the DOM and elevate every ancestor that forms its own
+  // stacking context (has a non-static position AND a z-index value below 10000).
+  // This is called immediately AND re-called after sidebar transitions complete.
+  const elevateTarget = useCallback(() => {
+    // Restore all previously elevated elements first
+    for (const { el, prevZ, prevPos } of elevatedElRef.current) {
+      el.style.zIndex = prevZ;
+      el.style.position = prevPos;
+    }
+    elevatedElRef.current = [];
+
+    if (!step?.target) return;
+    const target = document.querySelector(step.target) as HTMLElement | null;
+    if (!target) return;
+
+    // Collect target + ancestors that form stacking contexts with z-index < 10000
+    const toElevate: HTMLElement[] = [target];
+    let node: HTMLElement | null = target.parentElement;
+    while (node && node !== document.documentElement) {
+      const cs = window.getComputedStyle(node);
+      const pos = cs.position;
+      const zi = cs.zIndex;
+      if (pos !== 'static' && zi !== 'auto' && parseInt(zi) < 10000) {
+        toElevate.push(node);
+      }
+      node = node.parentElement;
+    }
+
+    const elevated: typeof elevatedElRef.current = [];
+    for (const el of toElevate) {
+      elevated.push({ el, prevZ: el.style.zIndex, prevPos: el.style.position });
+      el.style.zIndex = '10000';
+      const cs = window.getComputedStyle(el);
+      if (cs.position === 'static') el.style.position = 'relative';
+    }
+    elevatedElRef.current = elevated;
+  }, [step]);
+
+  useEffect(() => {
+    elevateTarget();
+    return () => {
+      for (const { el, prevZ, prevPos } of elevatedElRef.current) {
+        el.style.zIndex = prevZ;
+        el.style.position = prevPos;
+      }
+      elevatedElRef.current = [];
+    };
+  }, [elevateTarget]);
+
   // remeasureOnly: just read the current viewport rect without scrolling (used on scroll/resize)
   const remeasureRect = useCallback(() => {
     if (!step?.target) { setTargetRect(null); return; }
@@ -219,39 +271,17 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
     if (!step?.target) { setTargetRect(null); return; }
     const el = document.querySelector(step.target);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => setTargetRect(getTargetRect(step.target!)), 400);
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Re-elevate after sidebar/animation may have settled
+      elevateTarget();
+      setTimeout(() => {
+        elevateTarget();
+        setTargetRect(getTargetRect(step.target!));
+      }, 400);
     } else {
       setTargetRect(null);
     }
-  }, [step]);
-
-  // ── Elevate target element above overlay so it isn't dimmed ─────────────────
-  useEffect(() => {
-    // Restore previous element before elevating the new one
-    if (elevatedElRef.current) {
-      const { el, prevZ, prevPos } = elevatedElRef.current;
-      (el as HTMLElement).style.zIndex = prevZ;
-      (el as HTMLElement).style.position = prevPos;
-      elevatedElRef.current = null;
-    }
-    if (!step?.target) return;
-    const el = document.querySelector(step.target);
-    if (!el) return;
-    const s = (el as HTMLElement).style;
-    elevatedElRef.current = { el, prevZ: s.zIndex, prevPos: s.position };
-    s.zIndex = '10000';
-    // position must be non-static for z-index to apply
-    if (!s.position || s.position === 'static') s.position = 'relative';
-    return () => {
-      if (elevatedElRef.current) {
-        const { el: e, prevZ, prevPos } = elevatedElRef.current;
-        (e as HTMLElement).style.zIndex = prevZ;
-        (e as HTMLElement).style.position = prevPos;
-        elevatedElRef.current = null;
-      }
-    };
-  }, [step]);
+  }, [step, elevateTarget]);
 
   useEffect(() => {
     setActionDone(false);
