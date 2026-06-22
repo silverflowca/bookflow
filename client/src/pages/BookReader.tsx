@@ -91,13 +91,19 @@ export default function BookReader() {
   const [mediaPipId, setMediaPipId] = useState<string | null>(null);
 
   // Pending tour from Home page feature cards
-  const [pendingTour, setPendingTour] = useState<{ bookId: string; chapterIdx: number } | null>(() => {
+  const [pendingTour, setPendingTour] = useState<{ bookId: string; chapterIdx: number } | null>(null);
+
+  // Read sessionStorage after every navigation (useState initializer only runs once on first mount)
+  useEffect(() => {
     try {
       const raw = sessionStorage.getItem('BF_PENDING_TOUR');
-      if (raw) { sessionStorage.removeItem('BF_PENDING_TOUR'); return JSON.parse(raw); }
+      if (raw) {
+        sessionStorage.removeItem('BF_PENDING_TOUR');
+        // Small delay so chapter content finishes rendering before overlay mounts
+        setTimeout(() => setPendingTour(JSON.parse(raw)), 600);
+      }
     } catch { /* ignore */ }
-    return null;
-  });
+  }, [bookId, chapterId]);
   const mediaPauseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaPipCloseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaCtx = useMemo<MediaCtx>(() => ({
