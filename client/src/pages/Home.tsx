@@ -6,7 +6,7 @@ import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlight
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
-import { DEMO_BOOK_ID, DEMO_CHAPTER_IDS } from '../config/demoBook';
+import { DEMO_BOOK_ID, DEMO_CHAPTER_IDS, FEATURE_ORDER } from '../config/demoBook';
 
 
 // ─── Carousel config (written by AdminPage, read here) ───────────────────────
@@ -38,6 +38,12 @@ export default function Home() {
   const [, setSavedCount] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const [demoBookId, setDemoBookId] = useState<string>(DEMO_BOOK_ID);
+  // chapter IDs keyed by order_index (0–11) — loaded once when demoBookId is known
+  const [demoChapterIds, setDemoChapterIds] = useState<string[]>(() =>
+    Object.keys(FEATURE_ORDER)
+      .sort((a, b) => FEATURE_ORDER[a] - FEATURE_ORDER[b])
+      .map(f => DEMO_CHAPTER_IDS[f])
+  );
 
   useEffect(() => {
     loadBooks();
@@ -47,6 +53,15 @@ export default function Home() {
     }).catch(() => {});
     if (user) api.getSavedBooksCount().then(r => setSavedCount(r.count)).catch(() => {});
   }, [user]);
+
+  // When demoBookId changes, load its chapters to get live chapter IDs
+  useEffect(() => {
+    if (!demoBookId) return;
+    api.getChapters(demoBookId).then((chapters: any[]) => {
+      const sorted = [...chapters].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      setDemoChapterIds(sorted.map((c: any) => c.id));
+    }).catch(() => {});
+  }, [demoBookId]);
 
   function showToast(msg: string, type: 'ok' | 'err' = 'ok') {
     setToast({ msg, type });
@@ -340,7 +355,7 @@ export default function Home() {
       </section>
 
       {/* Editor Features Section */}
-      <EditorFeaturesSection demoBookId={demoBookId} />
+      <EditorFeaturesSection demoBookId={demoBookId} demoChapterIds={demoChapterIds} />
 
       {/* QR Code Section */}
       <QrCodeSection />
@@ -486,13 +501,13 @@ const EDITOR_FEATURES = [
 
 const FEATURE_IDS = ['rich-text','inline-questions','polls','audio','video','images','highlights','progress','forms','clubs','collaborate','publish'];
 
-function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
+function EditorFeaturesSection({ demoBookId, demoChapterIds }: { demoBookId: string; demoChapterIds: string[] }) {
   const [active, setActive] = useState<typeof EDITOR_FEATURES[0] | null>(null);
   const navigate = useNavigate();
 
   function launchTour(featureId: string) {
     const idx = FEATURE_IDS.indexOf(featureId);
-    const chId = DEMO_CHAPTER_IDS[featureId];
+    const chId = demoChapterIds[idx];   // live chapter ID by order_index
     if (idx < 0 || !demoBookId || !chId) return;
     // Store pending tour in sessionStorage — BookReader picks it up on mount
     sessionStorage.setItem('BF_PENDING_TOUR', JSON.stringify({ bookId: demoBookId, chapterIdx: idx }));
