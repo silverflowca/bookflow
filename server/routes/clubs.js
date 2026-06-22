@@ -36,6 +36,7 @@ async function notify(userId, type, title, body, extra = {}) {
 
 // ── GET /api/clubs  — list clubs for current user ─────────────────────────────
 router.get('/', authenticate, async (req, res) => {
+  const { type } = req.query; // optional: 'club' | 'study_group'
   try {
     // Step 1: get club IDs where user is an accepted member
     const { data: myMemberships } = await supabase
@@ -51,7 +52,7 @@ router.get('/', authenticate, async (req, res) => {
     let query = supabase
       .from('book_clubs')
       .select(`
-        id, name, description, cover_image_url, visibility, max_members, created_at, created_by,
+        id, name, description, cover_image_url, visibility, max_members, created_at, created_by, club_type,
         creator:profiles!book_clubs_created_by_fkey(id, display_name, avatar_url),
         settings:club_settings(*)
       `)
@@ -61,6 +62,9 @@ router.get('/', authenticate, async (req, res) => {
       query = query.or(`created_by.eq.${req.user.id},id.in.(${memberClubIds.join(',')})`);
     } else {
       query = query.eq('created_by', req.user.id);
+    }
+    if (type === 'club' || type === 'study_group') {
+      query = query.eq('club_type', type);
     }
 
     const { data: myClubs, error } = await query;
@@ -93,12 +97,12 @@ router.get('/', authenticate, async (req, res) => {
 
 // ── GET /api/clubs/public — discover public clubs ─────────────────────────────
 router.get('/public', authenticate, async (req, res) => {
-  const { search } = req.query;
+  const { search, type } = req.query;
   try {
     let query = supabase
       .from('book_clubs')
       .select(`
-        id, name, description, cover_image_url, max_members, created_at,
+        id, name, description, cover_image_url, max_members, created_at, club_type,
         creator:profiles!book_clubs_created_by_fkey(id, display_name, avatar_url),
         settings:club_settings(allow_join_requests)
       `)
@@ -107,6 +111,7 @@ router.get('/public', authenticate, async (req, res) => {
       .limit(50);
 
     if (search) query = query.ilike('name', `%${search}%`);
+    if (type === 'club' || type === 'study_group') query = query.eq('club_type', type);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -131,13 +136,14 @@ router.get('/public', authenticate, async (req, res) => {
 
 // ── POST /api/clubs — create a club ───────────────────────────────────────────
 router.post('/', authenticate, async (req, res) => {
-  const { name, description, visibility = 'private', max_members = 50 } = req.body;
+  const { name, description, visibility = 'private', max_members = 50, club_type = 'club' } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Club name is required' });
+  const validType = club_type === 'study_group' ? 'study_group' : 'club';
 
   try {
     const { data: club, error } = await supabase
       .from('book_clubs')
-      .insert({ name: name.trim(), description, visibility, max_members, created_by: req.user.id })
+      .insert({ name: name.trim(), description, visibility, max_members, created_by: req.user.id, club_type: validType })
       .select()
       .single();
     if (error) throw error;
@@ -174,7 +180,7 @@ router.get('/:clubId', authenticate, async (req, res) => {
     const { data: club, error } = await supabase
       .from('book_clubs')
       .select(`
-        id, name, description, cover_image_url, visibility, max_members, created_at,
+        id, name, description, cover_image_url, visibility, max_members, created_at, club_type,
         creator:profiles!book_clubs_created_by_fkey(id, display_name, avatar_url),
         settings:club_settings(*)
       `)

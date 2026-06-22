@@ -814,16 +814,20 @@ class ApiClient {
 
   // ── Book Clubs ─────────────────────────────────────────────────────────────
 
-  async getMyClubs(): Promise<any[]> {
-    return this.request('/clubs');
+  async getMyClubs(type?: 'club' | 'study_group'): Promise<any[]> {
+    const qs = type ? `?type=${type}` : '';
+    return this.request(`/clubs${qs}`);
   }
 
-  async getPublicClubs(search?: string): Promise<any[]> {
-    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+  async getPublicClubs(search?: string, type?: 'club' | 'study_group'): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (type) params.set('type', type);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/clubs/public${qs}`);
   }
 
-  async createClub(data: { name: string; description?: string; cover_image_url?: string; visibility?: string; max_members?: number }): Promise<any> {
+  async createClub(data: { name: string; description?: string; cover_image_url?: string; visibility?: string; max_members?: number; club_type?: 'club' | 'study_group' }): Promise<any> {
     return this.request('/clubs', { method: 'POST', body: JSON.stringify(data) });
   }
 

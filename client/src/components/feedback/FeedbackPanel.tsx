@@ -10,7 +10,7 @@ import api from '../../lib/api';
 import AnnotationCanvas from './AnnotationCanvas';
 import AudioRecorder from './AudioRecorder';
 
-type Step = 'type' | 'details' | 'screenshots' | 'audio' | 'review' | 'success';
+type Step = 'type' | 'details' | 'audio' | 'review' | 'success';
 
 const TYPE_CONFIG: Record<FeedbackType, { label: string; desc: string; color: string; Icon: React.ComponentType<{ className?: string }> }> = {
   bug:      { label: 'Bug Report',       desc: 'Something is broken or not working as expected',   color: 'border-red-300 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300',     Icon: Bug },
@@ -19,11 +19,10 @@ const TYPE_CONFIG: Record<FeedbackType, { label: string; desc: string; color: st
   comment:  { label: 'General Comment',  desc: 'Share general feedback or thoughts',               color: 'border-gray-300 bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300',  Icon: MessageSquare },
 };
 
-const STEPS: Step[] = ['type', 'details', 'screenshots', 'audio', 'review', 'success'];
+const STEPS: Step[] = ['type', 'details', 'audio', 'review', 'success'];
 const STEP_LABELS: Record<Step, string> = {
   type: 'Type',
   details: 'Details',
-  screenshots: 'Screenshots',
   audio: 'Audio',
   review: 'Review',
   success: 'Done',
@@ -199,7 +198,6 @@ export default function FeedbackPanel() {
   const canNext =
     (step === 'type' && fbType !== null) ||
     (step === 'details' && title.trim().length > 0) ||
-    step === 'screenshots' ||
     step === 'audio' ||
     step === 'review';
 
@@ -293,79 +291,74 @@ export default function FeedbackPanel() {
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   placeholder={fbType === 'bug' ? 'Steps to reproduce, what you expected vs. what happened…' : 'More context…'}
-                  rows={5}
+                  rows={4}
                   className="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-theme text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
                 />
               </div>
-            </div>
-          )}
 
-          {/* ── Step: Screenshots ──────────────────────────────────────────── */}
-          {step === 'screenshots' && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted">
-                Capture screenshots of the current app state. Navigate around and capture as many as needed — the panel stays open.
-              </p>
+              {/* ── Screenshots inline ───────────────────────────────────── */}
+              <div>
+                <label className="block text-sm font-medium text-theme mb-2">Screenshots (optional)</label>
 
-              {captureError && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-300 text-sm">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{captureError}</span>
-                </div>
-              )}
+                {captureError && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-300 text-sm mb-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{captureError}</span>
+                  </div>
+                )}
 
-              <button
-                onClick={captureScreenshot}
-                disabled={capturing}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors disabled:opacity-50"
-              >
-                {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                {capturing ? 'Capturing…' : screenshots.length === 0 ? 'Capture Screenshot' : 'Capture Another Screenshot'}
-              </button>
+                <button
+                  onClick={captureScreenshot}
+                  disabled={capturing}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors disabled:opacity-50 text-sm"
+                >
+                  {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  {capturing ? 'Capturing…' : screenshots.length === 0 ? 'Capture Screenshot' : 'Capture Another'}
+                </button>
 
-              {screenshots.length > 0 && (
-                <div className="grid grid-cols-2 gap-2">
-                  {screenshots.map((shot, i) => (
-                    <div key={i} className="relative group rounded-lg overflow-hidden border border-surface-hover">
-                      <img
-                        src={shot.localDataUrl}
-                        alt={`Screenshot ${i + 1}`}
-                        className="w-full h-24 object-cover"
-                      />
-                      {/* Badges row */}
-                      <div className="absolute top-1 left-1 flex flex-wrap gap-1">
-                        {shot.annotation_data.length > 0 && (
-                          <span className="bg-purple-500 text-white text-[10px] px-1.5 py-0.5 rounded leading-none">
-                            {shot.annotation_data.length} mark{shot.annotation_data.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                        {shot.note && (
-                          <span className="bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded leading-none">note</span>
-                        )}
-                        {shot.audioBlob && (
-                          <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded leading-none">audio</span>
-                        )}
+                {screenshots.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {screenshots.map((shot, i) => (
+                      <div key={i} className="relative group rounded-lg overflow-hidden border border-surface-hover">
+                        <img
+                          src={shot.localDataUrl}
+                          alt={`Screenshot ${i + 1}`}
+                          className="w-full h-20 object-cover"
+                        />
+                        <div className="absolute top-1 left-1 flex flex-wrap gap-1">
+                          {shot.annotation_data.length > 0 && (
+                            <span className="bg-purple-500 text-white text-[10px] px-1.5 py-0.5 rounded leading-none">
+                              {shot.annotation_data.length} mark{shot.annotation_data.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {shot.note && (
+                            <span className="bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded leading-none">note</span>
+                          )}
+                          {shot.audioBlob && (
+                            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded leading-none">audio</span>
+                          )}
+                        </div>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => setAnnotating(i)}
+                            className="p-1.5 bg-white/90 rounded-md text-gray-800 hover:bg-white"
+                            title="Annotate"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => removeScreenshot(i)}
+                            className="p-1.5 bg-white/90 rounded-md text-red-600 hover:bg-white"
+                            title="Remove"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => setAnnotating(i)}
-                          className="p-1.5 bg-white/90 rounded-md text-gray-800 hover:bg-white"
-                          title="Annotate"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => removeScreenshot(i)}
-                          className="p-1.5 bg-white/90 rounded-md text-red-600 hover:bg-white"
-                          title="Remove"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

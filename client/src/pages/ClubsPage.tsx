@@ -46,6 +46,7 @@ interface Club {
   visibility: 'public' | 'private';
   max_members: number;
   created_at: string;
+  club_type: 'club' | 'study_group';
   member_count?: number;
   allow_join_requests?: boolean;
   creator?: { id: string; display_name: string; avatar_url?: string };
@@ -98,11 +99,12 @@ function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }
 }
 
 interface CreateClubModalProps {
+  clubType: 'club' | 'study_group';
   onClose: () => void;
   onCreate: (club: Club) => void;
 }
 
-function CreateClubModal({ onClose, onCreate }: CreateClubModalProps) {
+function CreateClubModal({ clubType, onClose, onCreate }: CreateClubModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'private' | 'public'>('private');
@@ -110,16 +112,18 @@ function CreateClubModal({ onClose, onCreate }: CreateClubModalProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const label = clubType === 'study_group' ? 'Study Group' : 'Book Club';
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
     setError('');
     try {
-      const club = await api.createClub({ name: name.trim(), description: description.trim() || undefined, visibility, max_members: maxMembers });
+      const club = await api.createClub({ name: name.trim(), description: description.trim() || undefined, visibility, max_members: maxMembers, club_type: clubType });
       onCreate(club);
     } catch (err: any) {
-      setError(err.message || 'Failed to create club');
+      setError(err.message || `Failed to create ${label.toLowerCase()}`);
     } finally {
       setSaving(false);
     }
@@ -128,16 +132,16 @@ function CreateClubModal({ onClose, onCreate }: CreateClubModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="theme-section rounded-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold text-theme mb-4">Create Book Club</h2>
+        <h2 className="text-lg font-semibold text-theme mb-4">Create {label}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-muted mb-1">Club Name *</label>
+            <label className="block text-sm text-muted mb-1">{label} Name *</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               className="w-full px-3 py-2 theme-input rounded-lg text-sm"
-              placeholder="e.g. Sci-Fi Saturday Club"
+              placeholder={clubType === 'study_group' ? 'e.g. Sunday Morning Bible Study' : 'e.g. Sci-Fi Saturday Club'}
               required
             />
           </div>
@@ -148,7 +152,7 @@ function CreateClubModal({ onClose, onCreate }: CreateClubModalProps) {
               onChange={e => setDescription(e.target.value)}
               className="w-full px-3 py-2 theme-input rounded-lg text-sm resize-none"
               rows={3}
-              placeholder="What is this club about?"
+              placeholder={clubType === 'study_group' ? 'What book or topic will your group study?' : 'What is this club about?'}
             />
           </div>
           <div>
@@ -184,7 +188,7 @@ function CreateClubModal({ onClose, onCreate }: CreateClubModalProps) {
               className="flex items-center gap-2 px-4 py-2 text-sm theme-button-primary rounded-lg disabled:opacity-50"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Create Club
+              Create {label}
             </button>
           </div>
         </form>
@@ -263,6 +267,8 @@ function RequestJoinModal({ club, onClose, onRequested }: { club: Club; onClose:
 export default function ClubsPage() {
   const [myClubs, setMyClubs] = useState<Club[]>([]);
   const [publicClubs, setPublicClubs] = useState<Club[]>([]);
+  const [myStudyGroups, setMyStudyGroups] = useState<Club[]>([]);
+  const [publicStudyGroups, setPublicStudyGroups] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const [mainTab, setMainTab] = useState<'clubs' | 'bookstudy'>(
@@ -274,8 +280,11 @@ export default function ClubsPage() {
     setMainTab(searchParams.get('tab') === 'bookstudy' ? 'bookstudy' : 'clubs');
   }, [searchParams]);
   const [tab, setTab] = useState<'mine' | 'discover'>('mine');
+  const [sgTab, setSgTab] = useState<'mine' | 'discover'>('mine');
   const [search, setSearch] = useState('');
+  const [sgSearch, setSgSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [createType, setCreateType] = useState<'club' | 'study_group'>('club');
   const [joinRequestClub, setJoinRequestClub] = useState<Club | null>(null);
   const [requestedClubIds, setRequestedClubIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
@@ -286,12 +295,16 @@ export default function ClubsPage() {
 
   async function loadClubs() {
     try {
-      const [mine, pub] = await Promise.all([
-        api.getMyClubs().catch(() => []),
-        api.getPublicClubs().catch(() => []),
+      const [mine, pub, minesg, pubsg] = await Promise.all([
+        api.getMyClubs('club').catch(() => []),
+        api.getPublicClubs(undefined, 'club').catch(() => []),
+        api.getMyClubs('study_group').catch(() => []),
+        api.getPublicClubs(undefined, 'study_group').catch(() => []),
       ]);
       setMyClubs(mine);
       setPublicClubs(pub);
+      setMyStudyGroups(minesg);
+      setPublicStudyGroups(pubsg);
     } catch (err) {
       console.error('Failed to load clubs:', err);
     } finally {
@@ -301,21 +314,41 @@ export default function ClubsPage() {
 
   async function handleSearch() {
     try {
-      const results = await api.getPublicClubs(search);
+      const results = await api.getPublicClubs(search, 'club');
       setPublicClubs(results);
     } catch (err) {
       console.error('Search failed:', err);
     }
   }
 
+  async function handleSgSearch() {
+    try {
+      const results = await api.getPublicClubs(sgSearch, 'study_group');
+      setPublicStudyGroups(results);
+    } catch (err) {
+      console.error('Search failed:', err);
+    }
+  }
+
+  function openCreate(type: 'club' | 'study_group') {
+    setCreateType(type);
+    setShowCreate(true);
+  }
+
   function handleCreated(club: Club) {
-    setMyClubs(prev => [club, ...prev]);
+    if (club.club_type === 'study_group') {
+      setMyStudyGroups(prev => [club, ...prev]);
+    } else {
+      setMyClubs(prev => [club, ...prev]);
+    }
     setShowCreate(false);
     navigate(`/clubs/${club.id}`);
   }
 
   const myClubIds = new Set(myClubs.map(c => c.id));
+  const mySgIds = new Set(myStudyGroups.map(c => c.id));
   const displayedPublic = publicClubs;
+  const displayedPublicSg = publicStudyGroups;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -334,11 +367,11 @@ export default function ClubsPage() {
           <p className="text-muted mt-1">Read together, discuss together</p>
         </div>
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={() => openCreate(mainTab === 'bookstudy' ? 'study_group' : 'club')}
           className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium self-start sm:self-auto"
         >
           <Plus className="h-5 w-5" />
-          New Club
+          {mainTab === 'bookstudy' ? 'New Study Group' : 'New Club'}
         </button>
       </div>
 
@@ -430,7 +463,7 @@ export default function ClubsPage() {
                 <Users className="h-12 w-12 text-muted mx-auto mb-4" />
                 <h3 className="font-semibold text-theme mb-2">No clubs yet</h3>
                 <p className="text-muted text-sm mb-4">Create a club or get invited to one to start reading together.</p>
-                <button onClick={() => setShowCreate(true)} className="theme-button-primary px-4 py-2 rounded-lg text-sm font-medium">
+                <button onClick={() => openCreate('club')} className="theme-button-primary px-4 py-2 rounded-lg text-sm font-medium">
                   Create Your First Club
                 </button>
               </div>
@@ -509,9 +542,9 @@ export default function ClubsPage() {
 
       {/* ── Book Study Groups tab ──────────────────────────────────────── */}
       {mainTab === 'bookstudy' && (
-        <div>
+        <>
           <h2 className="text-xl font-bold text-theme mb-1">Book Study Groups</h2>
-          <p className="text-muted text-sm mb-8 max-w-2xl">Structured reading programs — work through a book together chapter by chapter with guided questions and group discussion.</p>
+          <p className="text-muted text-sm mb-6 max-w-2xl">Structured reading programs — work through a book together chapter by chapter with guided questions and group discussion.</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
             <div className="theme-section rounded-xl p-3 flex items-start gap-3">
@@ -523,7 +556,6 @@ export default function ClubsPage() {
                 <p className="text-xs text-muted mt-0.5 leading-relaxed">Progress through the book together at a shared pace. Each chapter unlocks on schedule so everyone stays in sync.</p>
               </div>
             </div>
-
             <div className="theme-section rounded-xl p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
                 <Users className="h-4 w-4 text-purple-500" />
@@ -533,7 +565,6 @@ export default function ClubsPage() {
                 <p className="text-xs text-muted mt-0.5 leading-relaxed">Built-in group chat lets your study group reflect, ask questions, and share insights as they read — no external app needed.</p>
               </div>
             </div>
-
             <div className="theme-section rounded-xl p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
                 <Search className="h-4 w-4 text-emerald-500" />
@@ -545,18 +576,110 @@ export default function ClubsPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 theme-button-primary px-5 py-2.5 rounded-lg font-medium text-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Start a Book Study Group
-          </button>
-        </div>
+          {/* Sub-tabs: Mine | Discover */}
+          <div className="flex gap-1 mb-6 theme-section p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setSgTab('mine')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${sgTab === 'mine' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+            >
+              My Groups {myStudyGroups.length > 0 && <span className="ml-1 opacity-60">({myStudyGroups.length})</span>}
+            </button>
+            <button
+              onClick={() => setSgTab('discover')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${sgTab === 'discover' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+            >
+              Discover
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong" />
+            </div>
+          ) : sgTab === 'mine' ? (
+            myStudyGroups.length === 0 ? (
+              <div className="text-center py-16 theme-section border-dashed rounded-xl">
+                <BookOpen className="h-12 w-12 text-muted mx-auto mb-4" />
+                <h3 className="font-semibold text-theme mb-2">No study groups yet</h3>
+                <p className="text-muted text-sm mb-4">Start a study group or get invited to one to begin learning together.</p>
+                <button onClick={() => openCreate('study_group')} className="theme-button-primary px-4 py-2 rounded-lg text-sm font-medium">
+                  Start Your First Study Group
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {myStudyGroups.map(club => (
+                  <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                ))}
+              </div>
+            )
+          ) : (
+            <div>
+              <div className="flex gap-2 mb-6">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+                  <input
+                    type="text"
+                    value={sgSearch}
+                    onChange={e => setSgSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSgSearch()}
+                    placeholder="Search public study groups..."
+                    className="w-full pl-9 pr-3 py-2 theme-input rounded-lg text-sm"
+                  />
+                </div>
+                <button onClick={handleSgSearch} className="theme-button-secondary px-4 py-2 rounded-lg text-sm">
+                  Search
+                </button>
+              </div>
+
+              {displayedPublicSg.length === 0 ? (
+                <div className="text-center py-16 text-muted">
+                  <Globe className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>No public study groups found.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {displayedPublicSg.map(club => {
+                    const isMember = mySgIds.has(club.id);
+                    const canRequest = club.allow_join_requests !== false;
+                    const requested = requestedClubIds.has(club.id);
+                    return (
+                      <div key={club.id} className="flex flex-col">
+                        <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                        {isMember ? (
+                          <button
+                            onClick={() => navigate(`/clubs/${club.id}`)}
+                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Member — Open
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => canRequest && !requested && setJoinRequestClub(club)}
+                            disabled={requested || !canRequest}
+                            title={!canRequest ? 'This group is not accepting join requests' : undefined}
+                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
+                          >
+                            {requested
+                              ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                              : !canRequest
+                                ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
+                                : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
+                            }
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {showCreate && (
-        <CreateClubModal onClose={() => setShowCreate(false)} onCreate={handleCreated} />
+        <CreateClubModal clubType={createType} onClose={() => setShowCreate(false)} onCreate={handleCreated} />
       )}
       {joinRequestClub && (
         <RequestJoinModal
