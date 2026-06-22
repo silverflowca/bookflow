@@ -37,6 +37,8 @@ const MediaContext = createContext<MediaCtx>({
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
+import TutorialOverlay from '../components/reader/TutorialOverlay';
+import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData,
@@ -87,6 +89,15 @@ export default function BookReader() {
   // Media coordination — one playing + one PiP at a time
   const [mediaPlayingId, setMediaPlayingId] = useState<string | null>(null);
   const [mediaPipId, setMediaPipId] = useState<string | null>(null);
+
+  // Pending tour from Home page feature cards
+  const [pendingTour, setPendingTour] = useState<{ bookId: string; chapterIdx: number } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('BF_PENDING_TOUR');
+      if (raw) { sessionStorage.removeItem('BF_PENDING_TOUR'); return JSON.parse(raw); }
+    } catch { /* ignore */ }
+    return null;
+  });
   const mediaPauseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaPipCloseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaCtx = useMemo<MediaCtx>(() => ({
@@ -1237,7 +1248,21 @@ export default function BookReader() {
         />
       )}
 
-
+      {/* Feature demo tour — launched from Home page feature cards */}
+      {pendingTour && book && (
+        <TutorialOverlay
+          chapters={buildFeatureTours(pendingTour.bookId)}
+          bookId={pendingTour.bookId}
+          initialChapter={pendingTour.chapterIdx}
+          initialStep={0}
+          onClose={() => setPendingTour(null)}
+          onBeforeStep={step => {
+            if (step?.target && ['#bf-toc-sidebar', '#bf-chapter-list', '#bf-progress-btn'].includes(step.target)) {
+              setShowToc(true);
+            }
+          }}
+        />
+      )}
 
     </div>
   );

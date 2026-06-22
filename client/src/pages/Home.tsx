@@ -6,9 +6,7 @@ import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlight
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
-import TutorialOverlay from '../components/reader/TutorialOverlay';
-import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
-import { DEMO_BOOK_ID } from '../config/demoBook';
+import { DEMO_BOOK_ID, DEMO_CHAPTER_IDS } from '../config/demoBook';
 
 
 // ─── Carousel config (written by AdminPage, read here) ───────────────────────
@@ -490,16 +488,16 @@ const FEATURE_IDS = ['rich-text','inline-questions','polls','audio','video','ima
 
 function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
   const [active, setActive] = useState<typeof EDITOR_FEATURES[0] | null>(null);
-  const [tourOpen, setTourOpen] = useState(false);
-  const [tourChapterIdx, setTourChapterIdx] = useState(0);
-  const tours = demoBookId ? buildFeatureTours(demoBookId) : [];
+  const navigate = useNavigate();
 
   function launchTour(featureId: string) {
     const idx = FEATURE_IDS.indexOf(featureId);
-    if (idx < 0 || !demoBookId) return;
-    setTourChapterIdx(idx);
+    const chId = DEMO_CHAPTER_IDS[featureId];
+    if (idx < 0 || !demoBookId || !chId) return;
+    // Store pending tour in sessionStorage — BookReader picks it up on mount
+    sessionStorage.setItem('BF_PENDING_TOUR', JSON.stringify({ bookId: demoBookId, chapterIdx: idx }));
     setActive(null);
-    setTourOpen(true);
+    navigate(`/book/${demoBookId}/chapter/${chId}`);
   }
 
   return (
@@ -622,16 +620,6 @@ function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
         </div>
       )}
 
-      {/* Feature demo tour */}
-      {tourOpen && demoBookId && (
-        <TutorialOverlay
-          chapters={tours}
-          bookId={demoBookId}
-          onClose={() => setTourOpen(false)}
-          initialChapter={tourChapterIdx}
-          initialStep={0}
-        />
-      )}
     </section>
   );
 }
