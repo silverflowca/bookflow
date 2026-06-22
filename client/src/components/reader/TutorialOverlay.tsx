@@ -134,9 +134,9 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   const [actionDone, setActionDone] = useState(false);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [mobile, setMobile] = useState(() => isMobileViewport());
-  // Show welcome screen on first open; skip it if resuming mid-tutorial
+  // Show welcome screen on first open; skip it if resuming mid-tutorial or if a specific chapter was requested
   const isResuming = (initialChapter == null && initialStep == null) && (saved.chapter > 0 || saved.step > 0);
-  const [showWelcome, setShowWelcome] = useState(!isResuming);
+  const [showWelcome, setShowWelcome] = useState(initialChapter == null && !isResuming);
   // Drag-to-move offset (desktop only)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const dragStartRef = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null);

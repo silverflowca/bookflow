@@ -8,7 +8,7 @@ import api from '../lib/api';
 import type { Book } from '../types';
 import TutorialOverlay from '../components/reader/TutorialOverlay';
 import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
-import { DEMO_BOOK_ID, DEMO_CHAPTER_IDS } from '../config/demoBook';
+import { DEMO_BOOK_ID } from '../config/demoBook';
 
 
 // ─── Carousel config (written by AdminPage, read here) ───────────────────────
@@ -492,7 +492,6 @@ function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
   const [active, setActive] = useState<typeof EDITOR_FEATURES[0] | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [tourChapterIdx, setTourChapterIdx] = useState(0);
-  const navigate = useNavigate();
   const tours = demoBookId ? buildFeatureTours(demoBookId) : [];
 
   function launchTour(featureId: string) {
@@ -501,17 +500,6 @@ function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
     setTourChapterIdx(idx);
     setActive(null);
     setTourOpen(true);
-  }
-
-  function goToChapter(featureId: string) {
-    const chId = DEMO_CHAPTER_IDS[featureId];
-    if (demoBookId && chId) {
-      navigate(`/book/${demoBookId}/chapter/${chId}`);
-    } else {
-      // fallback: open modal if no demo book configured
-      const f = EDITOR_FEATURES.find(x => x.id === featureId);
-      if (f) setActive(f);
-    }
   }
 
   return (
@@ -534,7 +522,7 @@ function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
           {EDITOR_FEATURES.map((f) => (
             <button
               key={f.id}
-              onClick={() => goToChapter(f.id)}
+              onClick={() => setActive(f)}
               className="group relative text-left rounded-2xl p-5 border transition-all duration-200 hover:scale-[1.03] hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
               style={{ background: 'var(--color-surface-hover, #f9fafb)', borderColor: 'var(--color-border, #e5e7eb)' }}
             >
