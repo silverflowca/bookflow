@@ -143,7 +143,7 @@ export default function Dashboard() {
   }
 
   async function handleDeleteBook(id: string) {
-    if (!confirm('Are you sure you want to delete this book? This cannot be undone.')) {
+    if (!confirm('Archive this book? It will be hidden from readers. You can reinstate it from the Admin → Books page.')) {
       return;
     }
 
@@ -151,7 +151,7 @@ export default function Dashboard() {
       await api.deleteBook(id);
       setBooks(books.filter(b => b.id !== id));
     } catch (err) {
-      console.error('Failed to delete book:', err);
+      console.error('Failed to archive book:', err);
     }
   }
 

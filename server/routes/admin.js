@@ -67,7 +67,7 @@ router.patch('/users/:id/role', async (req, res) => {
 
 // ── Books ─────────────────────────────────────────────────────────────────────
 
-/** List all books (regardless of visibility) */
+/** List all books (regardless of visibility, including archived) */
 router.get('/books', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -82,6 +82,23 @@ router.get('/books', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('Admin list books error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Reinstate an archived book — sets status back to 'draft' */
+router.patch('/books/:bookId/reinstate', async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('books')
+      .update({ status: 'draft' })
+      .eq('id', req.params.bookId)
+      .eq('status', 'archived'); // safety: only reinstate archived books
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin reinstate book error:', err);
     res.status(500).json({ error: err.message });
   }
 });

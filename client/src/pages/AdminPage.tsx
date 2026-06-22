@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -21,6 +21,78 @@ interface AdminStats {
 }
 
 type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'feedback';
+
+function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: (b: any[]) => void }) {
+  const [reinstating, setReinstating] = useState<string | null>(null);
+
+  const active = books.filter(b => b.status !== 'archived');
+  const archived = books.filter(b => b.status === 'archived');
+
+  async function handleReinstate(bookId: string) {
+    setReinstating(bookId);
+    try {
+      await api.adminReinstateBook(bookId);
+      onBooksChange(books.map(b => b.id === bookId ? { ...b, status: 'draft' } : b));
+    } catch (err) {
+      console.error('Reinstate failed:', err);
+    } finally {
+      setReinstating(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Active books */}
+      <div className="space-y-2">
+        {active.length === 0 && <p className="text-muted text-sm py-4 text-center">No active books.</p>}
+        {active.map(book => (
+          <div key={book.id} className="theme-section rounded-xl px-4 py-3 flex items-center gap-3">
+            <BookOpen className="h-5 w-5 text-muted shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-theme text-sm truncate">{book.title}</p>
+              <p className="text-xs text-muted">by {book.author?.display_name ?? '—'} · {book.status} · {book.visibility}</p>
+            </div>
+            <a href={`/edit/book/${book.id}`} className="text-xs text-blue-500 hover:underline">Open</a>
+          </div>
+        ))}
+      </div>
+
+      {/* Archived books */}
+      {archived.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-2 flex items-center gap-2">
+            <ArchiveRestore className="h-4 w-4" />
+            Archived ({archived.length})
+          </h3>
+          <div className="space-y-2">
+            {archived.map(book => (
+              <div key={book.id} className="theme-section rounded-xl px-4 py-3 flex items-center gap-3 opacity-70">
+                <BookOpen className="h-5 w-5 text-muted shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-theme text-sm truncate">{book.title}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium shrink-0">archived</span>
+                  </div>
+                  <p className="text-xs text-muted">by {book.author?.display_name ?? '—'} · {book.visibility}</p>
+                </div>
+                <button
+                  onClick={() => handleReinstate(book.id)}
+                  disabled={reinstating === book.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg theme-button-secondary hover:text-green-600 disabled:opacity-50"
+                >
+                  {reinstating === book.id
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <ArchiveRestore className="h-3.5 w-3.5" />}
+                  Reinstate
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const { profile } = useAuth();
@@ -226,24 +298,7 @@ export default function AdminPage() {
 
           {/* ── Books tab ─────────────────────────────────────────────────────── */}
           {tab === 'books' && (
-            <div className="space-y-2">
-              {books.length === 0 && <p className="text-muted text-sm py-8 text-center">No books found.</p>}
-              {books.map(book => (
-                <div key={book.id} className="theme-section rounded-xl px-4 py-3 flex items-center gap-3">
-                  <BookOpen className="h-5 w-5 text-muted shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-theme text-sm truncate">{book.title}</p>
-                    <p className="text-xs text-muted">by {book.author?.display_name ?? '—'} · {book.status} · {book.visibility}</p>
-                  </div>
-                  <a
-                    href={`/edit/book/${book.id}`}
-                    className="text-xs text-blue-500 hover:underline"
-                  >
-                    Open
-                  </a>
-                </div>
-              ))}
-            </div>
+            <BooksAdminTab books={books} onBooksChange={setBooks} />
           )}
 
           {/* ── Clubs tab ─────────────────────────────────────────────────────── */}

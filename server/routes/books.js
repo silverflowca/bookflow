@@ -26,7 +26,12 @@ router.get('/', optionalAuth, async (req, res) => {
       query = query.eq('visibility', 'public');
     }
 
-    if (status) query = query.eq('status', status);
+    // Never show archived books to regular users
+    if (status) {
+      query = query.eq('status', status);
+    } else {
+      query = query.neq('status', 'archived');
+    }
     if (visibility) query = query.eq('visibility', visibility);
     if (author_id) query = query.eq('author_id', author_id);
     if (search) query = query.ilike('title', `%${search}%`);
@@ -88,6 +93,7 @@ router.get('/my', authenticate, async (req, res) => {
         settings:book_settings(*)
       `)
       .eq('author_id', req.user.id)
+      .neq('status', 'archived')
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
@@ -443,19 +449,19 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
   }
 });
 
-// Delete book
+// Archive book (soft-delete — sets status to 'archived', never actually deleted)
 router.delete('/:id', authenticate, requireAuthor, async (req, res) => {
   try {
     const { error } = await supabase
       .from('books')
-      .delete()
+      .update({ status: 'archived' })
       .eq('id', req.params.id);
 
     if (error) throw error;
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Delete book error:', err);
+    console.error('Archive book error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -165,6 +165,7 @@ class ApiClient {
   }
 
   async deleteBook(id: string): Promise<void> {
+    // Soft-delete: server sets status = 'archived', book is never permanently removed
     return this.request(`/books/${id}`, { method: 'DELETE' });
   }
 
@@ -1107,6 +1108,10 @@ class ApiClient {
 
   async adminGetBooks(): Promise<any[]> {
     return this.request('/admin/books');
+  }
+
+  async adminReinstateBook(bookId: string): Promise<void> {
+    return this.request(`/admin/books/${bookId}/reinstate`, { method: 'PATCH' });
   }
 
   async adminGetClubs(): Promise<any[]> {
