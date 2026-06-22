@@ -1,7 +1,42 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X, Expand } from 'lucide-react';
 import api from '../lib/api';
+
+function ExpandableImage({ src, alt }: { src: string; alt: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="relative group cursor-zoom-in" onClick={() => setOpen(true)}>
+        <img src={src} alt={alt} className="w-full h-auto" />
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg p-1.5">
+          <Expand className="h-4 w-4 text-white" />
+        </div>
+      </div>
+      {open && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+            onClick={() => setOpen(false)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={src}
+            alt={alt}
+            className="max-w-full max-h-full rounded-2xl shadow-2xl object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 interface Club {
   id: string;
@@ -229,6 +264,15 @@ export default function ClubsPage() {
   const [myClubs, setMyClubs] = useState<Club[]>([]);
   const [publicClubs, setPublicClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const [mainTab, setMainTab] = useState<'clubs' | 'bookstudy'>(
+    searchParams.get('tab') === 'bookstudy' ? 'bookstudy' : 'clubs'
+  );
+
+  // Sync tab when URL search param changes (e.g. clicking nav link while already on /clubs)
+  useEffect(() => {
+    setMainTab(searchParams.get('tab') === 'bookstudy' ? 'bookstudy' : 'clubs');
+  }, [searchParams]);
   const [tab, setTab] = useState<'mine' | 'discover'>('mine');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -275,8 +319,16 @@ export default function ClubsPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Hero image — switches with tab */}
+      <div className="mb-8 rounded-2xl overflow-hidden shadow-md">
+        {mainTab === 'clubs'
+          ? <ExpandableImage src="/bookflow_clubs.png" alt="Book Clubs" />
+          : <ExpandableImage src="/bookstudy.png" alt="Book Study Groups" />
+        }
+      </div>
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-theme theme-title">Book Clubs & Study Groups</h1>
           <p className="text-muted mt-1">Read together, discuss together</p>
@@ -290,104 +342,216 @@ export default function ClubsPage() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 theme-section p-1 rounded-lg w-fit">
+      {/* Main tab bar — Clubs | Book Study Groups */}
+      <div className="flex gap-1 mb-6 border-b border-surface-hover">
         <button
-          onClick={() => setTab('mine')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'mine' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+          onClick={() => setMainTab('clubs')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            mainTab === 'clubs'
+              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+              : 'border-transparent text-muted hover:text-theme'
+          }`}
         >
-          My Clubs {myClubs.length > 0 && <span className="ml-1 opacity-60">({myClubs.length})</span>}
+          <Users className="h-4 w-4" />
+          Clubs
         </button>
         <button
-          onClick={() => setTab('discover')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'discover' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+          onClick={() => setMainTab('bookstudy')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            mainTab === 'bookstudy'
+              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+              : 'border-transparent text-muted hover:text-theme'
+          }`}
         >
-          Discover
+          <BookOpen className="h-4 w-4" />
+          Book Study Groups
         </button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong" />
-        </div>
-      ) : tab === 'mine' ? (
-        myClubs.length === 0 ? (
-          <div className="text-center py-16 theme-section border-dashed rounded-xl">
-            <Users className="h-12 w-12 text-muted mx-auto mb-4" />
-            <h3 className="font-semibold text-theme mb-2">No clubs yet</h3>
-            <p className="text-muted text-sm mb-4">Create a club or get invited to one to start reading together.</p>
-            <button onClick={() => setShowCreate(true)} className="theme-button-primary px-4 py-2 rounded-lg text-sm font-medium">
-              Create Your First Club
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {myClubs.map(club => (
-              <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-            ))}
-          </div>
-        )
-      ) : (
-        <div>
-          {/* Search */}
-          <div className="flex gap-2 mb-6">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder="Search public clubs..."
-                className="w-full pl-9 pr-3 py-2 theme-input rounded-lg text-sm"
-              />
+      {/* ── Clubs tab ──────────────────────────────────────────────────── */}
+      {mainTab === 'clubs' && (
+        <>
+          <h2 className="text-xl font-bold text-theme mb-1">Book Clubs</h2>
+          <p className="text-muted text-sm mb-6 max-w-2xl">Private reading communities around any book — create a club, invite members, and read together with shared progress and chapter chat.</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0">
+                <Users className="h-4 w-4 text-indigo-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Read Together</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Create a private club around any book and invite members with a single shareable link — done in under 60 seconds.</p>
+              </div>
             </div>
-            <button onClick={handleSearch} className="theme-button-secondary px-4 py-2 rounded-lg text-sm">
-              Search
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="h-4 w-4 text-purple-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Chapter Chat</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Built-in group chat per chapter lets members discuss what they're reading in real time — no external app needed.</p>
+              </div>
+            </div>
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                <Search className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Shared Progress</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Leaders see who has completed each chapter, who's ahead, and who needs a nudge — all from the club dashboard.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-tabs: Mine | Discover */}
+          <div className="flex gap-1 mb-6 theme-section p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setTab('mine')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'mine' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+            >
+              My Clubs {myClubs.length > 0 && <span className="ml-1 opacity-60">({myClubs.length})</span>}
+            </button>
+            <button
+              onClick={() => setTab('discover')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'discover' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+            >
+              Discover
             </button>
           </div>
 
-          {displayedPublic.length === 0 ? (
-            <div className="text-center py-16 text-muted">
-              <Globe className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p>No public clubs found.</p>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong" />
             </div>
+          ) : tab === 'mine' ? (
+            myClubs.length === 0 ? (
+              <div className="text-center py-16 theme-section border-dashed rounded-xl">
+                <Users className="h-12 w-12 text-muted mx-auto mb-4" />
+                <h3 className="font-semibold text-theme mb-2">No clubs yet</h3>
+                <p className="text-muted text-sm mb-4">Create a club or get invited to one to start reading together.</p>
+                <button onClick={() => setShowCreate(true)} className="theme-button-primary px-4 py-2 rounded-lg text-sm font-medium">
+                  Create Your First Club
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {myClubs.map(club => (
+                  <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                ))}
+              </div>
+            )
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {displayedPublic.map(club => {
-                const isMember = myClubIds.has(club.id);
-                const canRequest = club.allow_join_requests !== false;
-                const requested = requestedClubIds.has(club.id);
-                return (
-                  <div key={club.id} className="flex flex-col">
-                    <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-                    {isMember ? (
-                      <button
-                        onClick={() => navigate(`/clubs/${club.id}`)}
-                        className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg"
-                      >
-                        <Check className="h-3.5 w-3.5" /> Member — Open
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => canRequest && !requested && setJoinRequestClub(club)}
-                        disabled={requested || !canRequest}
-                        title={!canRequest ? 'This club is not accepting join requests' : undefined}
-                        className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
-                      >
-                        {requested
-                          ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
-                          : !canRequest
-                            ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
-                            : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
-                        }
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+            <div>
+              {/* Search */}
+              <div className="flex gap-2 mb-6">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    placeholder="Search public clubs..."
+                    className="w-full pl-9 pr-3 py-2 theme-input rounded-lg text-sm"
+                  />
+                </div>
+                <button onClick={handleSearch} className="theme-button-secondary px-4 py-2 rounded-lg text-sm">
+                  Search
+                </button>
+              </div>
+
+              {displayedPublic.length === 0 ? (
+                <div className="text-center py-16 text-muted">
+                  <Globe className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>No public clubs found.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {displayedPublic.map(club => {
+                    const isMember = myClubIds.has(club.id);
+                    const canRequest = club.allow_join_requests !== false;
+                    const requested = requestedClubIds.has(club.id);
+                    return (
+                      <div key={club.id} className="flex flex-col">
+                        <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                        {isMember ? (
+                          <button
+                            onClick={() => navigate(`/clubs/${club.id}`)}
+                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Member — Open
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => canRequest && !requested && setJoinRequestClub(club)}
+                            disabled={requested || !canRequest}
+                            title={!canRequest ? 'This club is not accepting join requests' : undefined}
+                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
+                          >
+                            {requested
+                              ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                              : !canRequest
+                                ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
+                                : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
+                            }
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
+        </>
+      )}
+
+      {/* ── Book Study Groups tab ──────────────────────────────────────── */}
+      {mainTab === 'bookstudy' && (
+        <div>
+          <h2 className="text-xl font-bold text-theme mb-1">Book Study Groups</h2>
+          <p className="text-muted text-sm mb-8 max-w-2xl">Structured reading programs — work through a book together chapter by chapter with guided questions and group discussion.</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="h-4 w-4 text-indigo-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Chapter-by-Chapter</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Progress through the book together at a shared pace. Each chapter unlocks on schedule so everyone stays in sync.</p>
+              </div>
+            </div>
+
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
+                <Users className="h-4 w-4 text-purple-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Group Discussion</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Built-in group chat lets your study group reflect, ask questions, and share insights as they read — no external app needed.</p>
+              </div>
+            </div>
+
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                <Search className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Track Every Member</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">See who's keeping up, who's ahead, and who needs encouragement — with per-chapter completion stats for every member.</p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 theme-button-primary px-5 py-2.5 rounded-lg font-medium text-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Start a Book Study Group
+          </button>
         </div>
       )}
 

@@ -147,6 +147,50 @@ router.post('/cover', authenticate, upload.single('cover'), async (req, res) => 
   }
 });
 
+// POST /files/avatar — upload user profile picture to Supabase Storage
+router.post('/avatar', authenticate, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    if (!req.file.mimetype.startsWith('image/')) return res.status(400).json({ error: 'File must be an image' });
+
+    const ext = req.file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+    const storagePath = `avatars/${req.user.id}/${Date.now()}.${ext}`;
+
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${storagePath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Content-Type': req.file.mimetype,
+          'x-upsert': 'true',
+        },
+        body: req.file.buffer,
+      }
+    );
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || `Storage upload failed (${uploadRes.status})`);
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`;
+
+    // Update profile record
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', req.user.id);
+    if (updateErr) throw updateErr;
+
+    res.json({ avatar_url: publicUrl });
+  } catch (err) {
+    console.error('[files/avatar] upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /files/media — direct server-side audio/video upload to Supabase Storage
 router.post('/media', authenticate, uploadMedia.single('file'), async (req, res) => {
   try {

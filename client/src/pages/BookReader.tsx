@@ -39,6 +39,7 @@ import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import TutorialOverlay from '../components/reader/TutorialOverlay';
 import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
+import { DEMO_BOOK_ID } from '../config/demoBook';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData,
@@ -104,6 +105,30 @@ export default function BookReader() {
       }
     } catch { /* ignore */ }
   }, [bookId, chapterId]);
+
+  // Auto-launch tour when reader navigates to a new chapter in the demo book
+  useEffect(() => {
+    if (!bookId || !chapterId || !book) return;
+    // Only trigger for the configured demo book
+    if (bookId !== DEMO_BOOK_ID) return;
+    // Don't double-launch if a tour is already pending/showing
+    if (pendingTour) return;
+    // Find which order_index this chapter has
+    const chapters = (book as any).chapters ?? [];
+    const ch = chapters.find((c: any) => c.id === chapterId);
+    if (!ch || ch.order_index == null) return;
+    const chapterIdx: number = ch.order_index;
+    // Track which chapters have already shown the tour this session
+    const seenKey = `BF_TOURED_${bookId}`;
+    try {
+      const seen: number[] = JSON.parse(sessionStorage.getItem(seenKey) || '[]');
+      if (seen.includes(chapterIdx)) return;
+      seen.push(chapterIdx);
+      sessionStorage.setItem(seenKey, JSON.stringify(seen));
+    } catch { /* ignore */ }
+    setTimeout(() => setPendingTour({ bookId, chapterIdx }), 800);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId, chapterId, book]);
   const mediaPauseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaPipCloseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaCtx = useMemo<MediaCtx>(() => ({
@@ -938,7 +963,7 @@ export default function BookReader() {
         )}
 
         {/* Header */}
-        <header className="flex-shrink-0 bg-surface border-b border-theme z-10">
+        <header id="bf-reader-header" className="flex-shrink-0 bg-surface border-b border-theme z-10">
           {/* Row 1: nav + chapter counter + TTS + Edit */}
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <button
@@ -1600,9 +1625,13 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
             </a>
           );
           break;
-        case 'highlight':
-          content = <mark className="bg-yellow-200 px-0.5">{content}</mark>;
+        case 'highlight': {
+          const hlColor: string | undefined = mark.attrs?.color;
+          content = hlColor
+            ? <mark style={{ backgroundColor: hlColor, padding: '0 2px', borderRadius: '2px' }}>{content}</mark>
+            : <mark className="bg-yellow-200 px-0.5 rounded">{content}</mark>;
           break;
+        }
         case 'inlineContentMark':
           // Handled by TipTapNode via anchor_text matching — skip to avoid double render
           break;

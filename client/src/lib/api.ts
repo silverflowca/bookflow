@@ -1055,6 +1055,22 @@ class ApiClient {
     return this.request(`/profile/${userId}`);
   }
 
+  async uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const token = localStorage.getItem('bookflow_token');
+    const res = await fetch(`${API_URL}/files/avatar`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any).error || 'Avatar upload failed');
+    }
+    return res.json();
+  }
+
   // Activity / Audit Trail
   async getBookActivity(
     bookId: string,

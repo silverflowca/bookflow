@@ -145,6 +145,8 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   const tooltipRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const elevatedElRef = useRef<{ el: Element; prevZ: string; prevPos: string } | null>(null);
+  const tabsRowRef = useRef<HTMLDivElement>(null);
+  const activePillRef = useRef<HTMLButtonElement>(null);
 
   // Track mobile breakpoint
   useEffect(() => {
@@ -162,6 +164,17 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
 
   // Reset drag offset whenever the step changes so card repositions near target
   useEffect(() => { setDragOffset(null); }, [chapterIdx, stepIdx]);
+
+  // Scroll active chapter pill to centre of the tab row on chapter change
+  useEffect(() => {
+    const row = tabsRowRef.current;
+    const pill = activePillRef.current;
+    if (!row || !pill) return;
+    const pillLeft = pill.offsetLeft;
+    const pillWidth = pill.offsetWidth;
+    const rowWidth = row.offsetWidth;
+    row.scrollTo({ left: pillLeft - rowWidth / 2 + pillWidth / 2, behavior: 'smooth' });
+  }, [chapterIdx]);
 
   // ── Drag handlers (desktop only) ─────────────────────────────────────────────
   function onDragStart(e: React.MouseEvent | React.TouchEvent) {
@@ -248,8 +261,10 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
     }
     // Notify host so it can open sidebar / prepare UI before we measure
     if (step && onBeforeStep) onBeforeStep(step);
-    // Navigate to a different page if the step requires it
-    if (step?.navigateTo && location.pathname !== step.navigateTo) {
+    // Navigate to a different page if the step requires it.
+    // Always navigate when stepIdx===0 (first step of a chapter) so switching chapters
+    // reliably loads the correct demo book chapter even if the path looks the same.
+    if (step?.navigateTo && (location.pathname !== step.navigateTo || stepIdx === 0)) {
       navigate(step.navigateTo);
       // Wait longer for page transition + render
       const t1 = setTimeout(() => measureTarget(), 800);
@@ -308,7 +323,7 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
   }, [step]);
 
   // ── Navigation ───────────────────────────────────────────────────────────────
-  const canAdvance = !step?.action || step.action.type === 'none' || actionDone;
+  const canAdvance = true;
   const isLast = chapterIdx === chapters.length - 1 && stepIdx === (chapter?.steps.length ?? 1) - 1;
 
   function advance() {
@@ -588,13 +603,14 @@ export default function TutorialOverlay({ chapters, bookId, onClose, initialChap
           </h2>
         </div>
 
-        {/* Chapter tabs — wrapping so all tabs fit regardless of count */}
-        <div className="flex flex-wrap gap-1.5 px-4 py-2">
+        {/* Chapter tabs — horizontally scrollable single row */}
+        <div ref={tabsRowRef} className="flex gap-1.5 px-4 py-2 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {chapters.map((ch, ci) => (
             <button
               key={ci}
+              ref={ci === chapterIdx ? activePillRef : undefined}
               onClick={() => goToChapter(ci)}
-              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+              className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-full transition-colors ${
                 ci === chapterIdx
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'

@@ -393,6 +393,10 @@ export default function Layout() {
                     <Users className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Clubs</span>
                   </Link>
+                  <Link to="/clubs?tab=bookstudy" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Study Groups">
+                    <BookOpen className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Study Groups</span>
+                  </Link>
                   <span className="flex items-center gap-1 text-muted/40 px-2 md:px-3 py-2 rounded-md text-sm font-medium cursor-not-allowed select-none" title="Live — coming soon">
                     <Video className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Live</span>
@@ -490,7 +494,10 @@ export default function Layout() {
                     <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> Books
                   </Link>
                   <Link to="/clubs" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
-                    <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs & Study Groups
+                    <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs
+                  </Link>
+                  <Link to="/clubs?tab=bookstudy" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                    <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> Study Groups
                   </Link>
                   <span className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted/40 cursor-not-allowed select-none">
                     <Video className="h-5 w-5 flex-shrink-0" /> Live <span className="ml-1 text-xs">(coming soon)</span>

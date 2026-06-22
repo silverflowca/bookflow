@@ -382,7 +382,10 @@ function jsonContentToHtml(content: unknown): string {
       if (mark.type === 'bold') text = `<strong>${text}</strong>`;
       if (mark.type === 'italic') text = `<em>${text}</em>`;
       if (mark.type === 'underline') text = `<u>${text}</u>`;
-      if (mark.type === 'highlight') text = `<mark>${text}</mark>`;
+      if (mark.type === 'highlight') {
+        const c = (mark as any).attrs?.color;
+        text = c ? `<mark style="background-color:${c};padding:0 2px;border-radius:2px">${text}</mark>` : `<mark>${text}</mark>`;
+      }
     }
     return text;
   }

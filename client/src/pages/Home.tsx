@@ -8,7 +8,6 @@ import api from '../lib/api';
 import type { Book } from '../types';
 import { DEMO_BOOK_ID, DEMO_CHAPTER_IDS, FEATURE_ORDER } from '../config/demoBook';
 
-
 // ─── Carousel config (written by AdminPage, read here) ───────────────────────
 export const CAROUSEL_SETTINGS_KEY = 'bookflow_carousel_settings';
 export interface CarouselSettings {
@@ -359,6 +358,12 @@ export default function Home() {
 
       {/* QR Code Section */}
       <QrCodeSection />
+
+      {/* Book Clubs Section */}
+      <BookClubsSection />
+
+      {/* Book Study Section */}
+      <BookStudySection />
     </div>
   );
 }
@@ -808,6 +813,102 @@ function QrCodeSection() {
   );
 }
 
+// ─── Book Clubs Section ───────────────────────────────────────────────────────
+function BookClubsSection() {
+  return (
+    <section className="py-20 bg-surface">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Image */}
+          <div className="rounded-3xl overflow-hidden shadow-xl">
+            <ExpandableImage src="/bookflow_clubs.png" alt="Book Clubs" caption="" />
+          </div>
+          {/* Text */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-500 mb-3">Community</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-theme leading-tight mb-5">
+              Read Together.<br />Grow Together.
+            </h2>
+            <p className="text-muted text-lg leading-relaxed mb-6">
+              Book clubs bring readers into the same space — sharing highlights, answering questions, and encouraging each other chapter by chapter. Create a private group for your team, church, or class in under a minute.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                'Invite members with a single shareable link',
+                'Track every member\'s reading progress',
+                'Built-in group chat — no extra app needed',
+                'Public or private — you control who joins',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted">
+                  <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-indigo-500" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link
+              to="/clubs"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-md"
+            >
+              <Users className="h-4 w-4" />
+              Explore Book Clubs
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Book Study Section ───────────────────────────────────────────────────────
+function BookStudySection() {
+  return (
+    <section className="py-20 bg-surface-hover">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Text — left on this section for visual variety */}
+          <div className="order-2 lg:order-1">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-purple-500 mb-3">Structured Learning</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-theme leading-tight mb-5">
+              Turn Any Book into<br />a Study Program.
+            </h2>
+            <p className="text-muted text-lg leading-relaxed mb-6">
+              Book Study Groups give leaders the tools to run structured, chapter-by-chapter reading programs — complete with guided reflection questions, inline polls, and group discussion threads built right into the reading experience.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                'Reflection questions embedded in every chapter',
+                'Live polls surface group insights instantly',
+                'Leaders see every member\'s answers and progress',
+                'Perfect for Bible study, training & recovery groups',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted">
+                  <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-purple-500" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link
+              to="/clubs"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition-colors shadow-md"
+            >
+              <BookOpen className="h-4 w-4" />
+              Start a Book Study
+            </Link>
+          </div>
+          {/* Image */}
+          <div className="order-1 lg:order-2 rounded-3xl overflow-hidden shadow-xl">
+            <ExpandableImage src="/bookstudy.png" alt="Book Study Groups" caption="" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Spiral Carousel ─────────────────────────────────────────────────────────
 //
 // Books orbit an ellipse centred in the hero section.
@@ -1106,16 +1207,15 @@ function ExpandableImage({ src, alt, caption }: { src: string; alt: string; capt
   return (
     <>
       <div className="flex flex-col gap-3">
-        <div className="relative rounded-2xl overflow-hidden shadow-sm flex-1">
+        <div
+          className="relative rounded-2xl overflow-hidden shadow-sm flex-1 cursor-zoom-in group"
+          onClick={() => setExpanded(true)}
+        >
           <img src={src} alt={alt} className="w-full h-full object-cover" />
-          {/* Expand button — bottom right, click/tap only */}
-          <button
-            onClick={() => setExpanded(true)}
-            className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/50 text-white hover:bg-black/70 transition-colors"
-            title="Expand image"
-          >
+          {/* Expand icon hint — top right, visible on hover */}
+          <div className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             <Maximize2 className="h-4 w-4" />
-          </button>
+          </div>
         </div>
         <p className="text-center text-sm font-semibold text-muted tracking-wide">{caption}</p>
       </div>

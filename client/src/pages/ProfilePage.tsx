@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   User, BookOpen, Users, BarChart2, MapPin, Globe,
   Lock, Eye, EyeOff, Edit2, Save, X, Check,
-  BookMarked, CheckCircle2, Mail, AtSign
+  BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
@@ -48,6 +48,7 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Edit form state
   const [form, setForm] = useState({
@@ -96,6 +97,22 @@ export default function ProfilePage() {
       setError(err.message || 'Failed to load profile');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const { avatar_url } = await api.uploadAvatar(file);
+      setData(prev => prev ? { ...prev, profile: { ...prev.profile, avatar_url } } : prev);
+      // Refresh auth context profile
+      window.dispatchEvent(new CustomEvent('bf-profile-updated', { detail: { avatar_url } }));
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload avatar');
+    } finally {
+      setAvatarUploading(false);
     }
   }
 
@@ -148,10 +165,20 @@ export default function ProfilePage() {
       <div className="bg-surface border-2 border-theme rounded-xl p-6 mb-6">
         <div className="flex flex-col sm:flex-row gap-4 items-start">
           {/* Avatar */}
-          <div className="h-20 w-20 rounded-full bg-surface-hover border-2 border-theme flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {p.avatar_url
-              ? <img src={p.avatar_url} alt={p.display_name} className="h-full w-full object-cover" />
-              : <User className="h-9 w-9 text-muted" />}
+          <div className="relative flex-shrink-0">
+            <div className="h-20 w-20 rounded-full bg-surface-hover border-2 border-theme flex items-center justify-center overflow-hidden">
+              {avatarUploading
+                ? <Loader2 className="h-7 w-7 text-accent animate-spin" />
+                : p.avatar_url
+                  ? <img src={p.avatar_url} alt={p.display_name} className="h-full w-full object-cover" />
+                  : <User className="h-9 w-9 text-muted" />}
+            </div>
+            {isOwnProfile && !avatarUploading && (
+              <label className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-accent flex items-center justify-center cursor-pointer shadow-md hover:opacity-90 transition-opacity" title="Change photo">
+                <Camera className="h-3.5 w-3.5 text-white" />
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+              </label>
+            )}
           </div>
 
           <div className="flex-1 min-w-0">

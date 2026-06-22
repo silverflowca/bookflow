@@ -100,6 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(updated);
   }
 
+  // Listen for avatar updates dispatched from ProfilePage after upload
+  useEffect(() => {
+    function onProfileUpdated(e: Event) {
+      const detail = (e as CustomEvent).detail as Partial<Profile>;
+      setProfile(prev => prev ? { ...prev, ...detail } : prev);
+    }
+    window.addEventListener('bf-profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('bf-profile-updated', onProfileUpdated);
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       user,
