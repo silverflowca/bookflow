@@ -24,6 +24,7 @@ router.get('/', authenticate, async (req, res) => {
         restream_client_id: '',
         restream_client_secret: '',
         home_tagline: '',
+        feature_demo_book_id: null,
       });
     }
 
@@ -34,6 +35,7 @@ router.get('/', authenticate, async (req, res) => {
       restream_client_id: data.restream_client_id || '',
       restream_client_secret: data.restream_client_secret || '',
       home_tagline: data.home_tagline || '',
+      feature_demo_book_id: data.feature_demo_book_id || null,
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -43,7 +45,7 @@ router.get('/', authenticate, async (req, res) => {
 
 // Update app settings
 router.put('/', authenticate, async (req, res) => {
-  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline } = req.body;
+  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline, feature_demo_book_id } = req.body;
 
   try {
     const { data, error } = await supabase
@@ -56,6 +58,7 @@ router.put('/', authenticate, async (req, res) => {
         restream_client_id: restream_client_id || '',
         restream_client_secret: restream_client_secret || '',
         home_tagline: home_tagline || '',
+        feature_demo_book_id: feature_demo_book_id || null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
@@ -72,6 +75,7 @@ router.put('/', authenticate, async (req, res) => {
       restream_client_id: data.restream_client_id || '',
       restream_client_secret: data.restream_client_secret || '',
       home_tagline: data.home_tagline || '',
+      feature_demo_book_id: data.feature_demo_book_id || null,
     });
   } catch (err) {
     console.error('Update settings error:', err);
@@ -90,17 +94,20 @@ router.get('/public', async (req, res) => {
       .limit(1)
       .maybeSingle();
 
-    if (!admin) return res.json({ home_tagline: '' });
+    if (!admin) return res.json({ home_tagline: '', feature_demo_book_id: null });
 
     const { data } = await supabase
       .from('app_settings')
-      .select('home_tagline')
+      .select('home_tagline, feature_demo_book_id')
       .eq('user_id', admin.id)
       .maybeSingle();
 
-    res.json({ home_tagline: data?.home_tagline || '' });
+    res.json({
+      home_tagline: data?.home_tagline || '',
+      feature_demo_book_id: data?.feature_demo_book_id || null,
+    });
   } catch (err) {
-    res.json({ home_tagline: '' });
+    res.json({ home_tagline: '', feature_demo_book_id: null });
   }
 });
 

@@ -47,7 +47,7 @@ export default function BookReader() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const highlightApplied = useRef(false);
@@ -128,8 +128,12 @@ export default function BookReader() {
     clearPip: (id) => setMediaPipId(prev => prev === id ? null : prev),
   }), [mediaPlayingId, mediaPipId]);
 
-  // Check if current user is the author
-  const isAuthor = book?.author_id === user?.id;
+  // Check if current user can edit: owner, collaborator (author/editor), or super admin
+  const isAuthor = book?.author_id === user?.id
+    || profile?.system_role === 'super_admin'
+    || !!(book?.collaborators?.some(
+        c => c.user_id === user?.id && ['author', 'editor'].includes(c.role)
+      ));
 
   // Get book settings for reader permissions
   const settings = book?.settings;

@@ -12,6 +12,7 @@ interface AppSettings {
   restream_client_id: string;
   restream_client_secret: string;
   home_tagline: string;
+  feature_demo_book_id: string | null;
 }
 
 const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string; preview: string }[] = [
@@ -30,7 +31,9 @@ export default function Settings() {
     restream_client_id: '',
     restream_client_secret: '',
     home_tagline: '',
+    feature_demo_book_id: null,
   });
+  const [myBooks, setMyBooks] = useState<{ id: string; title: string }[]>([]);
   const [showKey, setShowKey] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
   const [showRestreamSecret, setShowRestreamSecret] = useState(false);
@@ -45,6 +48,7 @@ export default function Settings() {
   useEffect(() => {
     loadSettings();
     loadRestreamStatus();
+    api.getMyBooks().then(books => setMyBooks(books.map((b: any) => ({ id: b.id, title: b.title })))).catch(() => {});
   }, []);
 
   // Handle OAuth callback redirect: ?restream=connected or ?restream=error
@@ -71,6 +75,7 @@ export default function Settings() {
         restream_client_id: data.restream_client_id || '',
         restream_client_secret: data.restream_client_secret || '',
         home_tagline: data.home_tagline || '',
+        feature_demo_book_id: data.feature_demo_book_id || null,
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -81,6 +86,7 @@ export default function Settings() {
         restream_client_id: '',
         restream_client_secret: '',
         home_tagline: '',
+        feature_demo_book_id: null,
       });
     }
   }
@@ -184,6 +190,42 @@ export default function Settings() {
             <p className="text-xs text-gray-500 mt-1">
               Leave empty to use the default tagline.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Feature Demo Settings */}
+      <div className="bg-white rounded-lg border mb-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Radio className="h-5 w-5 text-violet-500" />
+            <h2 className="text-lg font-semibold">Feature Demo Settings</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            Choose which book is used as the interactive feature demo on the home page. When set, each feature card shows a "Launch Interactive Tour" button that opens this book with a guided walkthrough.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Demo Book
+            </label>
+            <select
+              value={settings.feature_demo_book_id || ''}
+              onChange={e => setSettings({ ...settings, feature_demo_book_id: e.target.value || null })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500 text-sm bg-white"
+            >
+              <option value="">— No demo book (hides tour buttons) —</option>
+              {myBooks.map(b => (
+                <option key={b.id} value={b.id}>{b.title}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Only your own books appear here. The selected book should have one chapter per feature (run <code className="bg-gray-100 px-1 rounded">node server/seed-feature-demo.mjs</code> to generate it).
+            </p>
+            {settings.feature_demo_book_id && (
+              <p className="mt-2 text-xs text-violet-600 font-medium">
+                ID: {settings.feature_demo_book_id}
+              </p>
+            )}
           </div>
         </div>
       </div>

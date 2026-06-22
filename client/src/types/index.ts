@@ -167,7 +167,8 @@ export interface ReviewRequest {
 
 export type NotificationType =
   | 'invite' | 'comment' | 'comment_reply'
-  | 'review_submitted' | 'review_approved' | 'review_rejected' | 'mention';
+  | 'review_submitted' | 'review_approved' | 'review_rejected' | 'mention'
+  | 'feedback_reply';
 
 export interface UserNotification {
   id: string;
@@ -551,4 +552,70 @@ export interface BibleVerse {
   chapter: number;
   verse: number;
   text: string;
+}
+
+// ── Feedback system ───────────────────────────────────────────────────────────
+
+export type FeedbackType = 'bug' | 'feature' | 'question' | 'comment';
+export type FeedbackStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
+export interface AnnotationCommand {
+  tool: 'freehand' | 'circle' | 'highlight';
+  color: string;
+  points: { x: number; y: number }[];
+  lineWidth?: number;
+}
+
+export interface FeedbackScreenshot {
+  id?: string;
+  storage_path: string;
+  annotation_data: AnnotationCommand[];
+  order_index: number;
+  localDataUrl?: string;      // client-only, before upload
+  note?: string;              // client-only, per-screenshot text note
+  audioBlob?: Blob | null;    // client-only, per-screenshot audio recording
+  audioDuration?: number;     // client-only
+  audioStoragePath?: string;  // set after upload
+}
+
+export interface FeedbackAudio {
+  storage_path: string;
+  duration_seconds: number;
+}
+
+export interface FeedbackComment {
+  id: string;
+  feedback_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  author?: Profile;
+}
+
+export interface Feedback {
+  id: string;
+  user_id: string;
+  type: FeedbackType;
+  title: string;
+  description?: string;
+  status: FeedbackStatus;
+  page_url?: string;
+  user_agent?: string;
+  created_at: string;
+  updated_at: string;
+  user?: Profile;
+  screenshots?: FeedbackScreenshot[];
+  audio?: FeedbackAudio | null;
+  comments?: FeedbackComment[];
+}
+
+export interface FeedbackConfig {
+  id: string;
+  enabled: boolean;
+  config: {
+    disabled_user_ids?: string[];
+    disabled_book_ids?: string[];
+    disabled_club_ids?: string[];
+  };
+  updated_at: string;
 }

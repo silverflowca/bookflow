@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -11,6 +11,7 @@ import {
   type CarouselSettings,
 } from './Home';
 import SettingsPage from './Settings';
+import FeedbackAdminTab from '../components/feedback/FeedbackAdminTab';
 
 interface AdminStats {
   users: number;
@@ -19,7 +20,7 @@ interface AdminStats {
   super_admins: number;
 }
 
-type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings';
+type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'feedback';
 
 export default function AdminPage() {
   const { profile } = useAuth();
@@ -139,7 +140,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-surface-hover">
-        {(['settings', 'users', 'books', 'clubs', 'carousel'] as Tab[]).map(t => (
+        {(['settings', 'users', 'books', 'clubs', 'carousel', 'feedback'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => loadTab(t)}
@@ -151,6 +152,7 @@ export default function AdminPage() {
           >
             {t === 'carousel' && <Clapperboard className="h-3.5 w-3.5" />}
             {t === 'settings' && <Settings className="h-3.5 w-3.5" />}
+            {t === 'feedback' && <MessageSquarePlus className="h-3.5 w-3.5" />}
             {t}
           </button>
         ))}
@@ -351,6 +353,11 @@ export default function AdminPage() {
                 )}
               </div>
             </div>
+          )}
+
+          {/* ── Feedback tab ───────────────────────────────────────────────────── */}
+          {tab === 'feedback' && (
+            <FeedbackAdminTab />
           )}
         </>
       )}

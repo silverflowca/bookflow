@@ -2,10 +2,13 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles, Mic, Video, BarChart2, CheckSquare, ListChecks, AlignLeft, Image, X, Play, Maximize2 } from 'lucide-react';
+import { BookOpen, Star, PlusCircle, PenLine, FileText, MessageCircle, Highlighter, BookMarked, GraduationCap, Crown, Share2, Flame, Users, Sparkles, Mic, Video, BarChart2, CheckSquare, ListChecks, AlignLeft, Image, X, Play, Maximize2, PlayCircle } from 'lucide-react';
 import { HelpCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
+import TutorialOverlay from '../components/reader/TutorialOverlay';
+import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
+
 
 // ─── Carousel config (written by AdminPage, read here) ───────────────────────
 export const CAROUSEL_SETTINGS_KEY = 'bookflow_carousel_settings';
@@ -35,10 +38,14 @@ export default function Home() {
   const [tagline, setTagline] = useState(DEFAULT_TAGLINE);
   const [, setSavedCount] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const [demoBookId, setDemoBookId] = useState<string>('');
 
   useEffect(() => {
     loadBooks();
-    api.getPublicSettings().then(s => { if (s.home_tagline) setTagline(s.home_tagline); }).catch(() => {});
+    api.getPublicSettings().then(s => {
+      if (s.home_tagline) setTagline(s.home_tagline);
+      if (s.feature_demo_book_id) setDemoBookId(s.feature_demo_book_id);
+    }).catch(() => {});
     if (user) api.getSavedBooksCount().then(r => setSavedCount(r.count)).catch(() => {});
   }, [user]);
 
@@ -334,7 +341,7 @@ export default function Home() {
       </section>
 
       {/* Editor Features Section */}
-      <EditorFeaturesSection />
+      <EditorFeaturesSection demoBookId={demoBookId} />
 
       {/* QR Code Section */}
       <QrCodeSection />
@@ -478,8 +485,21 @@ const EDITOR_FEATURES = [
   },
 ];
 
-function EditorFeaturesSection() {
+const FEATURE_IDS = ['rich-text','inline-questions','polls','audio','video','images','highlights','progress','forms','clubs','collaborate','publish'];
+
+function EditorFeaturesSection({ demoBookId }: { demoBookId: string }) {
   const [active, setActive] = useState<typeof EDITOR_FEATURES[0] | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourChapterIdx, setTourChapterIdx] = useState(0);
+  const tours = demoBookId ? buildFeatureTours(demoBookId) : [];
+
+  function launchTour(featureId: string) {
+    const idx = FEATURE_IDS.indexOf(featureId);
+    if (idx < 0 || !demoBookId) return;
+    setTourChapterIdx(idx);
+    setActive(null);
+    setTourOpen(true);
+  }
 
   return (
     <section id="features" className="py-20 bg-surface">
@@ -552,16 +572,29 @@ function EditorFeaturesSection() {
               </button>
             </div>
 
-            {/* Demo placeholder */}
+            {/* Tour launcher */}
             <div
-              className="mx-6 mt-6 rounded-xl flex flex-col items-center justify-center gap-3 cursor-pointer group"
+              className="mx-6 mt-6 rounded-xl flex flex-col items-center justify-center gap-3"
               style={{ background: 'var(--color-surface-hover, #f3f4f6)', height: 220, border: '2px dashed var(--color-border, #d1d5db)' }}
             >
-              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${active.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
-                <Play className="h-7 w-7" />
-              </div>
-              <p className="text-sm text-muted font-medium">Live demo coming soon</p>
-              <p className="text-xs text-muted opacity-60">A video or interactive walkthrough will appear here</p>
+              {demoBookId ? (
+                <button
+                  onClick={() => launchTour(active.id)}
+                  className={`group flex flex-col items-center gap-3 px-8 py-5 rounded-2xl bg-gradient-to-br ${active.color} text-white shadow-lg hover:scale-105 transition-transform focus:outline-none`}
+                >
+                  <PlayCircle className="h-10 w-10 group-hover:scale-110 transition-transform" />
+                  <span className="font-bold text-sm">Launch Interactive Tour</span>
+                  <span className="text-white/75 text-xs">Opens the real reader with a guided walkthrough</span>
+                </button>
+              ) : (
+                <>
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${active.color} flex items-center justify-center text-white shadow-lg`}>
+                    <Play className="h-7 w-7" />
+                  </div>
+                  <p className="text-sm text-muted font-medium">Live demo coming soon</p>
+                  <p className="text-xs text-muted opacity-60">A video or interactive walkthrough will appear here</p>
+                </>
+              )}
             </div>
 
             {/* Description */}
@@ -586,6 +619,17 @@ function EditorFeaturesSection() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Feature demo tour */}
+      {tourOpen && demoBookId && (
+        <TutorialOverlay
+          chapters={tours}
+          bookId={demoBookId}
+          onClose={() => setTourOpen(false)}
+          initialChapter={tourChapterIdx}
+          initialStep={0}
+        />
       )}
     </section>
   );

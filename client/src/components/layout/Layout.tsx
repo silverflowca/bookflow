@@ -2,9 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, BarChart2, Video, Shield, Sparkles } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
+import FeedbackButton from '../feedback/FeedbackButton';
+import FeedbackPanel from '../feedback/FeedbackPanel';
+import { useFeedbackContext } from '../../contexts/FeedbackContext';
 import api from '../../lib/api';
 
 const TUTORIAL_BOOK_ID = 'f0c66a4a-ced2-4b75-ab42-84dafba9cd3d';
@@ -18,6 +21,7 @@ const READER_URL = `/book/${TUTORIAL_BOOK_ID}/chapter/${TUTORIAL_CH1}`;
 export default function Layout() {
   const { user, profile, logout } = useAuth();
   const { colorScheme, setColorScheme } = useTheme();
+  const { openFeedback } = useFeedbackContext();
   const navigate = useNavigate();
   const location = useLocation();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
@@ -406,6 +410,7 @@ export default function Layout() {
                   <div className="flex items-center gap-1 ml-2 pl-3 border-l-2 border-strong">
                     <div className="hidden md:flex items-center gap-1">
                       <NotificationBell />
+                      <FeedbackButton onClick={openFeedback} />
                     </div>
                     <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity p-1" title={profile?.display_name || user.email}>
                       <div className="h-8 w-8 rounded-full bg-surface-hover flex items-center justify-center border-2 border-theme overflow-hidden flex-shrink-0">
@@ -496,6 +501,12 @@ export default function Layout() {
                   >
                     <GraduationCap className="h-5 w-5 text-accent flex-shrink-0" /> Tutorial
                   </button>
+                  <button
+                    onClick={() => { openFeedback(); setShowMobileMenu(false); }}
+                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full"
+                  >
+                    <MessageSquarePlus className="h-5 w-5 text-accent flex-shrink-0" /> Feedback
+                  </button>
                   {profile?.system_role === 'super_admin' && (
                     <Link to="/admin" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-purple-500 hover:bg-surface-hover transition-colors">
                       <Shield className="h-5 w-5 flex-shrink-0" /> Admin Panel
@@ -564,6 +575,9 @@ export default function Layout() {
           }}
         />
       )}
+
+      {/* Feedback panel — rendered at layout level, persists across navigation */}
+      {user && <FeedbackPanel />}
 
       {/* Mobile bottom navigation — hidden on md+ */}
       {user && (

@@ -1,10 +1,11 @@
+import { BookOpen } from 'lucide-react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import type {
-  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData,
+  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData, ScriptureBlockData,
 } from '../../types/index';
 
-type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll';
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
@@ -184,6 +185,32 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         </span>
       );
     }
+    case 'scripture_block': {
+      const d = contentData as ScriptureBlockData;
+      return (
+        <span className="block w-full mt-1" contentEditable={false}>
+          <span className="block bg-amber-50 border-l-4 border-amber-600 rounded-r-lg p-4">
+            <span className="flex items-center gap-2 mb-3">
+              <BookOpen className="h-5 w-5 text-amber-700" />
+              <span className="font-semibold text-amber-800">{d.reference}</span>
+              {d.version && (
+                <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded">
+                  {d.version}
+                </span>
+              )}
+            </span>
+            <span className="block italic text-lg leading-relaxed text-gray-800">
+              "{d.text}"
+            </span>
+            {d.notes && (
+              <span className="block mt-3 text-sm text-gray-500 border-t border-amber-200 pt-3">
+                {d.notes}
+              </span>
+            )}
+          </span>
+        </span>
+      );
+    }
     default:
       return null;
   }
@@ -202,22 +229,24 @@ const TYPE_LABEL: Record<FormType, string> = {
   video: 'Video',
   image: 'Image',
   poll: 'Poll',
+  scripture_block: 'Scripture',
 };
 
 const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image']);
 
 // Per-type colour tokens used for the inline pill
 const TYPE_COLOR: Record<FormType, string> = {
-  textbox:     'bg-blue-50   border-blue-200   text-blue-700',
-  textarea:    'bg-blue-50   border-blue-200   text-blue-700',
-  select:      'bg-indigo-50 border-indigo-200 text-indigo-700',
-  multiselect: 'bg-violet-50 border-violet-200 text-violet-700',
-  radio:       'bg-orange-50 border-orange-200 text-orange-700',
-  checkbox:    'bg-teal-50   border-teal-200   text-teal-700',
-  audio:       'bg-yellow-50 border-yellow-200 text-yellow-700',
-  video:       'bg-red-50    border-red-200    text-red-700',
-  image:       'bg-pink-50   border-pink-200   text-pink-700',
-  poll:        'bg-green-50  border-green-200  text-green-700',
+  textbox:        'bg-blue-50   border-blue-200   text-blue-700',
+  textarea:       'bg-blue-50   border-blue-200   text-blue-700',
+  select:         'bg-indigo-50 border-indigo-200 text-indigo-700',
+  multiselect:    'bg-violet-50 border-violet-200 text-violet-700',
+  radio:          'bg-orange-50 border-orange-200 text-orange-700',
+  checkbox:       'bg-teal-50   border-teal-200   text-teal-700',
+  audio:          'bg-yellow-50 border-yellow-200 text-yellow-700',
+  video:          'bg-red-50    border-red-200    text-red-700',
+  image:          'bg-pink-50   border-pink-200   text-pink-700',
+  poll:           'bg-green-50  border-green-200  text-green-700',
+  scripture_block:'bg-amber-50  border-amber-200  text-amber-700',
 };
 
 // Location badge styles for non-inline placements
@@ -281,6 +310,23 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
         <span className="text-xs opacity-70 font-normal" data-testid="inline-form-badge">
           {meta?.icon} {label} · {meta?.label}
         </span>
+      </NodeViewWrapper>
+    );
+  }
+
+  // ── Scripture block: render as live preview (no pill wrapper) ────────────
+  if (contentType === 'scripture_block') {
+    return (
+      <NodeViewWrapper as="div" className="my-2" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
+        <div
+          className={`rounded${ringClass} cursor-pointer`}
+          onDoubleClick={handleDoubleClick}
+          title="Double-click to edit"
+        >
+          {!!contentData && (
+            <FormPreview contentType={contentType} contentData={contentData as any} />
+          )}
+        </div>
       </NodeViewWrapper>
     );
   }

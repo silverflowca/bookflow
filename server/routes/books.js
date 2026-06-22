@@ -165,7 +165,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
         *,
         author:profiles!books_author_id_fkey(id, display_name, avatar_url, bio),
         chapters:chapters(id, title, order_index, status, word_count, estimated_read_time_minutes),
-        settings:book_settings(*)
+        settings:book_settings(*),
+        collaborators:book_collaborators(id, user_id, role, invite_accepted_at)
       `)
       .eq('id', req.params.id)
       .single();

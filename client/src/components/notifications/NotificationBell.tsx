@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Check, UserPlus, MessageSquare, Star, XCircle } from 'lucide-react';
+import { Bell, Check, UserPlus, MessageSquare, Star, XCircle, MessageSquarePlus } from 'lucide-react';
 import api from '../../lib/api';
 import type { UserNotification } from '../../types';
 
@@ -12,6 +12,7 @@ function notificationIcon(type: UserNotification['type']) {
     case 'review_submitted': return <Star className="h-3.5 w-3.5 text-yellow-500" />;
     case 'review_approved': return <Check className="h-3.5 w-3.5 text-green-500" />;
     case 'review_rejected': return <XCircle className="h-3.5 w-3.5 text-red-500" />;
+    case 'feedback_reply': return <MessageSquarePlus className="h-3.5 w-3.5 text-purple-500" />;
     default: return <Bell className="h-3.5 w-3.5 text-muted" />;
   }
 }

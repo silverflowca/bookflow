@@ -4,6 +4,20 @@ import { authenticate, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Helper: check if user is owner or accepted collaborator of a book
+async function canEditBook(bookId, userId) {
+  const { data: book, error } = await supabase
+    .from('books')
+    .select('author_id, collaborators:book_collaborators(user_id, invite_accepted_at)')
+    .eq('id', bookId)
+    .single();
+  if (error) throw error;
+  if (book.author_id === userId) return true;
+  return (book.collaborators || []).some(
+    c => c.user_id === userId && c.invite_accepted_at !== null
+  );
+}
+
 // Get chapters for a book
 router.get('/books/:bookId/chapters', optionalAuth, async (req, res) => {
   try {
@@ -106,16 +120,7 @@ router.post('/books/:bookId/chapters', authenticate, async (req, res) => {
   const { title, content, content_text, order_index, status } = req.body;
 
   try {
-    // Check author
-    const { data: book, error: bookError } = await supabase
-      .from('books')
-      .select('author_id')
-      .eq('id', req.params.bookId)
-      .single();
-
-    if (bookError) throw bookError;
-
-    if (book.author_id !== req.user.id) {
+    if (!await canEditBook(req.params.bookId, req.user.id)) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
@@ -160,16 +165,15 @@ router.put('/chapters/:id', authenticate, async (req, res) => {
   const { title, content, content_text, order_index, status, word_count, estimated_read_time_minutes } = req.body;
 
   try {
-    // Check author
     const { data: chapter, error: chapterError } = await supabase
       .from('chapters')
-      .select('book_id, book:books(author_id)')
+      .select('book_id')
       .eq('id', req.params.id)
       .single();
 
     if (chapterError) throw chapterError;
 
-    if (chapter.book.author_id !== req.user.id) {
+    if (!await canEditBook(chapter.book_id, req.user.id)) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
@@ -207,16 +211,7 @@ router.put('/books/:bookId/chapters/reorder', authenticate, async (req, res) => 
   const { chapter_ids } = req.body; // Array of chapter IDs in new order
 
   try {
-    // Check author
-    const { data: book, error: bookError } = await supabase
-      .from('books')
-      .select('author_id')
-      .eq('id', req.params.bookId)
-      .single();
-
-    if (bookError) throw bookError;
-
-    if (book.author_id !== req.user.id) {
+    if (!await canEditBook(req.params.bookId, req.user.id)) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
@@ -250,16 +245,15 @@ router.put('/books/:bookId/chapters/reorder', authenticate, async (req, res) => 
 // Delete chapter
 router.delete('/chapters/:id', authenticate, async (req, res) => {
   try {
-    // Check author
     const { data: chapter, error: chapterError } = await supabase
       .from('chapters')
-      .select('book_id, book:books(author_id)')
+      .select('book_id')
       .eq('id', req.params.id)
       .single();
 
     if (chapterError) throw chapterError;
 
-    if (chapter.book.author_id !== req.user.id) {
+    if (!await canEditBook(chapter.book_id, req.user.id)) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
@@ -309,11 +303,12 @@ router.patch('/chapters/:id/slug', authenticate, async (req, res) => {
   try {
     const { data: chapter, error: chErr } = await supabase
       .from('chapters')
-      .select('book_id, book:books(author_id)')
+      .select('book_id')
       .eq('id', req.params.id)
       .single();
     if (chErr) throw chErr;
-    if (chapter.book.author_id !== req.user.id)
+
+    if (!await canEditBook(chapter.book_id, req.user.id))
       return res.status(403).json({ error: 'Not authorized' });
 
     const base = generateSlug(rawSlug);
@@ -339,12 +334,13 @@ router.post('/books/:bookId/chapters/:chapterId/generate-slug', authenticate, as
   try {
     const { data: chapter, error: chErr } = await supabase
       .from('chapters')
-      .select('title, book_id, book:books(author_id)')
+      .select('title, book_id')
       .eq('id', req.params.chapterId)
       .eq('book_id', req.params.bookId)
       .single();
     if (chErr) throw chErr;
-    if (chapter.book.author_id !== req.user.id)
+
+    if (!await canEditBook(req.params.bookId, req.user.id))
       return res.status(403).json({ error: 'Not authorized' });
 
     const base = generateSlug(chapter.title || 'chapter');

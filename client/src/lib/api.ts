@@ -16,6 +16,11 @@ import type {
   FormResponse,
   AllFormResponsesResult,
   BookLanding,
+  Feedback,
+  FeedbackStatus,
+  FeedbackConfig,
+  FeedbackComment,
+  AnnotationCommand,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -400,18 +405,18 @@ class ApiClient {
   }
 
   // App Settings
-  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string }> {
+  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string; feature_demo_book_id: string | null }> {
     return this.request('/settings');
   }
 
-  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string }): Promise<void> {
+  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string; feature_demo_book_id: string | null }): Promise<void> {
     return this.request('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     });
   }
 
-  async getPublicSettings(): Promise<{ home_tagline: string }> {
+  async getPublicSettings(): Promise<{ home_tagline: string; feature_demo_book_id: string | null }> {
     return this.request('/settings/public');
   }
 
@@ -1109,6 +1114,85 @@ class ApiClient {
 
   async generateChapterSlug(bookId: string, chapterId: string): Promise<{ id: string; slug: string }> {
     return this.request(`/books/${bookId}/chapters/${chapterId}/generate-slug`, { method: 'POST' });
+  }
+
+  // ── Feedback ────────────────────────────────────────────────────────────────
+
+  async uploadFeedbackScreenshot(blob: Blob): Promise<{ storage_path: string }> {
+    const token = this.getToken();
+    const form = new FormData();
+    form.append('screenshot', blob, 'screenshot.png');
+    const res = await fetch(`${API_URL}/feedback/screenshots`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error((d as any).error || `Screenshot upload failed (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async uploadFeedbackAudio(blob: Blob, durationSeconds: number): Promise<{ storage_path: string; duration_seconds: number }> {
+    const token = this.getToken();
+    const form = new FormData();
+    form.append('audio', blob, 'recording.webm');
+    form.append('duration_seconds', String(durationSeconds));
+    const res = await fetch(`${API_URL}/feedback/audio`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error((d as any).error || `Audio upload failed (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async submitFeedback(data: {
+    type: string;
+    title: string;
+    description?: string;
+    page_url: string;
+    user_agent: string;
+    screenshots: Array<{ storage_path: string; annotation_data: AnnotationCommand[]; order_index: number }>;
+    audio?: { storage_path: string; duration_seconds: number } | null;
+  }): Promise<Feedback> {
+    return this.request('/feedback', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async adminGetFeedback(params?: {
+    status?: FeedbackStatus;
+    type?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: Feedback[]; count: number; page: number; limit: number }> {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))).toString()
+      : '';
+    return this.request(`/feedback${qs}`);
+  }
+
+  async getFeedbackDetail(id: string): Promise<Feedback> {
+    return this.request(`/feedback/${id}`);
+  }
+
+  async updateFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback> {
+    return this.request(`/feedback/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  }
+
+  async addFeedbackComment(feedbackId: string, body: string): Promise<FeedbackComment> {
+    return this.request(`/feedback/${feedbackId}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+  }
+
+  async getFeedbackConfig(): Promise<FeedbackConfig> {
+    return this.request('/feedback/config');
+  }
+
+  async updateFeedbackConfig(data: Partial<Pick<FeedbackConfig, 'enabled' | 'config'>>): Promise<FeedbackConfig> {
+    return this.request('/feedback/config', { method: 'PATCH', body: JSON.stringify(data) });
   }
 }
 
