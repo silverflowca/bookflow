@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Save, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import type { CoverSize } from '../contexts/ThemeContext';
@@ -40,6 +40,8 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
+  const isFirstLoad = useRef(true);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'failed'>('unknown');
   const [restreamStatus, setRestreamStatus] = useState<{ connected: boolean; has_credentials: boolean } | null>(null);
   const [restreamConnecting, setRestreamConnecting] = useState(false);
@@ -98,11 +100,36 @@ export default function Settings() {
     } catch { /* silent */ }
   }
 
+  const saveNow = useCallback(async (s: AppSettings) => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await api.updateAppSettings(s);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  // Auto-save: debounce 800 ms after any settings change (skip the very first load)
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => saveNow(settings), 800);
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+  }, [settings, saveNow]);
+
   async function connectRestream() {
     // Save credentials first so the server can read them during OAuth
     setRestreamConnecting(true);
     try {
-      await api.updateAppSettings(settings);
+      await saveNow(settings);
       // Redirect to server OAuth initiation endpoint
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8682';
       // VITE_API_URL may be '/api' (relative) or 'https://host/api' — strip trailing /api for OAuth redirect
@@ -122,21 +149,6 @@ export default function Settings() {
       setRestreamStatus(s => s ? { ...s, connected: false, has_token: false } as any : null);
       setRestreamMsg({ type: 'success', text: 'Restream disconnected.' });
     } catch { /* silent */ }
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    try {
-      await api.updateAppSettings(settings);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      console.error('Failed to save settings:', err);
-      alert('Failed to save settings');
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function testConnection() {
@@ -507,24 +519,20 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Save Button */}
-      <div className="mt-6 flex items-center justify-between">
-        <div>
-          {saved && (
-            <span className="text-green-600 text-sm flex items-center gap-1">
-              <CheckCircle className="h-4 w-4" />
-              Settings saved successfully!
-            </span>
-          )}
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+      {/* Auto-save status */}
+      <div className="mt-6 flex items-center justify-end gap-2 text-sm">
+        {saving && (
+          <span className="flex items-center gap-1.5 text-muted">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Saving…
+          </span>
+        )}
+        {saved && !saving && (
+          <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+            <CheckCircle className="h-3.5 w-3.5" />
+            Saved
+          </span>
+        )}
       </div>
     </div>
   );
