@@ -50,7 +50,11 @@ export default function Settings() {
   useEffect(() => {
     loadSettings();
     loadRestreamStatus();
-    api.getMyBooks().then(books => setMyBooks(books.map((b: any) => ({ id: b.id, title: b.title })))).catch(() => {});
+    // Use adminGetBooks so all books appear (not just the logged-in user's own books)
+    api.adminGetBooks().then(books => setMyBooks(books.map((b: any) => ({ id: b.id, title: b.title })))).catch(() => {
+      // fallback to own books if admin endpoint fails
+      api.getMyBooks().then(books => setMyBooks(books.map((b: any) => ({ id: b.id, title: b.title })))).catch(() => {});
+    });
   }, []);
 
   // Handle OAuth callback redirect: ?restream=connected or ?restream=error
