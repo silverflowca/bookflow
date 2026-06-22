@@ -1282,7 +1282,10 @@ export default function BookReader() {
       {/* Feature demo tour — launched from Home page feature cards */}
       {pendingTour && book && (
         <TutorialOverlay
-          chapters={buildFeatureTours(pendingTour.bookId)}
+          chapters={buildFeatureTours(
+            pendingTour.bookId,
+            [...(book.chapters ?? [])].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)).map(c => c.id),
+          )}
           bookId={pendingTour.bookId}
           initialChapter={pendingTour.chapterIdx}
           initialStep={0}

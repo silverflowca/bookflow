@@ -9,15 +9,16 @@
  */
 
 import type { TutorialChapter } from './TutorialOverlay';
-import { DEMO_CHAPTER_IDS } from '../../config/demoBook';
+import { DEMO_CHAPTER_IDS, FEATURE_ORDER } from '../../config/demoBook';
 
-function chapterUrl(bookId: string, featureId: string): string {
-  const chId = DEMO_CHAPTER_IDS[featureId];
+function chapterUrl(bookId: string, featureId: string, liveIds?: string[]): string {
+  // Use live IDs (sorted by order_index) when available; fall back to static map
+  const chId = liveIds ? liveIds[FEATURE_ORDER[featureId]] : DEMO_CHAPTER_IDS[featureId];
   if (!bookId || !chId) return '';
   return `/book/${bookId}/chapter/${chId}`;
 }
 
-export function buildFeatureTours(bookId: string): TutorialChapter[] {
+export function buildFeatureTours(bookId: string, liveChapterIds?: string[]): TutorialChapter[] {
   return [
     // ── 1. Rich Text Editor ──────────────────────────────────────────────────
     {
@@ -30,7 +31,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Welcome to the Rich Text Editor',
           description: 'BookFlow gives every author a professional writing studio — no downloads, no installs. Let\'s take a quick look at how it works.',
-          navigateTo: chapterUrl(bookId, 'rich-text'),
+          navigateTo: chapterUrl(bookId, 'rich-text', liveChapterIds),
         },
         {
           chapter: 0,
@@ -67,7 +68,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Inline Reflection Questions',
           description: 'Questions are embedded directly inside chapters. Readers answer without leaving the page — no forms, no pop-ups. You see every response in your dashboard.',
-          navigateTo: chapterUrl(bookId, 'inline-questions'),
+          navigateTo: chapterUrl(bookId, 'inline-questions', liveChapterIds),
         },
         {
           chapter: 1,
@@ -98,7 +99,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Live Polls — Instant Reader Engagement',
           description: 'Polls turn reading into a two-way conversation. Insert a poll anywhere in a chapter and readers tap to vote. Results update in real time as people respond.',
-          navigateTo: chapterUrl(bookId, 'polls'),
+          navigateTo: chapterUrl(bookId, 'polls', liveChapterIds),
         },
         {
           chapter: 2,
@@ -129,7 +130,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Audio in Two Ways',
           description: 'BookFlow supports two audio modes: upload your own recorded MP3 per chapter, or activate AI text-to-speech to auto-narrate your book. Both are embedded directly in the reader.',
-          navigateTo: chapterUrl(bookId, 'audio'),
+          navigateTo: chapterUrl(bookId, 'audio', liveChapterIds),
         },
         {
           chapter: 3,
@@ -159,7 +160,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Video Without Leaving the Book',
           description: 'Authors paste a YouTube or Vimeo link while writing and BookFlow automatically converts it to a full embedded player. Readers watch without opening a new tab.',
-          navigateTo: chapterUrl(bookId, 'video'),
+          navigateTo: chapterUrl(bookId, 'video', liveChapterIds),
         },
         {
           chapter: 4,
@@ -189,7 +190,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Images Inside Chapters',
           description: 'Drop images anywhere in a chapter with a single upload. BookFlow optimises them automatically for all screen sizes — desktop, tablet, and mobile.',
-          navigateTo: chapterUrl(bookId, 'images'),
+          navigateTo: chapterUrl(bookId, 'images', liveChapterIds),
         },
         {
           chapter: 5,
@@ -219,7 +220,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Make the Book Your Own',
           description: 'Readers can highlight any passage in one of five colours and attach a personal note. All annotations are private by default — only visible to the reader who made them.',
-          navigateTo: chapterUrl(bookId, 'highlights'),
+          navigateTo: chapterUrl(bookId, 'highlights', liveChapterIds),
         },
         {
           chapter: 6,
@@ -249,7 +250,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Know Exactly Where Everyone Is',
           description: 'BookFlow tracks reader progress automatically. Every chapter opened, question answered, poll voted, and form submitted advances the reader\'s progress bar.',
-          navigateTo: chapterUrl(bookId, 'progress'),
+          navigateTo: chapterUrl(bookId, 'progress', liveChapterIds),
         },
         {
           chapter: 7,
@@ -286,7 +287,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Forms Without Leaving the Book',
           description: 'Drop text fields, dropdowns, radio buttons, checkboxes, and text areas anywhere in a chapter. Readers fill them in without ever navigating away from the reading experience.',
-          navigateTo: chapterUrl(bookId, 'forms'),
+          navigateTo: chapterUrl(bookId, 'forms', liveChapterIds),
         },
         {
           chapter: 8,
@@ -317,7 +318,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Read Together, Grow Together',
           description: 'Book clubs are private reading communities tied to a specific book. Create a club, add a book, and invite members with one shareable link — done in under 60 seconds.',
-          navigateTo: chapterUrl(bookId, 'clubs'),
+          navigateTo: chapterUrl(bookId, 'clubs', liveChapterIds),
         },
         {
           chapter: 9,
@@ -347,7 +348,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Team Writing Made Simple',
           description: 'Invite co-authors, editors, and reviewers with role-based permissions. Each collaborator sees the book in their own dashboard and works on their assigned sections.',
-          navigateTo: chapterUrl(bookId, 'collaborate'),
+          navigateTo: chapterUrl(bookId, 'collaborate', liveChapterIds),
         },
         {
           chapter: 10,
@@ -377,7 +378,7 @@ export function buildFeatureTours(bookId: string): TutorialChapter[] {
           placement: 'center',
           title: 'Share Your Book with the World',
           description: 'Publishing is one click. Choose public (anyone finds it in the BookFlow library) or private (only people you share the link with). A QR code is generated automatically.',
-          navigateTo: chapterUrl(bookId, 'publish'),
+          navigateTo: chapterUrl(bookId, 'publish', liveChapterIds),
         },
         {
           chapter: 11,
