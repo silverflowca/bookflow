@@ -8,7 +8,7 @@ import api from '../lib/api';
 import type { Book } from '../types';
 import TutorialOverlay from '../components/reader/TutorialOverlay';
 import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
-import { DEMO_CHAPTER_IDS } from '../config/demoBook';
+import { DEMO_BOOK_ID, DEMO_CHAPTER_IDS } from '../config/demoBook';
 
 
 // ─── Carousel config (written by AdminPage, read here) ───────────────────────
@@ -39,7 +39,7 @@ export default function Home() {
   const [tagline, setTagline] = useState(DEFAULT_TAGLINE);
   const [, setSavedCount] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
-  const [demoBookId, setDemoBookId] = useState<string>('');
+  const [demoBookId, setDemoBookId] = useState<string>(DEMO_BOOK_ID);
 
   useEffect(() => {
     loadBooks();
