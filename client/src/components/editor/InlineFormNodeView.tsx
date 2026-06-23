@@ -150,18 +150,27 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
     }
     case 'image': {
       const src = (contentData as any)?.url || (contentData as any)?.src;
-      const alt = (contentData as any)?.alt || (contentData as any)?.caption || '';
+      const alt = (contentData as any)?.alt || '';
+      const caption = (contentData as any)?.caption || '';
+      const widthClass: Record<string, string> = {
+        small: 'max-w-xs',
+        medium: 'max-w-md',
+        large: 'max-w-2xl',
+        full: 'w-full',
+      };
+      const wClass = widthClass[(contentData as any)?.width || 'full'] ?? 'w-full';
       if (!src) return <span className="text-xs opacity-60 ml-1">[no image]</span>;
       return (
-        <span className="block w-full mt-1" contentEditable={false}>
+        <figure className={`${wClass} mx-auto my-2`} contentEditable={false}>
           <img
             src={src}
             alt={alt}
-            className="w-full rounded-lg object-cover"
-            style={{ maxHeight: 300 }}
+            className="w-full rounded-lg object-contain bg-surface-hover"
           />
-          {alt && <span className="block text-xs text-center opacity-60 mt-0.5">{alt}</span>}
-        </span>
+          {caption && (
+            <figcaption className="text-center text-xs text-muted mt-1.5 italic">{caption}</figcaption>
+          )}
+        </figure>
       );
     }
     case 'poll': {
@@ -337,6 +346,24 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
 
   if (isMedia) {
     const mediaSizePct = (contentData as any)?.size ?? 100;
+
+    // Images render as a clean live preview (no pill border) — identical to the reader
+    if (contentType === 'image') {
+      return (
+        <NodeViewWrapper as="div" className="my-2" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
+          <div
+            className={`rounded${ringClass} cursor-pointer`}
+            onDoubleClick={handleDoubleClick}
+            title="Double-click to edit"
+          >
+            {!!contentData && (
+              <FormPreview contentType={contentType} contentData={contentData as any} />
+            )}
+          </div>
+        </NodeViewWrapper>
+      );
+    }
+
     return (
       <NodeViewWrapper as="div" className="my-2" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
         <div
