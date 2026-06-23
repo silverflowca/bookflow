@@ -192,7 +192,7 @@ export default function BookSettings() {
     setTimeout(() => setQrCopied(false), 2000);
   }
 
-  function updateSetting(key: keyof BookSettingsType, value: boolean | number) {
+  function updateSetting(key: keyof BookSettingsType, value: boolean | number | string) {
     if (!settings) return;
     setSettings({ ...settings, [key]: value });
   }
@@ -754,6 +754,40 @@ export default function BookSettings() {
               checked={settings.show_inline_form_preview ?? true}
               onChange={(v) => updateSetting('show_inline_form_preview', v)}
             />
+
+            {/* Editor preview mode — live vs minimal */}
+            <div>
+              <p className="text-sm font-medium text-theme mb-1">Inline component display</p>
+              <p className="text-xs text-muted mb-3">
+                Choose how embedded components (images, polls, questions, forms) appear while writing in the editor.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {(['live', 'minimal'] as const).map(mode => {
+                  const active = (settings.editor_preview_mode ?? 'live') === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateSetting('editor_preview_mode', mode)}
+                      className={`flex flex-col items-start gap-1.5 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                        active
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
+                      }`}
+                    >
+                      <span className={`text-sm font-semibold ${active ? 'text-blue-600 dark:text-blue-400' : 'text-theme'}`}>
+                        {mode === 'live' ? '🖼 Live Preview' : '🏷 Minimal'}
+                      </span>
+                      <span className="text-xs text-muted leading-snug">
+                        {mode === 'live'
+                          ? 'Components render exactly as readers see them — full images, polls, forms, etc.'
+                          : 'Components show as compact labelled badges so they stay out of your way while writing.'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>

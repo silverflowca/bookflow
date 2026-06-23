@@ -24,6 +24,8 @@ import type {
 import InlineContentModal from '../components/editor/InlineContentModal';
 import CommentsSidebar from '../components/comments/CommentsSidebar';
 import { useAuth } from '../contexts/AuthContext';
+import { EditorPreviewContext } from '../contexts/EditorPreviewContext';
+import type { EditorPreviewMode } from '../contexts/EditorPreviewContext';
 
 export default function ChapterEditor() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
@@ -760,7 +762,10 @@ export default function ChapterEditor() {
     );
   }
 
+  const editorPreviewMode: EditorPreviewMode = (bookSettings?.editor_preview_mode ?? 'live');
+
   return (
+    <EditorPreviewContext.Provider value={{ mode: editorPreviewMode }}>
     <div className="min-h-screen bg-surface-hover">
       {/* Live Episode Banner */}
       {liveEpisode && (
@@ -1238,6 +1243,7 @@ export default function ChapterEditor() {
         />
       )}
     </div>
+    </EditorPreviewContext.Provider>
   );
 }
 

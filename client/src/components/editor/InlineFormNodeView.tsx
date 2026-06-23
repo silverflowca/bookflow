@@ -4,6 +4,7 @@ import type { NodeViewProps } from '@tiptap/react';
 import type {
   TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData, ScriptureBlockData,
 } from '../../types/index';
+import { useEditorPreviewMode } from '../../contexts/EditorPreviewContext';
 
 type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
@@ -283,6 +284,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
     position: Position;
   };
 
+  const previewMode = useEditorPreviewMode();
   const isInline = !position || position === 'inline';
   const colorClass = TYPE_COLOR[contentType] ?? 'bg-gray-50 border-gray-200 text-gray-700';
   const label = TYPE_LABEL[contentType] ?? contentType;
@@ -318,6 +320,33 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
         {/* Location indicator */}
         <span className="text-xs opacity-70 font-normal" data-testid="inline-form-badge">
           {meta?.icon} {label} · {meta?.label}
+        </span>
+      </NodeViewWrapper>
+    );
+  }
+
+  // ── Minimal mode: compact labelled badge for all inline components ───────
+  if (previewMode === 'minimal') {
+    const isBlockMedia = BLOCK_MEDIA_TYPES.has(contentType);
+    return (
+      <NodeViewWrapper
+        as={isBlockMedia ? 'div' : 'span'}
+        className={isBlockMedia ? 'my-1' : undefined}
+        data-content-id={contentId}
+        data-content-type={contentType}
+        data-testid="inline-form-node"
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to edit"
+      >
+        <span
+          className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline cursor-pointer ${colorClass}${ringClass}`}
+        >
+          {anchorText && (
+            <span className="font-medium underline decoration-dotted underline-offset-2">
+              {anchorText}
+            </span>
+          )}
+          <span className="text-xs opacity-60 font-normal">[{label}]</span>
         </span>
       </NodeViewWrapper>
     );
