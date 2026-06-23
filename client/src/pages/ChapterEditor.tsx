@@ -52,6 +52,10 @@ export default function ChapterEditor() {
   const [markTooltip, setMarkTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
   const [showColPicker, setShowColPicker] = useState(false);
   const colPickerRef = useRef<HTMLDivElement>(null);
+  // Context menu (right-click / long-press)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenuRef = useRef<HTMLDivElement>(null);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -262,6 +266,25 @@ export default function ChapterEditor() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // Close context menu on outside click or Escape
+  useEffect(() => {
+    if (!ctxMenu) return;
+    function onDown(e: MouseEvent) {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) {
+        setCtxMenu(null);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setCtxMenu(null);
+    }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [ctxMenu]);
+
   async function loadInlineContent() {
     try {
       const data = await api.getInlineContent(chapterId!);
@@ -402,6 +425,35 @@ export default function ChapterEditor() {
     const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, ' ').trim();
     setShowInlineModal({ type, selection: { from, to, text } });
+  }
+
+  function openCtxMenu(x: number, y: number) {
+    // Clamp so the menu doesn't overflow the viewport
+    const menuW = 320;
+    const menuH = 380;
+    const cx = Math.min(x, window.innerWidth - menuW - 8);
+    const cy = Math.min(y, window.innerHeight - menuH - 8);
+    setCtxMenu({ x: Math.max(8, cx), y: Math.max(8, cy) });
+  }
+
+  function handleEditorContextMenu(e: React.MouseEvent) {
+    // Only fire inside the ProseMirror content (not on toolbar buttons etc.)
+    e.preventDefault();
+    openCtxMenu(e.clientX, e.clientY);
+  }
+
+  function handleEditorTouchStart(e: React.TouchEvent) {
+    const touch = e.touches[0];
+    longPressRef.current = setTimeout(() => {
+      openCtxMenu(touch.clientX, touch.clientY);
+    }, 600);
+  }
+
+  function handleEditorTouchEnd() {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
   }
 
   const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll'];
@@ -1086,7 +1138,14 @@ export default function ChapterEditor() {
           </div>
 
           {/* Editor Content */}
-          <div id="bf-editor-content" className="bg-surface border border-theme rounded-b-lg">
+          <div
+            id="bf-editor-content"
+            className="bg-surface border border-theme rounded-b-lg"
+            onContextMenu={handleEditorContextMenu}
+            onTouchStart={handleEditorTouchStart}
+            onTouchEnd={handleEditorTouchEnd}
+            onTouchMove={handleEditorTouchEnd}
+          >
             <EditorContent
               editor={editor}
               className="prose max-w-none p-6 min-h-[500px] focus:outline-none"
@@ -1230,6 +1289,49 @@ export default function ChapterEditor() {
       )}
 
       {/* Inline Content Modal */}
+      {/* ── Editor context menu (right-click / long-press) ─────────────────── */}
+      {ctxMenu && (
+        <div
+          ref={ctxMenuRef}
+          className="fixed z-[9999] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 w-80"
+          style={{ top: ctxMenu.y, left: ctxMenu.x }}
+        >
+          <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-1">
+            Insert component
+          </p>
+          <div className="grid grid-cols-4 gap-1">
+            {([
+              { type: 'question',        icon: '❓', label: 'Question' },
+              { type: 'poll',            icon: '📊', label: 'Poll' },
+              { type: 'highlight',       icon: '✏️',  label: 'Highlight' },
+              { type: 'note',            icon: '📝', label: 'Note' },
+              { type: 'link',            icon: '🔗', label: 'Link' },
+              { type: 'audio',           icon: '🎵', label: 'Audio' },
+              { type: 'video',           icon: '🎬', label: 'Video' },
+              { type: 'image',           icon: '🖼️',  label: 'Image' },
+              { type: 'textbox',         icon: '🔤', label: 'Text Input' },
+              { type: 'textarea',        icon: '📄', label: 'Text Area' },
+              { type: 'select',          icon: '🔽', label: 'Dropdown' },
+              { type: 'multiselect',     icon: '☑️',  label: 'Multi-Select' },
+              { type: 'radio',           icon: '⭕', label: 'Radio' },
+              { type: 'checkbox',        icon: '✅', label: 'Checkbox' },
+              { type: 'code_block',      icon: '💻', label: 'Code' },
+              { type: 'scripture_block', icon: '📖', label: 'Scripture' },
+            ] as { type: InlineContent['content_type']; icon: string; label: string }[]).map(({ type, icon, label }) => (
+              <button
+                key={type}
+                onClick={() => { setCtxMenu(null); handleAddInlineContent(type); }}
+                className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-center"
+                title={label}
+              >
+                <span className="text-xl leading-none">{icon}</span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showInlineModal && (
         <InlineContentModal
           type={showInlineModal.type}
