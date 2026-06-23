@@ -126,11 +126,18 @@ export default function Home() {
 
         {/* Text block — sits above carousel, never overlapped */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-16 pb-0 text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 mb-5 px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase"
-            style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', color: '#7c3aed' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
-            The Interactive Book Platform
+          {/* Badge + concept stamp inline */}
+          <div className="inline-flex items-center gap-3 mb-5">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase"
+              style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', color: '#7c3aed' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
+              The Interactive Book Platform
+            </div>
+            <Link to="/bl/about" className="select-none rotate-[-12deg] mt-1">
+              <div className="border-[2px] border-red-600 text-red-600 font-black uppercase text-[9px] px-2 py-1 rounded-sm tracking-widest whitespace-nowrap hover:bg-red-50 transition-colors opacity-80">
+                Concept Website
+              </div>
+            </Link>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight tracking-tight text-gray-900">
@@ -140,16 +147,9 @@ export default function Home() {
             </span>
           </h1>
 
-          <div className="flex items-center justify-center gap-4 mb-6 sm:mb-8">
-            <p className="text-base sm:text-lg text-gray-500 max-w-2xl leading-relaxed">
-              {tagline}
-            </p>
-            <Link to="/bl/about" className="flex-shrink-0 select-none rotate-[-12deg]">
-              <div className="border-[2px] border-red-600 text-red-600 font-black uppercase text-[9px] px-2 py-1 rounded-sm tracking-widest whitespace-nowrap hover:bg-red-50 transition-colors opacity-80">
-                Concept Website
-              </div>
-            </Link>
-          </div>
+          <p className="text-base sm:text-lg text-gray-500 mb-6 sm:mb-8 max-w-2xl mx-auto leading-relaxed">
+            {tagline}
+          </p>
 
           <div className="flex flex-wrap gap-4 justify-center">
             <Link

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   BookOpen, Clock, Users, Lock, Globe, ChevronRight,
   Loader2, AlertCircle, Sparkles,
@@ -12,16 +12,28 @@ export default function BookLandingPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [book, setBook] = useState<BookLanding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
+
+  // ?chapter=<slug> — jump directly to that chapter when book loads
+  const chapterSlugParam = new URLSearchParams(location.search).get('chapter');
 
   const load = useCallback(async () => {
     if (!slug) return;
     try {
       const data = await api.getBookLanding(slug);
       setBook(data);
+      // If a chapter slug was requested, navigate straight to it
+      if (chapterSlugParam) {
+        const target = data.chapters.find((c: any) => c.slug === chapterSlugParam);
+        if (target) {
+          navigate(`/book/${data.id}/chapter/${target.id}`, { replace: true });
+          return;
+        }
+      }
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string };
       if (e?.status === 401) { setNeedsLogin(true); return; }
@@ -29,7 +41,7 @@ export default function BookLandingPage() {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, chapterSlugParam, navigate]);
 
   useEffect(() => { load(); }, [load]);
 
