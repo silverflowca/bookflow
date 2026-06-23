@@ -6,7 +6,7 @@ import type {
 } from '../../types/index';
 import { useEditorPreviewMode } from '../../contexts/EditorPreviewContext';
 
-type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block';
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block' | 'drawing';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
@@ -221,6 +221,30 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         </span>
       );
     }
+    case 'drawing': {
+      const src = (contentData as any)?.dataUrl;
+      const caption = (contentData as any)?.caption || '';
+      const widthClass: Record<string, string> = {
+        small: 'max-w-xs',
+        medium: 'max-w-md',
+        large: 'max-w-2xl',
+        full: 'w-full',
+      };
+      const wClass = widthClass[(contentData as any)?.width || 'full'] ?? 'w-full';
+      if (!src) return <span className="text-xs opacity-60 ml-1">[empty drawing]</span>;
+      return (
+        <figure className={`${wClass} mx-auto my-2`} contentEditable={false}>
+          <img
+            src={src}
+            alt={(contentData as any)?.title || 'Drawing'}
+            className="w-full rounded-lg object-contain bg-white border border-gray-100"
+          />
+          {caption && (
+            <figcaption className="text-center text-xs text-muted mt-1.5 italic">{caption}</figcaption>
+          )}
+        </figure>
+      );
+    }
     default:
       return null;
   }
@@ -240,9 +264,10 @@ const TYPE_LABEL: Record<FormType, string> = {
   image: 'Image',
   poll: 'Poll',
   scripture_block: 'Scripture',
+  drawing: 'Drawing',
 };
 
-const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image']);
+const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image', 'drawing']);
 
 // Per-type colour tokens used for the inline pill
 const TYPE_COLOR: Record<FormType, string> = {
@@ -257,6 +282,7 @@ const TYPE_COLOR: Record<FormType, string> = {
   image:          'bg-pink-50   border-pink-200   text-pink-700',
   poll:           'bg-green-50  border-green-200  text-green-700',
   scripture_block:'bg-amber-50  border-amber-200  text-amber-700',
+  drawing:        'bg-purple-50 border-purple-200 text-purple-700',
 };
 
 // Location badge styles for non-inline placements

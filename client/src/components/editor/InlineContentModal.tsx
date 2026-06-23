@@ -4,12 +4,13 @@ import api from '../../lib/api';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, ImageData
+  CodeBlockData, ScriptureBlockData, ImageData, DrawingData
 } from '../../types';
 import {
   SelectForm, MultiselectForm, TextboxForm, TextareaForm,
   RadioForm, CheckboxForm, CodeBlockForm, ScriptureBlockForm
 } from './InteractiveForms';
+import DrawingCanvas from './DrawingCanvas';
 
 interface Props {
   type: InlineContent['content_type'];
@@ -48,6 +49,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
     checkbox: isEditing ? 'Edit Checkboxes' : 'Add Checkboxes',
     code_block: isEditing ? 'Edit Code Block' : 'Add Code Block',
     scripture_block: isEditing ? 'Edit Scripture' : 'Add Scripture Verse',
+    drawing: isEditing ? 'Edit Drawing' : 'Add Drawing',
   };
 
   const handleSubmit = (data: Partial<InlineContent>) => {
@@ -58,6 +60,19 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
       onCreate(payload);
     }
   };
+
+  // Drawing type: render the full drawing canvas popup directly (no wrapper modal needed)
+  if (type === 'drawing') {
+    return (
+      <DrawingCanvas
+        initialData={editingItem?.content_data as DrawingData | undefined}
+        onClose={onClose}
+        onSave={(drawingData) => {
+          handleSubmit({ content_data: drawingData });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-modal role="dialog" aria-modal="true">

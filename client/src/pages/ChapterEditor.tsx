@@ -461,7 +461,7 @@ export default function ChapterEditor() {
 
   const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll'];
   // Types that can be inserted as an atom node at the cursor (no text selection needed)
-  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block'];
+  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
@@ -1111,6 +1111,13 @@ export default function ChapterEditor() {
             >
               <Image className="h-4 w-4" />
             </ToolbarButton>
+            <ToolbarButton
+              onClick={() => handleAddInlineContent('drawing')}
+              title="Add Drawing"
+              className="text-purple-600"
+            >
+              <Pencil className="h-4 w-4" />
+            </ToolbarButton>
             <div className="w-px bg-surface-hover mx-1" />
             {/* Column Layout picker */}
             <div className="relative" ref={colPickerRef}>
@@ -1323,6 +1330,7 @@ export default function ChapterEditor() {
               { type: 'checkbox',        icon: '✅', label: 'Checkbox' },
               { type: 'code_block',      icon: '💻', label: 'Code' },
               { type: 'scripture_block', icon: '📖', label: 'Scripture' },
+              { type: 'drawing',         icon: '🎨', label: 'Drawing' },
             ] as { type: InlineContent['content_type']; icon: string; label: string }[]).map(({ type, icon, label }) => (
               <button
                 key={type}

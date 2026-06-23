@@ -77,6 +77,7 @@ export const InlineContentMark = Mark.create<InlineContentMarkOptions>({
       checkbox: 'inline-form inline-checkbox',
       code_block: 'inline-code',
       scripture_block: 'inline-scripture',
+      drawing: 'inline-drawing',
     };
     const className = classMap[contentType] || 'inline-default';
 

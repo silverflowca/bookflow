@@ -42,7 +42,7 @@ import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
 import { DEMO_BOOK_ID } from '../config/demoBook';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
-  SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData,
+  SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
   AllFormResponsesResult,
 } from '../types';
 
@@ -1715,7 +1715,7 @@ function TipTapNode({
     case 'text': {
       const nodeText = node.text || '';
       const FORM_TYPES_SET = new Set(['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block']);
-      const MEDIA_TYPES_SET = new Set(['audio', 'video', 'image']);
+      const MEDIA_TYPES_SET = new Set(['audio', 'video', 'image', 'drawing']);
 
       // Look up pre-assigned matches for this exact node key (computed before render, no mutation)
       const matchingContent = (nodeKeyPrefix && assignmentMap?.get(nodeKeyPrefix)) || [];
@@ -1780,7 +1780,7 @@ function TipTapNode({
           // Author image/audio/video renders inline as a block player
           segments.push(
             <span key={`media-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-3 w-full">
-              {ic.content_type === 'image' ? <InlineFormElement content={ic} /> : <InlineMediaPlayer content={ic} />}
+              {(ic.content_type === 'image' || ic.content_type === 'drawing') ? <InlineFormElement content={ic} /> : <InlineMediaPlayer content={ic} />}
             </span>
           );
         } else if (isFormType && position === 'inline') {
@@ -1998,6 +1998,9 @@ function InlineContentBlock({ content, isAuthor = false, userId }: { content: In
   }
   if (content.content_type === 'image') {
     return <ImageBlock content={content} />;
+  }
+  if (content.content_type === 'drawing') {
+    return <DrawingBlock content={content} />;
   }
   return null;
 }
@@ -3334,6 +3337,30 @@ function ImageBlock({ content }: { content: InlineContent }) {
   );
 }
 
+// Drawing block
+function DrawingBlock({ content }: { content: InlineContent }) {
+  const data = content.content_data as DrawingData;
+  const widthClass = {
+    small: 'max-w-xs',
+    medium: 'max-w-md',
+    large: 'max-w-2xl',
+    full: 'w-full',
+  }[data.width || 'full'];
+
+  return (
+    <figure className={`${widthClass} mx-auto my-2`}>
+      <img
+        src={data.dataUrl}
+        alt={data.title || 'Drawing'}
+        className="w-full rounded-lg object-contain bg-white border border-gray-100"
+      />
+      {data.caption && (
+        <figcaption className="text-center text-xs text-muted mt-1.5 italic">{data.caption}</figcaption>
+      )}
+    </figure>
+  );
+}
+
 // Compact inline media player — rendered directly in the text flow
 function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
@@ -3499,6 +3526,8 @@ function InlineFormElement({ content }: { content: InlineContent }) {
       return <InlineScripture content={content} />;
     case 'image':
       return <ImageBlock content={content} />;
+    case 'drawing':
+      return <DrawingBlock content={content} />;
     case 'audio':
     case 'video':
       return <MediaBlock content={content} />;

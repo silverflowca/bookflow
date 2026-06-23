@@ -204,7 +204,7 @@ export interface ActivityEvent {
 export type InlineContentType =
   | 'question' | 'poll' | 'highlight' | 'note' | 'link' | 'audio' | 'video'
   | 'select' | 'multiselect' | 'textbox' | 'textarea' | 'radio' | 'checkbox'
-  | 'code_block' | 'scripture_block' | 'image';
+  | 'code_block' | 'scripture_block' | 'image' | 'drawing';
 
 // Display mode for interactive content
 export type InlineDisplayMode = 'inline' | 'sidebar' | 'start_of_chapter' | 'end_of_chapter';
@@ -219,7 +219,7 @@ export interface InlineContent {
   anchor_text?: string;
   content_data: QuestionData | PollData | HighlightData | NoteData | LinkData | MediaData
     | SelectData | MultiselectData | TextboxData | TextareaData | RadioData | CheckboxData
-    | CodeBlockData | ScriptureBlockData | ImageData;
+    | CodeBlockData | ScriptureBlockData | ImageData | DrawingData;
   created_by: string;
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
@@ -364,6 +364,17 @@ export interface ImageData {
   alt?: string;
   caption?: string;
   width?: 'small' | 'medium' | 'large' | 'full';
+}
+
+export interface DrawingData {
+  /** Base64 PNG data URL of the drawing */
+  dataUrl: string;
+  title?: string;
+  caption?: string;
+  width?: 'small' | 'medium' | 'large' | 'full';
+  /** Original canvas dimensions, stored for display ratio */
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
 // Form response for interactive elements
