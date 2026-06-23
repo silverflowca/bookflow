@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X, Expand } from 'lucide-react';
+import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X, Expand, LayoutGrid, LayoutList } from 'lucide-react';
 import api from '../lib/api';
 
 function ExpandableImage({ src, alt }: { src: string; alt: string }) {
@@ -93,6 +93,48 @@ function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }
             </span>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ClubRow({ club, onOpen }: { club: Club; onOpen: (id: string) => void }) {
+  const memberCount = club.member_count ?? club.members?.filter(m => m.invite_accepted_at).length ?? 0;
+  const currentBook = club.books?.find(b => b.is_current)?.book;
+
+  return (
+    <div
+      className="theme-section rounded-xl overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex items-center gap-4 p-3"
+      onClick={() => onOpen(club.id)}
+    >
+      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        {club.cover_image_url
+          ? <img src={club.cover_image_url} alt={club.name} className="w-full h-full object-cover" />
+          : <Users className="h-5 w-5 text-white opacity-60" />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-theme text-sm truncate">{club.name}</h3>
+          {club.visibility === 'public'
+            ? <Globe className="h-3.5 w-3.5 text-muted flex-shrink-0" />
+            : <Lock className="h-3.5 w-3.5 text-muted flex-shrink-0" />
+          }
+        </div>
+        {club.description && (
+          <p className="text-muted text-xs truncate">{club.description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-4 flex-shrink-0 text-xs text-muted">
+        <span className="flex items-center gap-1">
+          <Users className="h-3.5 w-3.5" /> {memberCount} / {club.max_members}
+        </span>
+        {currentBook && (
+          <span className="hidden sm:flex items-center gap-1 max-w-[160px] truncate">
+            <BookOpen className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{currentBook.title}</span>
+          </span>
+        )}
       </div>
     </div>
   );
@@ -287,7 +329,15 @@ export default function ClubsPage() {
   const [createType, setCreateType] = useState<'club' | 'study_group'>('club');
   const [joinRequestClub, setJoinRequestClub] = useState<Club | null>(null);
   const [requestedClubIds, setRequestedClubIds] = useState<Set<string>>(new Set());
+  const [clubView, setClubView] = useState<'card' | 'list'>(() =>
+    (localStorage.getItem('bookflow-club-view') as 'card' | 'list') || 'card'
+  );
   const navigate = useNavigate();
+
+  function toggleClubView(v: 'card' | 'list') {
+    setClubView(v);
+    localStorage.setItem('bookflow-club-view', v);
+  }
 
   useEffect(() => {
     loadClubs();
@@ -366,13 +416,32 @@ export default function ClubsPage() {
           <h1 className="text-2xl font-bold text-theme theme-title">Book Clubs & Study Groups</h1>
           <p className="text-muted mt-1">Read together, discuss together</p>
         </div>
-        <button
-          onClick={() => openCreate(mainTab === 'bookstudy' ? 'study_group' : 'club')}
-          className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium self-start sm:self-auto"
-        >
-          <Plus className="h-5 w-5" />
-          {mainTab === 'bookstudy' ? 'New Study Group' : 'New Club'}
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Card / List toggle */}
+          <div className="flex items-center gap-1 border border-[var(--color-border)] rounded-lg p-0.5">
+            <button
+              onClick={() => toggleClubView('card')}
+              title="Card view"
+              className={`p-1.5 rounded-md transition-colors ${clubView === 'card' ? 'text-accent bg-accent/10' : 'text-muted hover:text-theme'}`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => toggleClubView('list')}
+              title="List view"
+              className={`p-1.5 rounded-md transition-colors ${clubView === 'list' ? 'text-accent bg-accent/10' : 'text-muted hover:text-theme'}`}
+            >
+              <LayoutList className="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            onClick={() => openCreate(mainTab === 'bookstudy' ? 'study_group' : 'club')}
+            className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium"
+          >
+            <Plus className="h-5 w-5" />
+            {mainTab === 'bookstudy' ? 'New Study Group' : 'New Club'}
+          </button>
+        </div>
       </div>
 
       {/* Main tab bar — Clubs | Book Study Groups */}
@@ -468,10 +537,11 @@ export default function ClubsPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {myClubs.map(club => (
-                  <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-                ))}
+              <div className={clubView === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}>
+                {myClubs.map(club => clubView === 'list'
+                  ? <ClubRow key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                  : <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                )}
               </div>
             )
           ) : (
@@ -500,36 +570,44 @@ export default function ClubsPage() {
                   <p>No public clubs found.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className={clubView === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}>
                   {displayedPublic.map(club => {
                     const isMember = myClubIds.has(club.id);
                     const canRequest = club.allow_join_requests !== false;
                     const requested = requestedClubIds.has(club.id);
-                    return (
+                    const joinBtn = isMember ? (
+                      <button
+                        onClick={() => navigate(`/clubs/${club.id}`)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg flex-shrink-0"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Member — Open
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => canRequest && !requested && setJoinRequestClub(club)}
+                        disabled={requested || !canRequest}
+                        title={!canRequest ? 'This club is not accepting join requests' : undefined}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50 flex-shrink-0"
+                      >
+                        {requested
+                          ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                          : !canRequest
+                            ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
+                            : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
+                        }
+                      </button>
+                    );
+                    return clubView === 'list' ? (
+                      <div key={club.id} className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <ClubRow club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                        </div>
+                        {joinBtn}
+                      </div>
+                    ) : (
                       <div key={club.id} className="flex flex-col">
                         <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-                        {isMember ? (
-                          <button
-                            onClick={() => navigate(`/clubs/${club.id}`)}
-                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg"
-                          >
-                            <Check className="h-3.5 w-3.5" /> Member — Open
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => canRequest && !requested && setJoinRequestClub(club)}
-                            disabled={requested || !canRequest}
-                            title={!canRequest ? 'This club is not accepting join requests' : undefined}
-                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
-                          >
-                            {requested
-                              ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
-                              : !canRequest
-                                ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
-                                : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
-                            }
-                          </button>
-                        )}
+                        <div className="mt-1">{joinBtn}</div>
                       </div>
                     );
                   })}
@@ -607,10 +685,11 @@ export default function ClubsPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {myStudyGroups.map(club => (
-                  <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-                ))}
+              <div className={clubView === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}>
+                {myStudyGroups.map(club => clubView === 'list'
+                  ? <ClubRow key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                  : <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                )}
               </div>
             )
           ) : (
@@ -638,36 +717,44 @@ export default function ClubsPage() {
                   <p>No public study groups found.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className={clubView === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}>
                   {displayedPublicSg.map(club => {
                     const isMember = mySgIds.has(club.id);
                     const canRequest = club.allow_join_requests !== false;
                     const requested = requestedClubIds.has(club.id);
-                    return (
+                    const joinBtn = isMember ? (
+                      <button
+                        onClick={() => navigate(`/clubs/${club.id}`)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg flex-shrink-0"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Member — Open
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => canRequest && !requested && setJoinRequestClub(club)}
+                        disabled={requested || !canRequest}
+                        title={!canRequest ? 'This group is not accepting join requests' : undefined}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50 flex-shrink-0"
+                      >
+                        {requested
+                          ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                          : !canRequest
+                            ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
+                            : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
+                        }
+                      </button>
+                    );
+                    return clubView === 'list' ? (
+                      <div key={club.id} className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <ClubRow club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                        </div>
+                        {joinBtn}
+                      </div>
+                    ) : (
                       <div key={club.id} className="flex flex-col">
                         <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
-                        {isMember ? (
-                          <button
-                            onClick={() => navigate(`/clubs/${club.id}`)}
-                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg"
-                          >
-                            <Check className="h-3.5 w-3.5" /> Member — Open
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => canRequest && !requested && setJoinRequestClub(club)}
-                            disabled={requested || !canRequest}
-                            title={!canRequest ? 'This group is not accepting join requests' : undefined}
-                            className="mt-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50"
-                          >
-                            {requested
-                              ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
-                              : !canRequest
-                                ? <><Lock className="h-3.5 w-3.5" /> Requests Closed</>
-                                : <><UserPlus className="h-3.5 w-3.5" /> Request to Join</>
-                            }
-                          </button>
-                        )}
+                        <div className="mt-1">{joinBtn}</div>
                       </div>
                     );
                   })}

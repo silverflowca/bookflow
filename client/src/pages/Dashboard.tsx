@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight, Search, X } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight, Search, X, LayoutGrid, LayoutList } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -91,6 +91,14 @@ export default function Dashboard() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
   const { coverSize } = useTheme();
+  const [bookListView, setBookListView] = useState<'card' | 'list'>(() =>
+    (localStorage.getItem('bookflow-book-view') as 'card' | 'list') || 'card'
+  );
+
+  function toggleBookView(v: 'card' | 'list') {
+    setBookListView(v);
+    localStorage.setItem('bookflow-book-view', v);
+  }
 
   // Grid columns by cover size
   const gridClass: Record<CoverSize, string> = {
@@ -98,6 +106,9 @@ export default function Dashboard() {
     medium: 'md:grid-cols-2 lg:grid-cols-3',
     large: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
   };
+
+  // List view: single column of compact rows
+  const listClass = 'grid-cols-1';
 
   useEffect(() => {
     loadAll();
@@ -183,20 +194,38 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--color-border)] mb-6">
-        <button
-          onClick={() => setTab('discover')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'discover' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
-        >
-          Discover Books
-        </button>
-        <button
-          onClick={() => setTab('mine')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'mine' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
-        >
-          My Books
-        </button>
+      {/* Tabs + view toggle */}
+      <div className="flex items-center justify-between border-b border-[var(--color-border)] mb-6">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setTab('discover')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'discover' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
+          >
+            Discover Books
+          </button>
+          <button
+            onClick={() => setTab('mine')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === 'mine' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-theme'}`}
+          >
+            My Books
+          </button>
+        </div>
+        <div className="flex items-center gap-1 mb-px">
+          <button
+            onClick={() => toggleBookView('card')}
+            title="Card view"
+            className={`p-1.5 rounded-md transition-colors ${bookListView === 'card' ? 'text-accent bg-accent/10' : 'text-muted hover:text-theme'}`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => toggleBookView('list')}
+            title="List view"
+            className={`p-1.5 rounded-md transition-colors ${bookListView === 'list' ? 'text-accent bg-accent/10' : 'text-muted hover:text-theme'}`}
+          >
+            <LayoutList className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* My Books Tab */}
@@ -219,12 +248,12 @@ export default function Dashboard() {
             </button>
           </div>
         ) : (
-          <div id="bf-dash-books-grid" className={`grid gap-4 ${gridClass[coverSize]}`}>
+          <div id="bf-dash-books-grid" className={`grid gap-4 ${bookListView === 'list' ? listClass : gridClass[coverSize]}`}>
             {books.map((book) => (
               <BookCard
                 key={book.id}
                 book={book}
-                coverSize={coverSize}
+                coverSize={bookListView === 'list' ? 'small' : coverSize}
                 onDelete={() => handleDeleteBook(book.id)}
                 onCoverUpdate={handleCoverUpdate}
                 onUpdate={handleBookUpdate}
@@ -264,9 +293,9 @@ export default function Dashboard() {
               <p>{search ? 'No books match your search.' : 'No public books yet.'}</p>
             </div>
           ) : (
-            <div className={`grid gap-4 ${gridClass[coverSize]}`}>
+            <div className={`grid gap-4 ${bookListView === 'list' ? listClass : gridClass[coverSize]}`}>
               {publicBooks.map((book) => (
-                <DiscoverBookCard key={book.id} book={book} coverSize={coverSize} />
+                <DiscoverBookCard key={book.id} book={book} coverSize={bookListView === 'list' ? 'small' : coverSize} />
               ))}
             </div>
           )}
@@ -280,7 +309,7 @@ export default function Dashboard() {
             <Users className="h-5 w-5 text-accent" />
             <h2 className="text-lg font-semibold text-theme">Collaborating On</h2>
           </div>
-          <div className={`grid gap-4 ${gridClass[coverSize]}`}>
+          <div className={`grid gap-4 ${bookListView === 'list' ? listClass : gridClass[coverSize]}`}>
             {collaboratingBooks.map((book) => (
               <div key={book.id} className="theme-section rounded-xl p-4 flex gap-4">
                 {book.cover_image_url ? (
@@ -651,6 +680,31 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
 
 function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSize }) {
   const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
+
+  if (coverSize === 'small') {
+    return (
+      <Link to={`/book/${book.id}`} className="theme-card rounded-xl flex gap-3 p-2.5 items-center hover:shadow-md transition-shadow group">
+        <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-surface-hover flex items-center justify-center">
+          {book.cover_image_url
+            ? <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+            : <BookOpen className="h-5 w-5 text-accent opacity-30" />
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-theme truncate leading-tight group-hover:text-accent transition-colors">{book.title}</p>
+          {book.subtitle && <p className="text-[11px] text-muted truncate">{book.subtitle}</p>}
+          {(book as any).author?.display_name && (
+            <p className="text-[11px] text-muted truncate">by {(book as any).author.display_name}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-muted">{chapterCount}</span>
+            <span className="text-[11px] text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <Link to={`/book/${book.id}`} className="theme-card rounded-xl block hover:shadow-md transition-shadow group">
       <div className={`${coverSize === 'large' ? 'aspect-[2/3]' : 'aspect-[3/2]'} rounded-t-xl overflow-hidden bg-surface-hover flex items-center justify-center`}>
