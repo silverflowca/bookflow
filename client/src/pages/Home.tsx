@@ -79,6 +79,17 @@ export default function Home() {
     }
   }
 
+  function handleShareBook(book: Book) {
+    const url = book.slug
+      ? `${window.location.origin}/bl/${book.slug}`
+      : `${window.location.origin}/book/${book.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Link copied!');
+    }).catch(() => {
+      showToast('Could not copy link', 'err');
+    });
+  }
+
   async function loadBooks() {
     try {
       const response = await api.getBooks({ visibility: 'public', status: 'published' });
@@ -353,7 +364,7 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {books.map((book) => (
-                <BookCard key={book.id} book={book} />
+                <BookCard key={book.id} book={book} onShare={handleShareBook} />
               ))}
             </div>
           )}
@@ -1298,42 +1309,54 @@ function RoleCard({
 
 // ─── Book Card (grid) ─────────────────────────────────────────────────────────
 
-function BookCard({ book }: { book: Book }) {
+function BookCard({ book, onShare }: { book: Book; onShare?: (b: Book) => void }) {
   return (
-    <Link
-      to={`/book/${book.id}`}
-      className="block bg-surface rounded-xl shadow-sm hover:shadow-lg overflow-hidden hover:[transition:transform_0.15s_ease,box-shadow_0.15s_ease] [transition:transform_1.2s_cubic-bezier(0.45,0.05,0.55,0.95),box-shadow_1.2s_ease] hover:scale-[1.04] will-change-transform"
-    >
-      <div className="aspect-[2/3] bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-        {book.cover_image_url ? (
-          <img
-            src={book.cover_image_url}
-            alt={book.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <BookOpen className="h-10 w-10 text-primary-400" />
-        )}
-      </div>
-      <div className="p-2.5">
-        <h3 className="font-semibold text-sm leading-snug mb-0.5 line-clamp-2">{book.title}</h3>
-        <p className="text-xs text-muted line-clamp-1">
-          by {book.author?.display_name || 'Unknown Author'}
-        </p>
-        {book.settings?.show_ratings !== false && book.rating_count! > 0 && (
-          <div className="flex items-center gap-0.5 mt-1 flex-wrap">
-            {[1, 2, 3, 4, 5].map(s => (
-              <Star
-                key={s}
-                className={`h-3 w-3 ${s <= Math.round(book.rating_average!) ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-muted'}`}
-              />
-            ))}
-            <span className="text-xs text-muted ml-0.5">
-              {book.rating_average?.toFixed(1)}
-            </span>
-          </div>
-        )}
-      </div>
-    </Link>
+    <div className="relative group">
+      <Link
+        to={`/book/${book.id}`}
+        className="block bg-surface rounded-xl shadow-sm hover:shadow-lg overflow-hidden hover:[transition:transform_0.15s_ease,box-shadow_0.15s_ease] [transition:transform_1.2s_cubic-bezier(0.45,0.05,0.55,0.95),box-shadow_1.2s_ease] hover:scale-[1.04] will-change-transform"
+      >
+        <div className="aspect-[2/3] bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+          {book.cover_image_url ? (
+            <img
+              src={book.cover_image_url}
+              alt={book.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <BookOpen className="h-10 w-10 text-primary-400" />
+          )}
+        </div>
+        <div className="p-2.5">
+          <h3 className="font-semibold text-sm leading-snug mb-0.5 line-clamp-2">{book.title}</h3>
+          <p className="text-xs text-muted line-clamp-1">
+            by {book.author?.display_name || 'Unknown Author'}
+          </p>
+          {book.settings?.show_ratings !== false && book.rating_count! > 0 && (
+            <div className="flex items-center gap-0.5 mt-1 flex-wrap">
+              {[1, 2, 3, 4, 5].map(s => (
+                <Star
+                  key={s}
+                  className={`h-3 w-3 ${s <= Math.round(book.rating_average!) ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-muted'}`}
+                />
+              ))}
+              <span className="text-xs text-muted ml-0.5">
+                {book.rating_average?.toFixed(1)}
+              </span>
+            </div>
+          )}
+        </div>
+      </Link>
+      {/* Share button — only for public books */}
+      {book.visibility === 'public' && onShare && (
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onShare(book); }}
+          title="Copy share link"
+          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+        >
+          <Share2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 }

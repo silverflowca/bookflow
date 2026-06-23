@@ -5,7 +5,7 @@ import {
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff, HelpCircle
+  Eye, EyeOff, HelpCircle, Share2
 } from 'lucide-react';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
@@ -93,6 +93,10 @@ export default function BookReader() {
 
   // Pending tour from Home page feature cards
   const [pendingTour, setPendingTour] = useState<{ bookId: string; chapterIdx: number } | null>(null);
+
+  // Share toast
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const shareToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Read sessionStorage after every navigation (useState initializer only runs once on first mount)
   useEffect(() => {
@@ -792,6 +796,27 @@ export default function BookReader() {
     );
   }
 
+  function handleShareChapter() {
+    // Build share URL: prefer /bl/<book-slug>?chapter=<chapter-slug>, fallback to direct reader URL
+    let url: string;
+    if (book?.slug && chapter?.slug) {
+      url = `${window.location.origin}/bl/${book.slug}?chapter=${chapter.slug}`;
+    } else if (book?.slug) {
+      url = `${window.location.origin}/bl/${book.slug}`;
+    } else {
+      url = window.location.href;
+    }
+    navigator.clipboard.writeText(url).then(() => {
+      if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
+      setShareToast('Link copied!');
+      shareToastTimer.current = setTimeout(() => setShareToast(null), 2500);
+    }).catch(() => {
+      if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
+      setShareToast('Could not copy');
+      shareToastTimer.current = setTimeout(() => setShareToast(null), 2500);
+    });
+  }
+
   return (
     <div className="h-full bg-surface-hover flex overflow-hidden">
       {/* Table of Contents Sidebar */}
@@ -889,14 +914,15 @@ export default function BookReader() {
                 const stat = progressEnabled ? bookChapterStats.get(ch.id) : null;
                 const chDone = stat && stat.total > 0 && stat.completed >= stat.total;
                 const pct = stat && stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0;
+                const isActive = ch.id === chapterId;
                 return (
-                  <div key={ch.id}>
+                  <div key={ch.id} className="group/ch relative">
                     <Link
                       to={`/book/${bookId}/chapter/${ch.id}`}
                       onClick={() => setShowToc(false)}
                       className={`flex items-center px-3 py-2 rounded text-sm ${
-                        ch.id === chapterId
-                          ? 'bg-primary-100 text-primary-700 font-medium'
+                        isActive
+                          ? 'bg-primary-100 text-primary-700 font-medium pr-8'
                           : 'text-theme hover:bg-surface-hover'
                       }`}
                     >
@@ -907,6 +933,18 @@ export default function BookReader() {
                         </span>
                       )}
                     </Link>
+                    {/* Share button — shown on active chapter or hover, only for public books */}
+                    {book.visibility === 'public' && (
+                      <button
+                        onClick={handleShareChapter}
+                        title="Copy chapter link"
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded text-muted hover:text-accent hover:bg-surface-hover transition-colors ${
+                          isActive ? 'opacity-100' : 'opacity-0 group-hover/ch:opacity-100'
+                        }`}
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     {showProgressPanel && stat && stat.total > 0 && (
                       <div className="mx-3 mb-2 mt-0.5">
                         <div className="flex items-center justify-between mb-1">
@@ -1105,7 +1143,18 @@ export default function BookReader() {
           <MediaContext.Provider value={mediaCtx}>
           <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold mb-6">{chapter.title}</h1>
+            <div className="flex items-start gap-3 mb-6">
+              <h1 className="text-3xl font-bold flex-1">{chapter.title}</h1>
+              {book.visibility === 'public' && (
+                <button
+                  onClick={handleShareChapter}
+                  title="Copy chapter link"
+                  className="mt-1 p-2 rounded-lg text-muted hover:text-accent hover:bg-surface-hover transition-colors shrink-0"
+                >
+                  <Share2 className="h-5 w-5" />
+                </button>
+              )}
+            </div>
 
             {/* Start of Chapter Content */}
             <StartOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} />
@@ -1296,6 +1345,13 @@ export default function BookReader() {
             }
           }}
         />
+      )}
+
+      {/* Share toast */}
+      {shareToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium shadow-xl pointer-events-none">
+          {shareToast}
+        </div>
       )}
 
     </div>
