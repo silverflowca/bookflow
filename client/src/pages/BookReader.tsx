@@ -1437,9 +1437,13 @@ function ChapterContent({
             {unmatchedMarkers.map(ic => {
               const markerClass = showHighlights ? getInlineContentClass(ic.content_type) : '';
               const icon = getInlineContentIcon(ic.content_type);
+              const hlStyle = (showHighlights && ic.content_type === 'highlight')
+                ? { backgroundColor: (ic.content_data as HighlightData)?.color ?? undefined }
+                : undefined;
               return (
                 <span key={ic.id} id={`reader-inline-${ic.id}`}
                   className={`${markerClass} cursor-pointer text-sm px-1 rounded`}
+                  style={hlStyle}
                   onClick={() => onContentClick(ic)}
                   title={ic.anchor_text || ic.content_type}
                 >
@@ -1496,10 +1500,15 @@ function ChapterContent({
       image: 'inline-media',
     }[marker.content_type as string] as string | undefined;
 
+    const highlightStyle = (showHighlights && marker.content_type === 'highlight')
+      ? { backgroundColor: (marker.content_data as HighlightData)?.color ?? undefined }
+      : undefined;
+
     elements.push(
       <span
         key={`marker-${marker.id}`}
         className={showHighlights ? markerClass : undefined}
+        style={highlightStyle}
         onClick={() => onContentClick(marker)}
         title={`Click to view ${marker.content_type}`}
       >
@@ -1742,6 +1751,9 @@ function TipTapNode({
         const segText = nodeText.slice(start, end);
         const markerClass = showHighlights ? getInlineContentClass(ic.content_type) : '';
         const icon = getInlineContentIcon(ic.content_type);
+        const hlColorStyle = (showHighlights && ic.content_type === 'highlight')
+          ? { backgroundColor: (ic.content_data as HighlightData)?.color ?? undefined }
+          : undefined;
 
         if (!ic.is_author_content) {
           // Reader-added content: show anchor text as a styled clickable marker only.
@@ -1751,6 +1763,7 @@ function TipTapNode({
           segments.push(
             <span key={`reader-${ic.id}`} id={`reader-inline-${ic.id}`}
               className={`${markerClass} cursor-pointer group`}
+              style={hlColorStyle}
               onClick={() => onContentClick(ic)}
               title={`Click to view ${ic.content_type}`}
             >
@@ -1850,14 +1863,17 @@ function TipTapNode({
       const isBlock = BLOCK_TYPES.has(effectiveIc.content_type);
       const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
       const markerClass = getInlineContentClass(effectiveIc.content_type);
+      const hlStyle = effectiveIc.content_type === 'highlight'
+        ? { backgroundColor: (effectiveIc.content_data as HighlightData)?.color ?? undefined }
+        : undefined;
       return isFullW ? (
         <span id={`reader-inline-${effectiveIc.id}`} className="block my-3">
-          {anchorText && !isBlock && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}>{anchorText}</mark>}
+          {anchorText && !isBlock && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`} style={hlStyle}>{anchorText}</mark>}
           <InlineFormElement content={effectiveIc} />
         </span>
       ) : (
         <span id={`reader-inline-${effectiveIc.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
-          {anchorText && <mark className={`${markerClass} px-0.5 rounded`}>{anchorText}</mark>}
+          {anchorText && <mark className={`${markerClass} px-0.5 rounded`} style={hlStyle}>{anchorText}</mark>}
           <InlineFormElement content={effectiveIc} />
         </span>
       );

@@ -330,7 +330,10 @@ export default function ChapterEditor() {
         if (idx === -1) return;
         const from = pos + idx;
         const to = from + anchor.length;
-        const mark = markType.create({ contentType: item.content_type, contentId: item.id });
+        const highlightColor = item.content_type === 'highlight'
+          ? (item.content_data as HighlightData)?.color ?? null
+          : null;
+        const mark = markType.create({ contentType: item.content_type, contentId: item.id, highlightColor });
         tr.addMark(from, to, mark);
         found = true;
       });
@@ -530,11 +533,14 @@ export default function ChapterEditor() {
             }
           } else if (hasSelection) {
             // Non-form with selection: apply a mark on the selected text
+            const highlightColor = showInlineModal.type === 'highlight'
+              ? (created.content_data as HighlightData)?.color ?? undefined
+              : undefined;
             editor
               .chain()
               .focus()
               .setTextSelection({ from: showInlineModal.selection!.from, to: showInlineModal.selection!.to })
-              .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id })
+              .setInlineContentMark({ contentType: showInlineModal.type, contentId: created.id, highlightColor })
               .run();
           } else if (isCursorInsertable && hasCursor) {
             // Media/image with cursor but no selection: insert atom node at cursor position

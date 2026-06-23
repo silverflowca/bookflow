@@ -7,7 +7,7 @@ export interface InlineContentMarkOptions {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     inlineContentMark: {
-      setInlineContentMark: (attributes: { contentType: string; contentId: string }) => ReturnType;
+      setInlineContentMark: (attributes: { contentType: string; contentId: string; highlightColor?: string }) => ReturnType;
       unsetInlineContentMark: () => ReturnType;
     };
   }
@@ -38,6 +38,14 @@ export const InlineContentMark = Mark.create<InlineContentMarkOptions>({
         renderHTML: attributes => {
           if (!attributes.contentId) return {};
           return { 'data-content-id': attributes.contentId };
+        },
+      },
+      highlightColor: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-highlight-color'),
+        renderHTML: attributes => {
+          if (!attributes.highlightColor) return {};
+          return { 'data-highlight-color': attributes.highlightColor };
         },
       },
     };
@@ -72,11 +80,18 @@ export const InlineContentMark = Mark.create<InlineContentMarkOptions>({
     };
     const className = classMap[contentType] || 'inline-default';
 
+    // For highlights, override the static yellow with the stored color
+    const highlightColor = HTMLAttributes['data-highlight-color'];
+    const extraStyle = (contentType === 'highlight' && highlightColor)
+      ? { style: `background-color: ${highlightColor};` }
+      : {};
+
     return [
       'span',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         'data-inline-content': 'true',
         class: className,
+        ...extraStyle,
       }),
       0,
     ];
