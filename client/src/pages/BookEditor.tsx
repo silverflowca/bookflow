@@ -692,6 +692,49 @@ export default function BookEditor() {
   const [coverExpanded, setCoverExpanded] = useState(false);
   const bookShareRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 5;
+  const dragOverIdRef = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  function handleChapterDragStart(e: React.DragEvent, id: string) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('chapterId', id);
+  }
+
+  function handleChapterDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIdRef.current !== id) {
+      dragOverIdRef.current = id;
+      setDragOverId(id);
+    }
+  }
+
+  async function handleChapterDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    setDragOverId(null);
+    dragOverIdRef.current = null;
+    const sourceId = e.dataTransfer.getData('chapterId');
+    if (!sourceId || sourceId === targetId || !bookId) return;
+    const sorted = [...chapters].sort((a, b) => a.order_index - b.order_index);
+    const srcIdx = sorted.findIndex(c => c.id === sourceId);
+    const tgtIdx = sorted.findIndex(c => c.id === targetId);
+    if (srcIdx === -1 || tgtIdx === -1) return;
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(srcIdx, 1);
+    reordered.splice(tgtIdx, 0, moved);
+    const withOrder = reordered.map((c, i) => ({ ...c, order_index: i }));
+    setChapters(withOrder);
+    try {
+      await api.reorderChapters(bookId, withOrder.map(c => c.id));
+    } catch (err) {
+      console.error('Failed to reorder chapters:', err);
+    }
+  }
+
+  function handleChapterDragEnd() {
+    setDragOverId(null);
+    dragOverIdRef.current = null;
+  }
 
   const toggleChapterComments = useCallback(async (chapterId: string) => {
     setExpandedChapterComments(prev => {
@@ -1228,9 +1271,16 @@ export default function BookEditor() {
               const hasMore = visibleComments.length < comments.length;
 
               return (
-                <div key={chapter.id}>
+                <div key={chapter.id}
+                  draggable
+                  onDragStart={e => handleChapterDragStart(e, chapter.id)}
+                  onDragOver={e => handleChapterDragOver(e, chapter.id)}
+                  onDrop={e => handleChapterDrop(e, chapter.id)}
+                  onDragEnd={handleChapterDragEnd}
+                  className={dragOverId === chapter.id ? 'border-t-2 border-accent' : ''}
+                >
                   <div className="flex items-center gap-4 p-4 hover:bg-surface-hover">
-                    <GripVertical className="h-5 w-5 text-muted cursor-move" />
+                    <GripVertical className="h-5 w-5 text-muted cursor-grab active:cursor-grabbing" />
                     <div className="flex-1">
                       <Link
                         to={`/edit/book/${bookId}/chapter/${chapter.id}`}
