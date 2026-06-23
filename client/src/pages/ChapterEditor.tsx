@@ -655,16 +655,20 @@ export default function ChapterEditor() {
     const item = inlineContents.find(i => i.id === id);
     if (!item) return;
     const zone = item.position_in_chapter || 'inline';
+    // Sort zone items and assign clean sequential indices to normalise nulls
     const zoneItems = [...inlineContents]
       .filter(i => (i.position_in_chapter || 'inline') === zone)
-      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      .map((i, pos) => ({ ...i, order_index: pos }));
     const idx = zoneItems.findIndex(i => i.id === id);
+    if (idx === -1) return;
     if (direction === 'up' && idx === 0) return;
     if (direction === 'down' && idx === zoneItems.length - 1) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
     const swapItem = zoneItems[swapIdx];
-    const newOrder = (item.order_index ?? idx);
-    const swapOrder = (swapItem.order_index ?? swapIdx);
+    // After normalisation these are always distinct integers
+    const newOrder = zoneItems[idx].order_index!;
+    const swapOrder = swapItem.order_index!;
     try {
       await api.reorderInlineContent(id, swapOrder);
       await api.reorderInlineContent(swapItem.id, newOrder);

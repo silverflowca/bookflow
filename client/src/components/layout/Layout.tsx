@@ -367,10 +367,18 @@ export default function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 text-accent hover:opacity-80 transition-opacity">
-              <BookOpen className="h-8 w-8" />
-              <span className="text-xl font-bold">BookFlow</span>
-            </Link>
+            <div className="flex flex-col items-start">
+              <Link to="/" className="flex items-center gap-2 text-accent hover:opacity-80 transition-opacity">
+                <BookOpen className="h-8 w-8" />
+                <span className="text-xl font-bold">BookFlow</span>
+              </Link>
+              {/* Concept stamp — sits below logo, rotated slightly */}
+              <Link to="/bl/about" className="select-none self-end mt-2 rotate-[-8deg]">
+                <div className="border-[2px] border-red-600 text-red-600 font-black uppercase text-[8px] px-1.5 py-px rounded-sm tracking-widest whitespace-nowrap hover:bg-red-50 transition-colors">
+                  Concept Website
+                </div>
+              </Link>
+            </div>
 
             {/* Desktop Navigation — always shown */}
             <nav className="flex items-center gap-1">

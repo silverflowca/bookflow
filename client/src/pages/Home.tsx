@@ -140,9 +140,16 @@ export default function Home() {
             </span>
           </h1>
 
-          <p className="text-base sm:text-lg text-gray-500 mb-6 sm:mb-8 max-w-2xl mx-auto leading-relaxed">
-            {tagline}
-          </p>
+          <div className="flex items-center justify-center gap-4 mb-6 sm:mb-8">
+            <p className="text-base sm:text-lg text-gray-500 max-w-2xl leading-relaxed">
+              {tagline}
+            </p>
+            <Link to="/bl/about" className="flex-shrink-0 select-none rotate-[-12deg]">
+              <div className="border-[2px] border-red-600 text-red-600 font-black uppercase text-[9px] px-2 py-1 rounded-sm tracking-widest whitespace-nowrap hover:bg-red-50 transition-colors opacity-80">
+                Concept Website
+              </div>
+            </Link>
+          </div>
 
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
