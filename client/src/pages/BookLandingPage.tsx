@@ -77,20 +77,6 @@ export default function BookLandingPage() {
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg,#0f0c29 0%,#1e1245 50%,#0d1b3e 100%)' }}>
 
-      {/* Nav bar */}
-      <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-        <Link to="/" className="flex items-center gap-2 text-white font-bold text-lg">
-          <BookOpen className="h-6 w-6 text-violet-400" />
-          BookFlow
-        </Link>
-        {!user && (
-          <div className="flex gap-3">
-            <Link to="/login" className="px-4 py-2 text-sm text-white/70 hover:text-white transition-colors">Sign In</Link>
-            <Link to="/register" className="px-4 py-2 text-sm font-semibold rounded-lg text-white" style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>Get Started Free</Link>
-          </div>
-        )}
-      </div>
-
       {/* Hero */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col lg:flex-row gap-12 items-start">
