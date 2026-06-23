@@ -1114,6 +1114,10 @@ class ApiClient {
     return this.request(`/admin/books/${bookId}/reinstate`, { method: 'PATCH' });
   }
 
+  async adminArchiveBook(bookId: string): Promise<void> {
+    return this.request(`/books/${bookId}`, { method: 'DELETE' });
+  }
+
   async adminGetClubs(): Promise<any[]> {
     return this.request('/admin/clubs');
   }

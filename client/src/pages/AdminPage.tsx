@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore, Archive } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -23,20 +23,33 @@ interface AdminStats {
 type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'feedback';
 
 function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: (b: any[]) => void }) {
-  const [reinstating, setReinstating] = useState<string | null>(null);
+  const [actioning, setActioning] = useState<string | null>(null);
 
   const active = books.filter(b => b.status !== 'archived');
   const archived = books.filter(b => b.status === 'archived');
 
+  async function handleArchive(bookId: string) {
+    if (!confirm('Archive this book? It will be hidden from readers but can be reinstated here.')) return;
+    setActioning(bookId);
+    try {
+      await api.adminArchiveBook(bookId);
+      onBooksChange(books.map(b => b.id === bookId ? { ...b, status: 'archived' } : b));
+    } catch (err) {
+      console.error('Archive failed:', err);
+    } finally {
+      setActioning(null);
+    }
+  }
+
   async function handleReinstate(bookId: string) {
-    setReinstating(bookId);
+    setActioning(bookId);
     try {
       await api.adminReinstateBook(bookId);
       onBooksChange(books.map(b => b.id === bookId ? { ...b, status: 'draft' } : b));
     } catch (err) {
       console.error('Reinstate failed:', err);
     } finally {
-      setReinstating(null);
+      setActioning(null);
     }
   }
 
@@ -52,7 +65,18 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
               <p className="font-medium text-theme text-sm truncate">{book.title}</p>
               <p className="text-xs text-muted">by {book.author?.display_name ?? '—'} · {book.status} · {book.visibility}</p>
             </div>
-            <a href={`/edit/book/${book.id}`} className="text-xs text-blue-500 hover:underline">Open</a>
+            <a href={`/edit/book/${book.id}`} className="text-xs text-blue-500 hover:underline shrink-0">Open</a>
+            <button
+              onClick={() => handleArchive(book.id)}
+              disabled={actioning === book.id}
+              title="Archive book"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg theme-button-secondary hover:text-amber-600 disabled:opacity-50 shrink-0"
+            >
+              {actioning === book.id
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Archive className="h-3.5 w-3.5" />}
+              Archive
+            </button>
           </div>
         ))}
       </div>
@@ -77,10 +101,10 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
                 </div>
                 <button
                   onClick={() => handleReinstate(book.id)}
-                  disabled={reinstating === book.id}
+                  disabled={actioning === book.id}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg theme-button-secondary hover:text-green-600 disabled:opacity-50"
                 >
-                  {reinstating === book.id
+                  {actioning === book.id
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     : <ArchiveRestore className="h-3.5 w-3.5" />}
                   Reinstate
