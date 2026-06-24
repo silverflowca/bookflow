@@ -1450,6 +1450,7 @@ function ReaderAuthModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -1472,76 +1473,160 @@ function ReaderAuthModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-muted hover:text-theme">
-          <X className="h-5 w-5" />
-        </button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-theme/50">
 
-        <div className="text-center mb-5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 mb-3">
-            <Lock className="h-6 w-6 text-accent" />
+        {/* Branded header */}
+        <div className="relative bg-accent px-6 pt-8 pb-6 text-center">
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {/* Logo */}
+          <div className="inline-flex items-center gap-2.5 mb-4">
+            <div className="p-2 bg-white/20 rounded-xl">
+              <BookOpen className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-white tracking-tight">BookFlow</span>
           </div>
-          <h2 className="text-xl font-bold text-theme">Sign in to continue</h2>
-          <p className="text-sm text-muted mt-1">Save your responses and track your progress</p>
+          <h2 className="text-lg font-semibold text-white">
+            {tab === 'login' ? 'Welcome back' : 'Create your account'}
+          </h2>
+          <p className="text-sm text-white/75 mt-1">
+            {tab === 'login'
+              ? 'Sign in to save your responses and track progress'
+              : 'Join BookFlow to save your responses and track progress'}
+          </p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex rounded-lg overflow-hidden border border-theme mb-5 text-sm font-medium">
+        <div className="flex border-b border-theme">
           <button
             onClick={() => { setTab('login'); setError(''); }}
-            className={`flex-1 py-2 transition-colors ${tab === 'login' ? 'bg-accent text-white' : 'text-muted hover:bg-surface-hover'}`}
+            className={`flex-1 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+              tab === 'login'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-muted hover:text-theme'
+            }`}
           >
             Sign In
           </button>
           <button
             onClick={() => { setTab('register'); setError(''); }}
-            className={`flex-1 py-2 transition-colors ${tab === 'register' ? 'bg-accent text-white' : 'text-muted hover:bg-surface-hover'}`}
+            className={`flex-1 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px ${
+              tab === 'register'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-muted hover:text-theme'
+            }`}
           >
             Create Account
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Form body */}
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           {tab === 'register' && (
-            <input
-              type="text"
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              placeholder="Your name"
-              required
-              className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-accent focus:outline-none"
-            />
+            <div>
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  placeholder="Jane Smith"
+                  required
+                  autoComplete="name"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-theme rounded-lg bg-surface-hover focus:bg-surface focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
           )}
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="Email"
-            required
-            className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-accent focus:outline-none"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-accent focus:outline-none"
-          />
+
+          <div>
+            <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Email Address</label>
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-theme rounded-lg bg-surface-hover focus:bg-surface focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={tab === 'register' ? 'Create a password' : 'Your password'}
+                required
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                className="w-full pl-9 pr-10 py-2.5 text-sm border border-theme rounded-lg bg-surface-hover focus:bg-surface focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-theme transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
           {error && (
-            <p className="text-sm text-red-500 flex items-center gap-1">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </p>
+            <div className="flex items-start gap-2.5 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            </div>
           )}
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-accent text-white rounded-lg font-medium text-sm hover:bg-accent/90 disabled:opacity-60 transition-colors"
+            className="w-full py-2.5 theme-button-primary rounded-lg font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? 'Please wait…' : tab === 'login' ? 'Sign In' : 'Create Account'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Please wait…
+              </>
+            ) : tab === 'login' ? 'Sign In to BookFlow' : 'Create My Account'}
           </button>
+
+          <p className="text-center text-xs text-muted pt-1">
+            {tab === 'login' ? (
+              <>No account yet?{' '}
+                <button type="button" onClick={() => { setTab('register'); setError(''); }} className="text-accent font-semibold hover:underline">
+                  Create one free
+                </button>
+              </>
+            ) : (
+              <>Already have an account?{' '}
+                <button type="button" onClick={() => { setTab('login'); setError(''); }} className="text-accent font-semibold hover:underline">
+                  Sign in
+                </button>
+              </>
+            )}
+          </p>
         </form>
       </div>
     </div>
