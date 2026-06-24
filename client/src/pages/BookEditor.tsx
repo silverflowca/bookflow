@@ -1304,9 +1304,6 @@ export default function BookEditor() {
                       <div className="flex gap-3 text-xs text-muted flex-wrap">
                         <span>{chapter.word_count || 0} words</span>
                         <span>{chapter.estimated_read_time_minutes || 1} min read</span>
-                        <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
-                          {chapter.status}
-                        </span>
                         {chapter.updated_at && (
                           <span title={new Date(chapter.updated_at).toLocaleString()}>
                             edited {fmtRelative(new Date(chapter.updated_at))}
