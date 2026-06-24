@@ -27,11 +27,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { EditorPreviewContext } from '../contexts/EditorPreviewContext';
 import type { EditorPreviewMode } from '../contexts/EditorPreviewContext';
 
+function fmtRelative(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export default function ChapterEditor() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const [, setChapter] = useState<Chapter | null>(null);
+  const [chapter, setChapter] = useState<Chapter | null>(null);
   const [title, setTitle] = useState('');
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +48,7 @@ export default function ChapterEditor() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [inlineContents, setInlineContents] = useState<InlineContent[]>([]);
   const inlineContentsRef = useRef<InlineContent[]>([]);
+  const pendingContentRef = useRef<unknown>(null);
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInlineModal, setShowInlineModal] = useState<{
     type: InlineContent['content_type'];
@@ -179,6 +189,14 @@ export default function ChapterEditor() {
     };
   }, [chapterId, bookId]);
 
+  // Apply content that was loaded before the editor was ready
+  useEffect(() => {
+    if (editor && pendingContentRef.current) {
+      editor.commands.setContent(pendingContentRef.current as any);
+      pendingContentRef.current = null;
+    }
+  }, [editor]);
+
   // Poll for a live episode presenting this chapter/book
   useEffect(() => {
     if (!bookId) return;
@@ -202,7 +220,7 @@ export default function ChapterEditor() {
       const data = await api.getChapter(chapterId!);
       setChapter(data);
       setTitle(data.title);
-      if (editor && data.content) {
+      if (data.content) {
         // Parse content if it's a string
         let contentToSet = data.content;
         if (typeof contentToSet === 'string') {
@@ -231,7 +249,12 @@ export default function ChapterEditor() {
             }
           }
         }
-        editor.commands.setContent(contentToSet);
+        if (editor) {
+          editor.commands.setContent(contentToSet);
+        } else {
+          // Editor not ready yet — stash for the editor-ready effect
+          pendingContentRef.current = contentToSet;
+        }
       }
     } catch (err) {
       console.error('Failed to load chapter:', err);
@@ -861,7 +884,7 @@ export default function ChapterEditor() {
             </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <span className={`text-xs text-muted hidden sm:inline transition-opacity duration-500 ${lastSaved && !saving ? 'opacity-100' : 'opacity-0'}`}>
-                Saved
+                {lastSaved ? `Saved · edited ${fmtRelative(lastSaved)}` : chapter?.updated_at ? `Last edited ${fmtRelative(new Date(chapter.updated_at))}` : 'Saved'}
               </span>
               <button
                 onClick={() => handleSave()}

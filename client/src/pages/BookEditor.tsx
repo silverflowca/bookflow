@@ -6,6 +6,15 @@ import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
 
+function fmtRelative(date: Date): string {
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // ── Book Share Dropdown ───────────────────────────────────────────────────────
 function BookShareDropdown({ book, bookId, onClose }: {
   book: Book;
@@ -968,6 +977,10 @@ export default function BookEditor() {
                 <div className="min-w-0">
                   <h1 className="text-xl sm:text-2xl font-bold truncate">{book.title}</h1>
                   {book.subtitle && <p className="text-muted text-sm truncate">{book.subtitle}</p>}
+                  <p className="text-xs text-muted mt-0.5">
+                    Created {new Date(book.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {' · '}Updated {fmtRelative(new Date(book.updated_at))}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-1 flex-wrap">
@@ -1288,12 +1301,17 @@ export default function BookEditor() {
                       >
                         Chapter {index + 1}: {chapter.title}
                       </Link>
-                      <div className="flex gap-3 text-sm text-muted">
+                      <div className="flex gap-3 text-xs text-muted flex-wrap">
                         <span>{chapter.word_count || 0} words</span>
                         <span>{chapter.estimated_read_time_minutes || 1} min read</span>
                         <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
                           {chapter.status}
                         </span>
+                        {chapter.updated_at && (
+                          <span title={new Date(chapter.updated_at).toLocaleString()}>
+                            edited {fmtRelative(new Date(chapter.updated_at))}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2 items-center">
