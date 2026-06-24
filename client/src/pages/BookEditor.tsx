@@ -1042,12 +1042,7 @@ export default function BookEditor() {
       {/* Status + Actions Bar */}
       <div className="relative bg-surface rounded-lg border-theme border px-4 py-3 mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Left: status pill + chapter count */}
-          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-            book.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {book.status}
-          </span>
+          {/* Left: chapter count */}
           <span className="text-sm text-muted">{chapters.length} chapters</span>
 
           <div className="flex-1" />
@@ -1304,6 +1299,9 @@ export default function BookEditor() {
                       <div className="flex gap-3 text-xs text-muted flex-wrap">
                         <span>{chapter.word_count || 0} words</span>
                         <span>{chapter.estimated_read_time_minutes || 1} min read</span>
+                        <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
+                          {chapter.status}
+                        </span>
                         {chapter.updated_at && (
                           <span title={new Date(chapter.updated_at).toLocaleString()}>
                             edited {fmtRelative(new Date(chapter.updated_at))}
