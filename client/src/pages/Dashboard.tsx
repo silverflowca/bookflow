@@ -102,9 +102,9 @@ export default function Dashboard() {
 
   // Grid columns by cover size
   const gridClass: Record<CoverSize, string> = {
-    small: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
-    medium: 'md:grid-cols-2 lg:grid-cols-3',
-    large: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    small: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6',
+    medium: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+    large: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
   };
 
   // List view: single column of compact rows
@@ -521,12 +521,16 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
 
   const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
 
+  // Standalone hidden file input — kept outside any Link/label so .click() never triggers navigation
+  const coverFileInput = (
+    <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+  );
+
   // If no cover yet: hover-to-upload on the cover itself
   // If cover exists: cover links to editor; upload is in the ⋮ menu
   const coverLabel = book.cover_image_url ? (
     <Link to={`/edit/book/${book.id}`} className="block w-full h-full bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative overflow-hidden">
-      <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
-      <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+      <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-contain" />
       {uploadingCover && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
           <Loader2 className="h-5 w-5 text-white animate-spin" />
@@ -534,19 +538,19 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
       )}
     </Link>
   ) : (
-    <label
-      className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer block overflow-hidden"
+    <div
+      className="bg-gradient-to-br from-surface-hover to-surface flex items-center justify-center relative group cursor-pointer overflow-hidden w-full h-full"
       onMouseEnter={() => setShowCoverUpload(true)}
       onMouseLeave={() => !uploadingCover && setShowCoverUpload(false)}
+      onClick={() => coverInputRef.current?.click()}
     >
-      <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
       <BookOpen className={coverSize === 'large' ? 'h-16 w-16 text-accent opacity-30' : 'h-8 w-8 text-accent opacity-30'} />
       {(showCoverUpload || uploadingCover) && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
           {uploadingCover ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white opacity-80" />}
         </div>
       )}
-    </label>
+    </div>
   );
 
   const menuDropdown = showMenu && (
@@ -557,11 +561,9 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
       <Link to={`/edit/book/${book.id}/settings`} onClick={() => setShowMenu(false)} className="flex items-center gap-2.5 px-4 py-2 text-sm text-theme hover:bg-surface-hover">
         <Settings className="h-3.5 w-3.5" /> Settings
       </Link>
-      {book.cover_image_url && (
-        <button onClick={() => { setShowMenu(false); coverInputRef.current?.click(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover">
-          <Upload className="h-3.5 w-3.5" /> Change Cover
-        </button>
-      )}
+      <button onClick={() => { setShowMenu(false); coverInputRef.current?.click(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover">
+        <Upload className="h-3.5 w-3.5" /> {book.cover_image_url ? 'Change Cover' : 'Add Cover'}
+      </button>
       {book.visibility === 'public' && (
         <button onClick={() => { setShowMenu(false); handleCopyUrl(); }} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-theme hover:bg-surface-hover">
           {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
@@ -583,11 +585,11 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
   );
 
   const actionButtons = (
-    <div className="flex gap-1.5">
-      <Link to={`/edit/book/${book.id}`} className="flex-1 text-center py-1.5 theme-button-primary rounded-lg font-medium text-sm">Edit</Link>
-      <Link to={`/book/${book.id}`} className="flex-1 text-center py-1.5 theme-button-secondary rounded-lg font-medium text-sm">View</Link>
-      <Link to={`/edit/book/${book.id}/dashboard`} className="flex items-center justify-center px-2 py-1.5 theme-button-secondary rounded-lg" title="Stats">
-        <LayoutDashboard className="h-4 w-4" />
+    <div className="flex gap-1">
+      <Link to={`/edit/book/${book.id}`} className="flex-1 text-center py-1 theme-button-primary rounded-lg font-medium text-xs">Edit</Link>
+      <Link to={`/book/${book.id}`} className="flex-1 text-center py-1 theme-button-secondary rounded-lg font-medium text-xs">View</Link>
+      <Link to={`/edit/book/${book.id}/dashboard`} className="flex items-center justify-center px-1.5 py-1 theme-button-secondary rounded-lg" title="Stats">
+        <LayoutDashboard className="h-3.5 w-3.5" />
       </Link>
     </div>
   );
@@ -595,42 +597,79 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
   // ── SMALL: horizontal compact row ───────────────────────────────────────────
   if (coverSize === 'small') {
     return (
-      <div className="theme-card rounded-xl flex gap-3 p-2.5 items-center">
-        <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0">
-          {coverLabel}
-        </div>
-        <div className="flex-1 min-w-0">
-          <Link to={`/edit/book/${book.id}`}>
-            <p className="font-semibold text-sm text-theme truncate leading-tight">{book.title}</p>
-            {book.subtitle && <p className="text-[11px] text-muted truncate">{book.subtitle}</p>}
-          </Link>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[11px] text-muted">{chapterCount}</span>
-            {visibilityBtn}
+      <>
+        {coverFileInput}
+        <div className="theme-card rounded-xl flex gap-3 p-2.5 items-center">
+          <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0">
+            {coverLabel}
+          </div>
+          <div className="flex-1 min-w-0">
+            <Link to={`/edit/book/${book.id}`}>
+              <p className="font-semibold text-base text-theme truncate leading-tight">{book.title}</p>
+              {book.subtitle && <p className="text-xs text-muted truncate">{book.subtitle}</p>}
+            </Link>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted">{chapterCount}</span>
+              {visibilityBtn}
+            </div>
+          </div>
+          <div className="relative flex-shrink-0" ref={menuRef}>
+            <button onClick={() => setShowMenu(!showMenu)} className="p-1 text-muted hover:text-theme rounded-lg transition-colors">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            {menuDropdown}
           </div>
         </div>
-        <div className="relative flex-shrink-0" ref={menuRef}>
-          <button onClick={() => setShowMenu(!showMenu)} className="p-1 text-muted hover:text-theme rounded-lg transition-colors">
-            <MoreVertical className="h-4 w-4" />
-          </button>
-          {menuDropdown}
-        </div>
-      </div>
+      </>
     );
   }
 
   // ── LARGE: tall portrait cover, title prominent below ────────────────────────
   if (coverSize === 'large') {
     return (
+      <>
+        {coverFileInput}
+        <div className="theme-card rounded-xl">
+          <div className="aspect-[2/3] rounded-t-xl overflow-hidden">
+            {coverLabel}
+          </div>
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <Link to={`/edit/book/${book.id}`} className="flex-1 min-w-0">
+                <h3 className="font-bold text-lg leading-snug text-theme">{book.title}</h3>
+                {book.subtitle && <p className="text-sm text-muted mt-0.5 line-clamp-2">{book.subtitle}</p>}
+              </Link>
+              <div className="relative shrink-0" ref={menuRef}>
+                <button onClick={() => setShowMenu(!showMenu)} className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors">
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                {menuDropdown}
+              </div>
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-muted">{chapterCount}</span>
+              {visibilityBtn}
+            </div>
+            {actionButtons}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── MEDIUM (default): portrait cover, standard card ────────────────────────
+  return (
+    <>
+      {coverFileInput}
       <div className="theme-card rounded-xl">
         <div className="aspect-[2/3] rounded-t-xl overflow-hidden">
           {coverLabel}
         </div>
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="p-3">
+          <div className="flex items-start justify-between gap-1.5">
             <Link to={`/edit/book/${book.id}`} className="flex-1 min-w-0">
-              <h3 className="font-bold text-lg leading-snug text-theme">{book.title}</h3>
-              {book.subtitle && <p className="text-sm text-muted mt-0.5 line-clamp-2">{book.subtitle}</p>}
+              <h3 className="font-semibold text-sm leading-snug truncate text-theme">{book.title}</h3>
+              {book.subtitle && <p className="text-xs text-muted truncate mt-0.5">{book.subtitle}</p>}
             </Link>
             <div className="relative shrink-0" ref={menuRef}>
               <button onClick={() => setShowMenu(!showMenu)} className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors">
@@ -639,42 +678,14 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
               {menuDropdown}
             </div>
           </div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mt-1.5 mb-2">
             <span className="text-xs text-muted">{chapterCount}</span>
             {visibilityBtn}
           </div>
           {actionButtons}
         </div>
       </div>
-    );
-  }
-
-  // ── MEDIUM (default): landscape cover, standard card ────────────────────────
-  return (
-    <div className="theme-card rounded-xl">
-      <div className="aspect-[3/2] rounded-t-xl overflow-hidden">
-        {coverLabel}
-      </div>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <Link to={`/edit/book/${book.id}`} className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base truncate text-theme">{book.title}</h3>
-            {book.subtitle && <p className="text-xs text-muted truncate mt-0.5">{book.subtitle}</p>}
-          </Link>
-          <div className="relative shrink-0" ref={menuRef}>
-            <button onClick={() => setShowMenu(!showMenu)} className="p-1 -mr-1 text-muted hover:text-theme rounded-lg transition-colors">
-              <MoreVertical className="h-4 w-4" />
-            </button>
-            {menuDropdown}
-          </div>
-        </div>
-        <div className="flex items-center justify-between mt-2 mb-3">
-          <span className="text-xs text-muted">{chapterCount}</span>
-          {visibilityBtn}
-        </div>
-        {actionButtons}
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -691,14 +702,14 @@ function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSiz
           }
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-theme truncate leading-tight group-hover:text-accent transition-colors">{book.title}</p>
-          {book.subtitle && <p className="text-[11px] text-muted truncate">{book.subtitle}</p>}
+          <p className="font-semibold text-base text-theme truncate leading-tight group-hover:text-accent transition-colors">{book.title}</p>
+          {book.subtitle && <p className="text-xs text-muted truncate">{book.subtitle}</p>}
           {(book as any).author?.display_name && (
-            <p className="text-[11px] text-muted truncate">by {(book as any).author.display_name}</p>
+            <p className="text-xs text-muted truncate">by {(book as any).author.display_name}</p>
           )}
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-[11px] text-muted">{chapterCount}</span>
-            <span className="text-[11px] text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
+            <span className="text-xs text-muted">{chapterCount}</span>
+            <span className="text-xs text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
           </div>
         </div>
       </Link>
@@ -707,19 +718,18 @@ function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSiz
 
   return (
     <Link to={`/book/${book.id}`} className="theme-card rounded-xl block hover:shadow-md transition-shadow group">
-      <div className={`${coverSize === 'large' ? 'aspect-[2/3]' : 'aspect-[3/2]'} rounded-t-xl overflow-hidden bg-surface-hover flex items-center justify-center`}>
+      <div className="aspect-[2/3] rounded-t-xl overflow-hidden bg-surface-hover flex items-center justify-center">
         {book.cover_image_url
           ? <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
-          : <BookOpen className={`${coverSize === 'large' ? 'h-16 w-16' : 'h-8 w-8'} text-accent opacity-30`} />
+          : <BookOpen className={`${coverSize === 'large' ? 'h-16 w-16' : 'h-10 w-10'} text-accent opacity-30`} />
         }
       </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-base truncate text-theme group-hover:text-accent transition-colors">{book.title}</h3>
-        {book.subtitle && <p className="text-xs text-muted truncate mt-0.5">{book.subtitle}</p>}
+      <div className="p-3">
+        <h3 className="font-semibold text-sm leading-snug truncate text-theme group-hover:text-accent transition-colors">{book.title}</h3>
         {(book as any).author?.display_name && (
-          <p className="text-xs text-muted mt-1">by {(book as any).author.display_name}</p>
+          <p className="text-xs text-muted truncate mt-0.5">by {(book as any).author.display_name}</p>
         )}
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-1.5">
           <span className="text-xs text-muted">{chapterCount}</span>
           <span className="text-xs text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
         </div>
