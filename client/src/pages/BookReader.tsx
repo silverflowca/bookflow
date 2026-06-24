@@ -1496,6 +1496,7 @@ function ReaderAuthModal({ onClose }: { onClose: () => void }) {
           <p className="text-lg font-bold text-gray-900">
             {tab === 'login' ? 'Sign In' : 'Sign Up'}
           </p>
+          <p className="text-sm text-gray-500 mt-0.5">To track your response you can sign in or register.</p>
         </div>
 
 
