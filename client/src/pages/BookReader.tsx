@@ -1498,29 +1498,6 @@ function ReaderAuthModal({ onClose }: { onClose: () => void }) {
           </p>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex bg-white border-b border-gray-200 flex-shrink-0">
-          <button
-            onClick={() => { setTab('login'); setError(''); }}
-            className={`flex-1 py-2.5 text-sm font-semibold transition-colors border-b-2 -mb-px ${
-              tab === 'login'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => { setTab('register'); setError(''); }}
-            className={`flex-1 py-2.5 text-sm font-semibold transition-colors border-b-2 -mb-px ${
-              tab === 'register'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
 
         {/* Form body */}
         <form onSubmit={handleSubmit} className="bg-white px-5 py-4 space-y-3 overflow-y-auto">
