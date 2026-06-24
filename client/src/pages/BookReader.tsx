@@ -1493,11 +1493,8 @@ function ReaderAuthModal({ onClose }: { onClose: () => void }) {
             <BookOpen className="h-8 w-8" />
             <span className="text-xl font-bold text-gray-900">BookFlow</span>
           </div>
-          <p className="text-sm font-semibold text-gray-800">
-            {tab === 'login' ? 'Welcome back' : 'Create your account'}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {tab === 'login' ? 'Sign in to save your progress' : 'Join to save your responses and progress'}
+          <p className="text-lg font-bold text-gray-900">
+            {tab === 'login' ? 'Sign In' : 'Sign Up'}
           </p>
         </div>
 
@@ -1608,7 +1605,7 @@ function ReaderAuthModal({ onClose }: { onClose: () => void }) {
             ) : tab === 'login' ? 'Sign In to BookFlow' : 'Create My Account'}
           </button>
 
-          <p className="text-center text-xs text-gray-500 pb-1">
+          <p className="text-center text-sm text-gray-600 pb-1">
             {tab === 'login' ? (
               <>No account yet?{' '}
                 <button type="button" onClick={() => { setTab('register'); setError(''); }} className="text-purple-600 font-semibold hover:underline">
