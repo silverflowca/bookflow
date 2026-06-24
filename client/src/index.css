@@ -708,3 +708,8 @@ button, a, label, select, input[type="button"], input[type="submit"] {
 .bf-wiggle {
   animation: bf-wiggle 0.6s ease-in-out;
 }
+
+/* Reader focus mode — hide entire app header */
+body[data-reader-focus="1"] #bf-app-header {
+  display: none !important;
+}

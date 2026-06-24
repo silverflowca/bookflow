@@ -34,6 +34,9 @@ const MediaContext = createContext<MediaCtx>({
   requestPlay: () => {}, requestPip: () => {},
   clearPlay: () => {}, clearPip: () => {},
 });
+// Context that any interactive component can call to request a login/register modal
+const AuthGateContext = createContext<() => void>(() => {});
+
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
@@ -45,6 +48,7 @@ import type {
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
   AllFormResponsesResult,
 } from '../types';
+
 
 export default function BookReader() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId?: string }>();
@@ -93,6 +97,23 @@ export default function BookReader() {
 
   // Pending tour from Home page feature cards
   const [pendingTour, setPendingTour] = useState<{ bookId: string; chapterIdx: number } | null>(null);
+
+  // Auth gate modal — shown when a guest tries to interact with a component
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const requestAuth = useCallback(() => setShowAuthModal(true), []);
+
+  // Focus / simple view mode — hides sidebar, filter bar, and inline panel
+  const [focusMode, setFocusMode] = useState(false);
+  const toggleFocusMode = () => {
+    setFocusMode(v => {
+      const entering = !v;
+      if (entering) setShowToc(false);
+      document.body.dataset.readerFocus = entering ? '1' : '';
+      return entering;
+    });
+  };
+  // Clean up body attribute on unmount
+  useEffect(() => () => { document.body.dataset.readerFocus = ''; }, []);
 
   // Share toast
   const [shareToast, setShareToast] = useState<string | null>(null);
@@ -796,7 +817,7 @@ export default function BookReader() {
     );
   }
 
-  function handleShareChapter() {
+  async function handleShareChapter() {
     // Build share URL: prefer /bl/<book-slug>?chapter=<chapter-slug>, fallback to direct reader URL
     let url: string;
     if (book?.slug && chapter?.slug) {
@@ -806,6 +827,37 @@ export default function BookReader() {
     } else {
       url = window.location.href;
     }
+
+    const shareTitle = chapter?.title ? `${chapter.title} — ${book?.title ?? ''}` : (book?.title ?? 'BookFlow');
+    const shareText = book?.description ? book.description.slice(0, 120) : shareTitle;
+
+    // Use Web Share API if available (mobile / modern desktop)
+    if (navigator.share) {
+      const shareData: ShareData = { title: shareTitle, text: shareText, url };
+
+      // Attach cover image as a File if the browser supports sharing files
+      if (book?.cover_image_url && navigator.canShare) {
+        try {
+          const resp = await fetch(book.cover_image_url);
+          const blob = await resp.blob();
+          const ext = blob.type.split('/')[1]?.split('+')[0] || 'jpg';
+          const file = new File([blob], `cover.${ext}`, { type: blob.type });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ ...shareData, files: [file] });
+            return;
+          }
+        } catch { /* image fetch failed — share without image */ }
+      }
+
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return; // user dismissed share sheet
+      }
+    }
+
+    // Fallback: copy to clipboard
     navigator.clipboard.writeText(url).then(() => {
       if (shareToastTimer.current) clearTimeout(shareToastTimer.current);
       setShareToast('Link copied!');
@@ -818,11 +870,12 @@ export default function BookReader() {
   }
 
   return (
+    <AuthGateContext.Provider value={requestAuth}>
     <div className="h-full bg-surface-hover flex overflow-hidden">
       {/* Table of Contents Sidebar */}
       <aside id="bf-toc-sidebar" className={`fixed inset-y-0 left-0 w-72 bg-surface border-r border-theme transform transition-transform z-20 ${
         showToc ? 'translate-x-0' : '-translate-x-full'
-      } lg:relative lg:translate-x-0 lg:flex-shrink-0 lg:h-full`}>
+      } ${focusMode ? '' : 'lg:relative lg:translate-x-0 lg:flex-shrink-0 lg:h-full'}`}>
         <div className="h-full flex flex-col overflow-y-auto">
           <div className="p-4 border-b border-theme flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2 text-accent">
@@ -933,18 +986,6 @@ export default function BookReader() {
                         </span>
                       )}
                     </Link>
-                    {/* Share button — shown on active chapter or hover, only for public books */}
-                    {book.visibility === 'public' && (
-                      <button
-                        onClick={handleShareChapter}
-                        title="Copy chapter link"
-                        className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded text-muted hover:text-accent hover:bg-surface-hover transition-colors ${
-                          isActive ? 'opacity-100' : 'opacity-0 group-hover/ch:opacity-100'
-                        }`}
-                      >
-                        <Share2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
                     {showProgressPanel && stat && stat.total > 0 && (
                       <div className="mx-3 mb-2 mt-0.5">
                         <div className="flex items-center justify-between mb-1">
@@ -1000,7 +1041,32 @@ export default function BookReader() {
           </div>
         )}
 
-        {/* Header */}
+        {/* Focus mode: minimal bar — hamburger left, logo center, minimize right */}
+        {focusMode && (
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-theme bg-surface relative z-30">
+            <button
+              onClick={() => setShowToc(v => !v)}
+              className="p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+              title="Chapters"
+            >
+              {showToc ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            <Link to="/" className="flex items-center gap-2 text-accent">
+              <BookOpen className="h-6 w-6" />
+              <span className="text-lg font-bold">BookFlow</span>
+            </Link>
+            <button
+              onClick={toggleFocusMode}
+              className="p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+              title="Exit focus mode"
+            >
+              <Maximize2 className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Header — hidden in focus mode */}
+        {!focusMode && (
         <header id="bf-reader-header" className="flex-shrink-0 bg-surface border-b border-theme z-10">
           {/* Row 1: nav + chapter counter + TTS + Edit */}
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -1056,6 +1122,14 @@ export default function BookReader() {
                 <span className="hidden sm:inline">Edit</span>
               </Link>
             )}
+            {/* Focus mode toggle */}
+            <button
+              onClick={toggleFocusMode}
+              title="Focus mode — hide panels"
+              className="ml-2 p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
           </div>
 
           {/* Row 2: content filter + component type icons */}
@@ -1111,6 +1185,8 @@ export default function BookReader() {
             </div>
           </div>
         </header>
+        )} {/* end !focusMode header */}
+
 
         {/* Scrollable chapter content */}
         <div className="flex-1 overflow-y-auto">
@@ -1278,8 +1354,8 @@ export default function BookReader() {
       </main>
 
 
-      {/* Inline Content Panel */}
-      {activeContent && (
+      {/* Inline Content Panel — hidden in focus mode */}
+      {activeContent && !focusMode && (
         <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
           <MediaContext.Provider value={mediaCtx}>
             <InlineContentPanel
@@ -1354,6 +1430,120 @@ export default function BookReader() {
         </div>
       )}
 
+      {/* Auth gate modal — shown when a guest tries to interact with a component */}
+      {showAuthModal && (
+        <ReaderAuthModal onClose={() => setShowAuthModal(false)} />
+      )}
+
+    </div>
+    </AuthGateContext.Provider>
+  );
+}
+
+// ─── Auth Gate Modal ────────────────────────────────────────────────────────
+// Shown when a guest clicks on an interactive component. Provides inline
+// login / register without leaving the page. On success the modal closes
+// and the user is already on the same chapter — they can interact immediately.
+function ReaderAuthModal({ onClose }: { onClose: () => void }) {
+  const { login, register } = useAuth();
+  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      if (tab === 'login') {
+        await login(email, password);
+      } else {
+        await register(email, password, displayName);
+      }
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-muted hover:text-theme">
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="text-center mb-5">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 mb-3">
+            <Lock className="h-6 w-6 text-accent" />
+          </div>
+          <h2 className="text-xl font-bold text-theme">Sign in to continue</h2>
+          <p className="text-sm text-muted mt-1">Save your responses and track your progress</p>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="flex rounded-lg overflow-hidden border border-theme mb-5 text-sm font-medium">
+          <button
+            onClick={() => { setTab('login'); setError(''); }}
+            className={`flex-1 py-2 transition-colors ${tab === 'login' ? 'bg-accent text-white' : 'text-muted hover:bg-surface-hover'}`}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => { setTab('register'); setError(''); }}
+            className={`flex-1 py-2 transition-colors ${tab === 'register' ? 'bg-accent text-white' : 'text-muted hover:bg-surface-hover'}`}
+          >
+            Create Account
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {tab === 'register' && (
+            <input
+              type="text"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder="Your name"
+              required
+              className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-accent focus:outline-none"
+            />
+          )}
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="Email"
+            required
+            className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-accent focus:outline-none"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Password"
+            required
+            className="w-full px-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-accent focus:outline-none"
+          />
+          {error && (
+            <p className="text-sm text-red-500 flex items-center gap-1">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 bg-accent text-white rounded-lg font-medium text-sm hover:bg-accent/90 disabled:opacity-60 transition-colors"
+          >
+            {loading ? 'Please wait…' : tab === 'login' ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -2073,6 +2263,7 @@ function QuestionBlock({ content }: { content: InlineContent }) {
   const [answer, setAnswer] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markCompleteRef = useRef(markComplete);
@@ -2134,8 +2325,9 @@ function QuestionBlock({ content }: { content: InlineContent }) {
         <textarea
           value={answer}
           onChange={handleChange}
+          onFocus={() => { if (!api.getToken()) requestAuth(); }}
           rows={4}
-          placeholder="Write your response…"
+          placeholder={api.getToken() ? 'Write your response…' : 'Sign in to write your response…'}
           className="w-full p-3 theme-input rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
       )}
@@ -2687,6 +2879,7 @@ function PollBlock({ content }: { content: InlineContent }) {
   const [totalVotes, setTotalVotes] = useState(0);
   const [voted, setVoted] = useState(false);
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
@@ -2709,6 +2902,7 @@ function PollBlock({ content }: { content: InlineContent }) {
 
   async function handleVote() {
     if (!selected) return;
+    if (!api.getToken()) { requestAuth(); return; }
     try {
       const res = await api.votePoll(content.id, selected);
       setResults(res.results);
@@ -2741,7 +2935,7 @@ function PollBlock({ content }: { content: InlineContent }) {
           return (
             <div
               key={opt.id}
-              onClick={() => !voted && setSelected(opt.id)}
+              onClick={() => { if (!voted) { if (!api.getToken()) { requestAuth(); return; } setSelected(opt.id); } }}
               className={`relative p-3 border rounded-lg cursor-pointer transition-colors ${
                 selected === opt.id
                   ? 'border-green-500 bg-green-100'
@@ -3597,6 +3791,7 @@ function InlineSelect({ content }: { content: InlineContent }) {
   const data = content.content_data as SelectData;
   const [value, setValue] = useState(data.default_value || '');
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
@@ -3605,9 +3800,9 @@ function InlineSelect({ content }: { content: InlineContent }) {
   }, [content.id]);
 
   const handleChange = (newValue: string) => {
+    if (!api.getToken()) { requestAuth(); return; }
     setValue(newValue);
     if (newValue) markComplete(itemKey, 'form');
-    if (!api.getToken()) return;
     api.submitFormResponse(content.id, { value: newValue }).catch(() => {});
   };
 
@@ -3635,6 +3830,7 @@ function InlineMultiselect({ content }: { content: InlineContent }) {
   const data = content.content_data as MultiselectData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
@@ -3645,10 +3841,10 @@ function InlineMultiselect({ content }: { content: InlineContent }) {
   }, [content.id]);
 
   const toggleOption = (id: string) => {
+    if (!api.getToken()) { requestAuth(); return; }
     const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     setSelected(newSelected);
     if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
-    if (!api.getToken()) return;
     api.submitFormResponse(content.id, { value: newSelected }).catch(() => {});
   };
 
@@ -3682,6 +3878,7 @@ function InlineTextbox({ content }: { content: InlineContent }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -3694,9 +3891,9 @@ function InlineTextbox({ content }: { content: InlineContent }) {
   }, [content.id]);
 
   const handleChange = (newValue: string) => {
+    if (!api.getToken()) { requestAuth(); return; }
     setValue(newValue);
     if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
-    if (!api.getToken()) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       api.submitFormResponse(content.id, { value: newValue }).catch(() => {});
@@ -3747,6 +3944,7 @@ function InlineTextarea({ content }: { content: InlineContent }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
   const isFull = (data.width ?? 'full') === 'full';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -3761,6 +3959,7 @@ function InlineTextarea({ content }: { content: InlineContent }) {
   }, [content.id]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!api.getToken()) { requestAuth(); return; }
     const newValue = e.target.value;
     setValue(newValue);
     if (data.auto_expand && e.target) {
@@ -3768,12 +3967,11 @@ function InlineTextarea({ content }: { content: InlineContent }) {
       e.target.style.height = e.target.scrollHeight + 'px';
     }
     if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
-    if (!api.getToken()) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       api.submitFormResponse(content.id, { value: newValue }).catch(() => {});
     }, 600);
-  }, [data.auto_expand, content.id, itemKey, markComplete, markIncomplete]);
+  }, [data.auto_expand, content.id, itemKey, markComplete, markIncomplete, requestAuth]);
 
   // Set initial height when auto_expand is on
   useEffect(() => {
@@ -3829,6 +4027,7 @@ function InlineRadio({ content }: { content: InlineContent }) {
   const data = content.content_data as RadioData;
   const [selected, setSelected] = useState(data.default_value || '');
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
@@ -3839,9 +4038,9 @@ function InlineRadio({ content }: { content: InlineContent }) {
   }, [content.id]);
 
   const handleChange = (optId: string) => {
+    if (!api.getToken()) { requestAuth(); return; }
     setSelected(optId);
     markComplete(itemKey, 'form');
-    if (!api.getToken()) return;
     api.submitFormResponse(content.id, { value: optId }).catch(() => {});
   };
 
@@ -3869,6 +4068,7 @@ function InlineCheckbox({ content }: { content: InlineContent }) {
   const data = content.content_data as CheckboxData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
 
   useEffect(() => {
@@ -3879,10 +4079,10 @@ function InlineCheckbox({ content }: { content: InlineContent }) {
   }, [content.id]);
 
   const toggleOption = (id: string) => {
+    if (!api.getToken()) { requestAuth(); return; }
     const newSelected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
     setSelected(newSelected);
     if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
-    if (!api.getToken()) return;
     api.submitFormResponse(content.id, { value: newSelected }).catch(() => {});
   };
 

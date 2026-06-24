@@ -290,6 +290,11 @@ class ApiClient {
     return this.request(`/form-responses/${contentId}/all`);
   }
 
+  async getBookResponses(bookId: string, chapterId?: string): Promise<import('../types').BookResponseItem[]> {
+    const qs = chapterId ? `?chapter_id=${chapterId}` : '';
+    return this.request(`/books/${bookId}/responses${qs}`);
+  }
+
   // Reading Progress
   async getReadingProgress(bookId: string): Promise<ReadingProgress | null> {
     return this.request(`/books/${bookId}/progress`);
@@ -419,6 +424,34 @@ class ApiClient {
 
   async getPublicSettings(): Promise<{ home_tagline: string; feature_demo_book_id: string | null }> {
     return this.request('/settings/public');
+  }
+
+  // API Key management
+  async listApiKeys(): Promise<{ id: string; name: string; last_used_at: string | null; created_at: string }[]> {
+    return this.request('/settings/api-keys');
+  }
+  async createApiKey(name: string): Promise<{ id: string; name: string; created_at: string; key: string }> {
+    return this.request('/settings/api-keys', { method: 'POST', body: JSON.stringify({ name }) });
+  }
+  async revokeApiKey(id: string): Promise<{ success: boolean }> {
+    return this.request(`/settings/api-keys/${id}`, { method: 'DELETE' });
+  }
+
+  // Book import
+  async importBook(payload: {
+    external_id?: string;
+    book: { title: string; subtitle?: string; description?: string; visibility?: string; status?: string; cover_image?: string; cover_image_url?: string };
+    settings?: Record<string, unknown>;
+    chapters?: { title: string; order_index?: number; status?: string; content?: unknown; content_text?: string; inline_content?: unknown[] }[];
+    collaborators?: { email: string; role: string }[];
+  }): Promise<{ book_id: string; external_id: string | null; created: boolean; chapters: { id: string; title: string; order_index: number }[]; inline_content_count: number; collaborators_invited: number; warnings: string[] }> {
+    return this.request('/import/books', { method: 'POST', body: JSON.stringify(payload) });
+  }
+  async listImportedBooks(): Promise<{ external_id: string; book_id: string; created_at: string }[]> {
+    return this.request('/import/books');
+  }
+  async getImportedBook(externalId: string): Promise<{ external_id: string; book_id: string; created_at: string }> {
+    return this.request(`/import/books/${encodeURIComponent(externalId)}`);
   }
 
   // Saved Books

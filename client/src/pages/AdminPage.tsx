@@ -63,7 +63,11 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
             <BookOpen className="h-5 w-5 text-muted shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-theme text-sm truncate">{book.title}</p>
-              <p className="text-xs text-muted">by {book.author?.display_name ?? '—'} · {book.status} · {book.visibility}</p>
+              <p className="text-xs text-muted">
+                by {book.author?.display_name ?? '—'} · {book.status} · {book.visibility}
+                {book.created_at && <> · Created {new Date(book.created_at).toLocaleDateString()}</>}
+                {book.published_at && <> · Published {new Date(book.published_at).toLocaleDateString()}</>}
+              </p>
             </div>
             <a href={`/edit/book/${book.id}`} className="text-xs text-blue-500 hover:underline shrink-0">Open</a>
             <button
@@ -97,7 +101,10 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
                     <p className="font-medium text-theme text-sm truncate">{book.title}</p>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium shrink-0">archived</span>
                   </div>
-                  <p className="text-xs text-muted">by {book.author?.display_name ?? '—'} · {book.visibility}</p>
+                  <p className="text-xs text-muted">
+                    by {book.author?.display_name ?? '—'} · {book.visibility}
+                    {book.created_at && <> · Created {new Date(book.created_at).toLocaleDateString()}</>}
+                  </p>
                 </div>
                 <button
                   onClick={() => handleReinstate(book.id)}
@@ -290,7 +297,10 @@ export default function AdminPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted truncate">{user.email}</p>
+                    <p className="text-xs text-muted truncate">
+                      {user.email}
+                      {user.created_at && <> · Joined {new Date(user.created_at).toLocaleDateString()}</>}
+                    </p>
                   </div>
 
                   {/* Role toggle */}
@@ -334,7 +344,10 @@ export default function AdminPage() {
                   <Users2 className="h-5 w-5 text-muted shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-theme text-sm truncate">{club.name}</p>
-                    <p className="text-xs text-muted">by {club.creator?.display_name ?? '—'} · {club.visibility}</p>
+                    <p className="text-xs text-muted">
+                      by {club.creator?.display_name ?? '—'} · {club.visibility}
+                      {club.created_at && <> · Created {new Date(club.created_at).toLocaleDateString()}</>}
+                    </p>
                   </div>
                   <a
                     href={`/clubs/${club.id}`}

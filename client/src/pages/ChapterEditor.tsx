@@ -23,6 +23,7 @@ import type {
 } from '../types';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import CommentsSidebar from '../components/comments/CommentsSidebar';
+import BookResponsesViewer from '../components/responses/BookResponsesViewer';
 import { useAuth } from '../contexts/AuthContext';
 import { EditorPreviewContext } from '../contexts/EditorPreviewContext';
 import type { EditorPreviewMode } from '../contexts/EditorPreviewContext';
@@ -55,7 +56,10 @@ export default function ChapterEditor() {
     selection?: { from: number; to: number; text: string };
     editingItem?: InlineContent;
   } | null>(null);
-  const [showComments, setShowComments] = useState(() => searchParams.get('comments') === '1');
+  const [rightPanel, setRightPanel] = useState<'comments' | 'inline' | 'responses'>(
+    () => searchParams.get('comments') === '1' ? 'comments' : 'inline'
+  );
+  const showComments = rightPanel === 'comments';
   const [commentSelection, setCommentSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
   const [bookSettings, setBookSettings] = useState<BookSettings | null>(null);
@@ -896,7 +900,7 @@ export default function ChapterEditor() {
               </button>
               {commentSelection && (
                 <button
-                  onClick={() => setShowComments(true)}
+                  onClick={() => setRightPanel('comments')}
                   className="flex items-center gap-1 px-2 py-1.5 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors text-sm font-medium"
                   title="Comment on selected text"
                 >
@@ -905,7 +909,7 @@ export default function ChapterEditor() {
                 </button>
               )}
               <button
-                onClick={() => setShowComments(!showComments)}
+                onClick={() => setRightPanel(p => p === 'comments' ? 'inline' : 'comments')}
                 className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded transition-colors text-sm ${
                   showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:bg-surface-hover'
                 }`}
@@ -1215,14 +1219,14 @@ export default function ChapterEditor() {
           })()}
         </div>
 
-        {/* Right Panel — tabbed: Comments / Inline Content */}
+        {/* Right Panel — tabbed: Comments / Inline / Responses */}
         <div id="bf-editor-panel" className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 h-[calc(100vh-6rem)]">
           {/* Tab bar */}
           <div className="flex border-2 border-theme rounded-t-lg overflow-hidden bg-surface flex-shrink-0">
             <button
-              onClick={() => setShowComments(true)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-                showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
+              onClick={() => setRightPanel('comments')}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium transition-colors ${
+                rightPanel === 'comments' ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
               }`}
             >
               <HelpCircle className="h-3.5 w-3.5" />
@@ -1230,30 +1234,43 @@ export default function ChapterEditor() {
             </button>
             <div className="w-px bg-theme" />
             <button
-              onClick={() => setShowComments(false)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-                !showComments ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
+              onClick={() => setRightPanel('inline')}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium transition-colors ${
+                rightPanel === 'inline' ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
               }`}
             >
               <StickyNote className="h-3.5 w-3.5" />
               Inline
             </button>
+            <div className="w-px bg-theme" />
+            <button
+              onClick={() => setRightPanel('responses')}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium transition-colors ${
+                rightPanel === 'responses' ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
+              }`}
+            >
+              <BarChart2 className="h-3.5 w-3.5" />
+              Responses
+            </button>
           </div>
 
-          {/* Panel content */}
-          {showComments && chapterId && bookId ? (
+          {/* Comments panel */}
+          {rightPanel === 'comments' && chapterId && bookId && (
             <div className="flex-1 border-2 border-t-0 border-theme rounded-b-lg overflow-hidden flex flex-col">
               <CommentsSidebar
                 chapterId={chapterId}
                 bookId={bookId}
                 canResolve={['owner', 'author', 'editor'].includes(userRole)}
                 currentUserId={user?.id}
-                onClose={() => { setShowComments(false); setCommentSelection(null); }}
+                onClose={() => { setRightPanel('inline'); setCommentSelection(null); }}
                 pendingSelection={commentSelection}
                 onSelectionUsed={() => setCommentSelection(null)}
               />
             </div>
-          ) : (
+          )}
+
+          {/* Inline content panel */}
+          {rightPanel === 'inline' && (
             <div className="theme-card rounded-t-none border-t-0 flex-1 overflow-hidden flex flex-col">
               <div className="p-3 border-b flex items-center justify-between flex-shrink-0">
                 <p className="text-xs text-muted">{inlineContents.length} items</p>
@@ -1294,6 +1311,13 @@ export default function ChapterEditor() {
               </div>
             </div>
           )}
+
+          {/* Responses panel */}
+          {rightPanel === 'responses' && bookId && chapterId && (
+            <div className="theme-card rounded-t-none border-t-0 flex-1 overflow-y-auto">
+              <BookResponsesViewer bookId={bookId} chapterId={chapterId} compact />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1302,7 +1326,7 @@ export default function ChapterEditor() {
         <div className="lg:hidden">
           <div
             className="fixed inset-0 bg-black/30 z-20"
-            onClick={() => { setShowComments(false); setCommentSelection(null); }}
+            onClick={() => { setRightPanel('inline'); setCommentSelection(null); }}
           />
           <div className="fixed right-0 top-0 h-full z-30 w-80 border-l-2 border-theme">
             <CommentsSidebar
@@ -1310,7 +1334,7 @@ export default function ChapterEditor() {
               bookId={bookId}
               canResolve={['owner', 'author', 'editor'].includes(userRole)}
               currentUserId={user?.id}
-              onClose={() => { setShowComments(false); setCommentSelection(null); }}
+              onClose={() => { setRightPanel('inline'); setCommentSelection(null); }}
               pendingSelection={commentSelection}
               onSelectionUsed={() => setCommentSelection(null)}
             />

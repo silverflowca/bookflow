@@ -422,6 +422,21 @@ export interface QuestionAnswer {
   created_at: string;
 }
 
+// Book-level responses viewer item (GET /books/:id/responses)
+export interface BookResponseItem {
+  id: string;
+  content_type: string;
+  content_data: any;
+  position_in_chapter: string;
+  order_index: number;
+  chapter_id: string;
+  chapter_title: string;
+  chapter_order: number;
+  total: number;
+  responses: (FormResponseWithUser & { selected_option?: string; answer_text?: string; selected_options?: string[]; is_correct?: boolean })[];
+  aggregates: FormResponseAggregate | null;
+}
+
 // Reading progress
 export interface ReadingProgress {
   id: string;

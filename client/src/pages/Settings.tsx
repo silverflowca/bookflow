@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe, Loader2 } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe, Loader2, Key, Plus, Trash2, Copy } from 'lucide-react';
 import api from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import type { CoverSize } from '../contexts/ThemeContext';
@@ -47,9 +47,18 @@ export default function Settings() {
   const [restreamConnecting, setRestreamConnecting] = useState(false);
   const [restreamMsg, setRestreamMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // API Keys state
+  interface ApiKey { id: string; name: string; last_used_at: string | null; created_at: string; }
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [newRawKey, setNewRawKey] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadRestreamStatus();
+    loadApiKeys();
     // Use adminGetBooks so all books appear (not just the logged-in user's own books)
     api.adminGetBooks().then(books => setMyBooks(books.map((b: any) => ({ id: b.id, title: b.title })))).catch(() => {
       // fallback to own books if admin endpoint fails
@@ -95,6 +104,45 @@ export default function Settings() {
         feature_demo_book_id: null,
       });
     }
+  }
+
+  async function loadApiKeys() {
+    try {
+      const data = await api.listApiKeys();
+      setApiKeys(data);
+    } catch { /* silent */ }
+  }
+
+  async function generateApiKey() {
+    if (!newKeyName.trim()) return;
+    setGeneratingKey(true);
+    try {
+      const data = await api.createApiKey(newKeyName.trim());
+      setNewRawKey(data.key);
+      setNewKeyName('');
+      setApiKeys(prev => [{ id: data.id, name: data.name, created_at: data.created_at, last_used_at: null }, ...prev]);
+    } catch (err) {
+      console.error('Failed to generate API key:', err);
+    } finally {
+      setGeneratingKey(false);
+    }
+  }
+
+  async function revokeApiKey(id: string) {
+    if (!confirm('Revoke this API key? Any integrations using it will stop working.')) return;
+    try {
+      await api.revokeApiKey(id);
+      setApiKeys(prev => prev.filter(k => k.id !== id));
+      if (newRawKey) setNewRawKey(null);
+    } catch (err) {
+      console.error('Failed to revoke API key:', err);
+    }
+  }
+
+  function copyKey(key: string) {
+    navigator.clipboard.writeText(key);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 2000);
   }
 
   async function loadRestreamStatus() {
@@ -486,6 +534,85 @@ export default function Settings() {
               <span className="text-xs text-gray-500">Credentials saved — click Connect to authorize</span>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* API Keys */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Key className="h-5 w-5 text-emerald-500" />
+            <h2 className="text-lg font-semibold">API Keys</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            Generate API keys for machine-to-machine access (n8n, Zapier, custom scripts). Pass the key as an <code className="bg-gray-100 px-1 rounded text-xs">X-API-Key</code> header. The raw key is shown only once at creation.
+          </p>
+
+          {/* New key form */}
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={e => setNewKeyName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && generateApiKey()}
+              className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="Key label, e.g. n8n integration"
+            />
+            <button
+              type="button"
+              onClick={generateApiKey}
+              disabled={generatingKey || !newKeyName.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            >
+              {generatingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Generate
+            </button>
+          </div>
+
+          {/* One-time raw key display */}
+          {newRawKey && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-xs font-medium text-emerald-700 mb-1">Copy this key now — it won't be shown again:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs break-all font-mono text-emerald-900">{newRawKey}</code>
+                <button
+                  type="button"
+                  onClick={() => copyKey(newRawKey)}
+                  className="shrink-0 flex items-center gap-1 px-2 py-1 border border-emerald-300 text-emerald-700 rounded text-xs hover:bg-emerald-100"
+                >
+                  <Copy className="h-3 w-3" />
+                  {keyCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Key list */}
+          {apiKeys.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No API keys yet.</p>
+          ) : (
+            <div className="divide-y border rounded-lg">
+              {apiKeys.map(k => (
+                <div key={k.id} className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">{k.name}</p>
+                    <p className="text-xs text-gray-400">
+                      Created {new Date(k.created_at).toLocaleDateString()}
+                      {k.last_used_at && ` · Last used ${new Date(k.last_used_at).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => revokeApiKey(k.id)}
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Revoke
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

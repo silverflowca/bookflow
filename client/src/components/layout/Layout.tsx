@@ -363,7 +363,7 @@ export default function Layout() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-theme">
       {/* Header */}
-      <header className="theme-header flex-shrink-0">
+      <header id="bf-app-header" className="theme-header flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -385,7 +385,7 @@ export default function Layout() {
               {user ? (
                 <>
                   {/* Core nav — always visible, text label shown on lg+ */}
-                  <Link to="/dashboard" className="relative flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Books">
+                  <Link to="/dashboard" id="bf-nav-books" className="relative flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Books">
                     <BookOpen className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Books</span>
                     {savedCount > 0 && (
@@ -401,11 +401,11 @@ export default function Layout() {
                     <Users className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Clubs</span>
                   </Link>
-                  <Link to="/clubs?tab=bookstudy" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Study Groups">
+                  <Link to="/clubs?tab=bookstudy" id="bf-nav-study" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Study Groups">
                     <BookOpen className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Study Groups</span>
                   </Link>
-                  <span className="flex items-center gap-1 text-muted/40 px-2 md:px-3 py-2 rounded-md text-sm font-medium cursor-not-allowed select-none" title="Live — coming soon">
+                  <span id="bf-nav-live" className="flex items-center gap-1 text-muted/40 px-2 md:px-3 py-2 rounded-md text-sm font-medium cursor-not-allowed select-none" title="Live — coming soon">
                     <Video className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Live</span>
                   </span>
@@ -497,14 +497,14 @@ export default function Layout() {
                 </Link>
 
                 {/* Nav links */}
-                <div className="py-2">
-                  <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                <div id="bf-mobile-nav-links" className="py-2">
+                  <Link to="/dashboard" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
                     <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> Books
                   </Link>
-                  <Link to="/clubs" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                  <Link to="/clubs" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
                     <Users className="h-5 w-5 text-accent flex-shrink-0" /> Book Clubs
                   </Link>
-                  <Link to="/clubs?tab=bookstudy" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                  <Link to="/clubs?tab=bookstudy" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
                     <BookOpen className="h-5 w-5 text-accent flex-shrink-0" /> Study Groups
                   </Link>
                   <span className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted/40 cursor-not-allowed select-none">

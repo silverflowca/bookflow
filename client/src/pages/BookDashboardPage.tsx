@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
+import BookResponsesViewer from '../components/responses/BookResponsesViewer';
 
 type BookStats = Awaited<ReturnType<typeof api.getBookStats>>;
 
@@ -87,6 +88,7 @@ export default function BookDashboardPage() {
   const [stats, setStats] = useState<BookStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'overview' | 'responses'>('overview');
 
   useEffect(() => {
     if (bookId) load();
@@ -154,6 +156,51 @@ export default function BookDashboardPage() {
         </Link>
       </div>
 
+      {/* Tab strip */}
+      <div className="flex border-b border-[var(--color-border)] mb-6">
+        <button
+          onClick={() => setTab('overview')}
+          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            tab === 'overview'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-muted hover:text-theme'
+          }`}
+        >
+          <BarChart2 className="h-4 w-4" />
+          Overview
+        </button>
+        <button
+          onClick={() => setTab('responses')}
+          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            tab === 'responses'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-muted hover:text-theme'
+          }`}
+        >
+          <MessageSquare className="h-4 w-4" />
+          Responses
+          {overview.total_form_responses > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-xs font-semibold">
+              {overview.total_form_responses}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {tab === 'responses' && bookId && (
+        <div className="theme-section rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-[var(--color-border)] flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-accent" />
+            <h2 className="text-sm font-semibold text-theme">All Reader Responses</h2>
+          </div>
+          <div className="p-4">
+            <BookResponsesViewer bookId={bookId} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'overview' && (
+      <>
       {/* Stat cards — row 1: readers */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <StatCard icon={Users} label="Total Readers" value={overview.total_readers} color="blue" />
@@ -282,6 +329,8 @@ export default function BookDashboardPage() {
           <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No readers yet. Share your book to start gathering stats.</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );

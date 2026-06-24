@@ -1,6 +1,7 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
 import { authenticate } from '../middleware/auth.js';
+import { createHash, randomBytes } from 'crypto';
 
 const router = express.Router();
 
@@ -108,6 +109,60 @@ router.get('/public', async (req, res) => {
     });
   } catch (err) {
     res.json({ home_tagline: '', feature_demo_book_id: null });
+  }
+});
+
+// ── API Key Management ────────────────────────────────────────────────────────
+
+// List API keys for current user (never returns raw key)
+router.get('/api-keys', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('api_keys')
+      .select('id, name, last_used_at, created_at')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('List API keys error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate a new API key — returns raw key ONCE
+router.post('/api-keys', authenticate, async (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Key name is required' });
+  try {
+    const rawKey = 'bfk_' + randomBytes(32).toString('hex');
+    const keyHash = createHash('sha256').update(rawKey).digest('hex');
+    const { data, error } = await supabase
+      .from('api_keys')
+      .insert({ user_id: req.user.id, key_hash: keyHash, name: name.trim() })
+      .select('id, name, created_at')
+      .single();
+    if (error) throw error;
+    res.status(201).json({ ...data, key: rawKey });
+  } catch (err) {
+    console.error('Create API key error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Revoke an API key
+router.delete('/api-keys/:id', authenticate, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('api_keys')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete API key error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

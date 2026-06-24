@@ -708,4 +708,159 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
   }
 });
 
+// ── GET /books/:id/responses ──────────────────────────────────────────────────
+// Returns all inline content for a book with aggregated responses.
+// Author or super_admin only.  Optional ?chapter_id=uuid to scope to one chapter.
+router.get('/:id/responses', authenticate, requireAuthor, async (req, res) => {
+  const bookId = req.params.id;
+  const { chapter_id } = req.query;
+
+  try {
+    // 1. Fetch inline content joined with chapter info
+    let icQuery = supabase
+      .schema('bookflow')
+      .from('inline_content')
+      .select('id, content_type, content_data, position_in_chapter, order_index, chapter_id, chapters(title, order_index)')
+      .eq('book_id', bookId)
+      .order('order_index', { ascending: true });
+
+    if (chapter_id) icQuery = icQuery.eq('chapter_id', chapter_id);
+
+    const { data: items, error: icErr } = await icQuery;
+    if (icErr) throw icErr;
+    if (!items?.length) return res.json([]);
+
+    const allIds = items.map(i => i.id);
+    const formIds = items.filter(i => ['select','multiselect','radio','checkbox','textbox','textarea'].includes(i.content_type)).map(i => i.id);
+    const pollIds = items.filter(i => i.content_type === 'poll').map(i => i.id);
+    const questionIds = items.filter(i => i.content_type === 'question').map(i => i.id);
+
+    // 2. Batch-fetch form responses
+    const formResponsesByItem = {};
+    if (formIds.length) {
+      const { data: frs } = await supabase
+        .schema('bookflow')
+        .from('form_responses')
+        .select('inline_content_id, id, user_id, response_data, updated_at, user:profiles!form_responses_user_id_fkey(id, display_name, avatar_url)')
+        .in('inline_content_id', formIds)
+        .order('updated_at', { ascending: false });
+      (frs || []).forEach(r => {
+        if (!formResponsesByItem[r.inline_content_id]) formResponsesByItem[r.inline_content_id] = [];
+        formResponsesByItem[r.inline_content_id].push(r);
+      });
+    }
+
+    // 3. Batch-fetch poll responses
+    const pollResponsesByItem = {};
+    if (pollIds.length) {
+      const { data: prs } = await supabase
+        .schema('bookflow')
+        .from('poll_responses')
+        .select('inline_content_id, id, user_id, selected_option, created_at, user:profiles!poll_responses_user_id_fkey(id, display_name, avatar_url)')
+        .in('inline_content_id', pollIds);
+      (prs || []).forEach(r => {
+        if (!pollResponsesByItem[r.inline_content_id]) pollResponsesByItem[r.inline_content_id] = [];
+        pollResponsesByItem[r.inline_content_id].push(r);
+      });
+    }
+
+    // 4. Batch-fetch question answers
+    const questionAnswersByItem = {};
+    if (questionIds.length) {
+      const { data: qas } = await supabase
+        .schema('bookflow')
+        .from('question_answers')
+        .select('inline_content_id, id, user_id, answer_text, selected_options, is_correct, created_at, user:profiles!question_answers_user_id_fkey(id, display_name, avatar_url)')
+        .in('inline_content_id', questionIds)
+        .order('created_at', { ascending: false });
+      (qas || []).forEach(r => {
+        if (!questionAnswersByItem[r.inline_content_id]) questionAnswersByItem[r.inline_content_id] = [];
+        questionAnswersByItem[r.inline_content_id].push(r);
+      });
+    }
+
+    // 5. Build response per item
+    const choiceTypes = ['select', 'multiselect', 'radio', 'checkbox'];
+    const result = items.map(item => {
+      const chap = item.chapters || {};
+      let responses = [];
+      let aggregates = null;
+      let total = 0;
+
+      if (item.content_type === 'poll') {
+        const prs = pollResponsesByItem[item.id] || [];
+        total = prs.length;
+        responses = prs;
+        // Build option-count aggregates
+        const options = item.content_data?.options || [];
+        const counts = {};
+        options.forEach(o => { counts[o.id] = 0; });
+        prs.forEach(r => { if (counts[r.selected_option] !== undefined) counts[r.selected_option]++; });
+        aggregates = {
+          counts,
+          total,
+          options: options.map(o => ({
+            id: o.id,
+            text: o.text,
+            count: counts[o.id] || 0,
+            percent: total > 0 ? Math.round(((counts[o.id] || 0) / total) * 100) : 0,
+          })),
+        };
+      } else if (item.content_type === 'question') {
+        responses = questionAnswersByItem[item.id] || [];
+        total = responses.length;
+      } else if (choiceTypes.includes(item.content_type)) {
+        const frs = formResponsesByItem[item.id] || [];
+        total = frs.length;
+        responses = frs;
+        const options = item.content_data?.options || [];
+        const counts = {};
+        options.forEach(o => { counts[o.id] = 0; });
+        frs.forEach(r => {
+          const val = r.response_data?.value;
+          if (!val) return;
+          if (Array.isArray(val)) val.forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+          else if (counts[val] !== undefined) counts[val]++;
+        });
+        aggregates = {
+          counts,
+          total,
+          options: options.map(o => ({
+            id: o.id,
+            text: o.text,
+            count: counts[o.id] || 0,
+            percent: total > 0 ? Math.round(((counts[o.id] || 0) / total) * 100) : 0,
+          })),
+        };
+      } else {
+        // textbox / textarea / other
+        responses = formResponsesByItem[item.id] || [];
+        total = responses.length;
+      }
+
+      return {
+        id: item.id,
+        content_type: item.content_type,
+        content_data: item.content_data,
+        position_in_chapter: item.position_in_chapter,
+        order_index: item.order_index,
+        chapter_id: item.chapter_id,
+        chapter_title: chap.title || '',
+        chapter_order: chap.order_index ?? 0,
+        total,
+        responses,
+        aggregates,
+      };
+    });
+
+    // Sort by chapter order then item order
+    result.sort((a, b) => a.chapter_order - b.chapter_order || (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    res.json(result);
+  } catch (err) {
+    console.error('Book responses error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

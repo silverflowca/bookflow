@@ -336,7 +336,11 @@ export default function ProfilePage() {
                       <Link to={`/book/${r.book?.id}`} className="text-sm font-medium text-theme hover:text-accent truncate block">
                         {r.book?.title || 'Untitled'}
                       </Link>
-                      <p className="text-xs text-muted">{r.book?.author?.display_name || ''}</p>
+                      <p className="text-xs text-muted">
+                        {r.book?.author?.display_name || ''}
+                        {r.started_at && <> · Started {new Date(r.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+                        {r.last_read_at && <> · Last read {new Date(r.last_read_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+                      </p>
                       <div className="mt-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
                         <div className="h-full bg-accent rounded-full" style={{ width: `${r.percent_complete}%` }} />
                       </div>
@@ -363,6 +367,7 @@ export default function ProfilePage() {
                         : <BookOpen className="h-6 w-6 text-muted m-auto mt-6" />}
                     </div>
                     <p className="text-xs text-theme truncate leading-tight">{r.book?.title}</p>
+                    {r.completed_at && <p className="text-[10px] text-muted mt-0.5">{new Date(r.completed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>}
                   </Link>
                 ))}
               </div>

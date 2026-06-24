@@ -73,7 +73,7 @@ router.get('/books', async (req, res) => {
     const { data, error } = await supabase
       .from('books')
       .select(`
-        id, title, status, visibility, created_at, updated_at,
+        id, title, status, visibility, created_at, updated_at, published_at,
         author:profiles!books_author_id_fkey(id, display_name, email)
       `)
       .order('created_at', { ascending: false });

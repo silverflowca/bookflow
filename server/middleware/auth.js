@@ -1,4 +1,9 @@
 import supabase from '../config/supabase.js';
+import { createHash } from 'crypto';
+
+function sha256(str) {
+  return createHash('sha256').update(str).digest('hex');
+}
 
 /**
  * Check if a user ID belongs to a super_admin.
@@ -167,4 +172,31 @@ export function requireRole(allowedRoles) {
   };
 }
 
-export default { authenticate, optionalAuth, requireAuthor, requireRole, requireSuperAdmin };
+/**
+ * Dual auth middleware — accepts either X-API-Key header or Bearer JWT.
+ * API keys are stored as SHA-256 hashes in the api_keys table.
+ */
+export async function authenticateAny(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey) {
+    try {
+      const hash = sha256(apiKey);
+      const { data } = await supabase
+        .from('api_keys')
+        .select('user_id')
+        .eq('key_hash', hash)
+        .maybeSingle();
+      if (!data) return res.status(401).json({ error: 'Invalid API key' });
+      req.user = { id: data.user_id };
+      // fire-and-forget
+      supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('key_hash', hash);
+      return next();
+    } catch (err) {
+      console.error('API key auth error:', err);
+      return res.status(401).json({ error: 'Authentication failed' });
+    }
+  }
+  return authenticate(req, res, next);
+}
+
+export default { authenticate, optionalAuth, requireAuthor, requireRole, requireSuperAdmin, authenticateAny };

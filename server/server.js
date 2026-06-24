@@ -36,6 +36,7 @@ import adminRoutes from './routes/admin.js';
 import feedbackRoutes from './routes/feedback.js';
 import savedBooksRoutes from './routes/saved-books.js';
 import bookLandingRoutes from './routes/book-landing.js';
+import importRoutes from './routes/import.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { startStatusCron } from './services/chat-status.js';
 
@@ -65,7 +66,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -110,6 +111,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/saved-books', savedBooksRoutes);
 app.use('/api/book-landing', bookLandingRoutes);
 app.use('/api/bl', bookLandingRoutes); // short alias: /bl/:slug
+app.use('/api/import', importRoutes);
 
 // Invite acceptance
 app.post('/api/invites/accept/:token', optionalAuth, acceptInvite);
