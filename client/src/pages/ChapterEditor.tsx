@@ -4,7 +4,7 @@ import {
   ChevronLeft, Save, Eye, HelpCircle, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen,
-  LayoutGrid, Image, ArrowUp, ArrowDown, Copy
+  LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -12,6 +12,8 @@ import Highlight from '@tiptap/extension-highlight';
 import TipTapLink from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import InlineContentMark from '../components/editor/InlineContentMark';
 import { InlineFormNode } from '../components/editor/InlineFormNode';
 import { ColumnLayout, ColumnCell } from '../components/editor/ColumnLayoutNode';
@@ -85,6 +87,8 @@ export default function ChapterEditor() {
       Placeholder.configure({
         placeholder: 'Start writing your chapter...',
       }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       InlineContentMark,
       InlineFormNode,
       ColumnLayout,
@@ -1022,6 +1026,13 @@ export default function ChapterEditor() {
               1.
             </ToolbarButton>
             <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleTaskList().run()}
+              active={editor?.isActive('taskList')}
+              title="Checklist"
+            >
+              <ListChecks className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBlockquote().run()}
               active={editor?.isActive('blockquote')}
               title="Quote"
@@ -1524,7 +1535,7 @@ function InlineContentItem({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
             {/* Visibility Toggle */}
             <button
               onClick={(e) => {
@@ -1628,7 +1639,7 @@ function InlineContentItem({
                   onDelete(item.id);
                 }
               }}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-600 hover:bg-red-200 rounded ml-auto"
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-600 hover:bg-red-200 rounded"
             >
               <Trash2 className="h-3 w-3" />
               Delete

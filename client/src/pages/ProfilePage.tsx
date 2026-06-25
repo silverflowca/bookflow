@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   User, BookOpen, Users, BarChart2, MapPin, Globe,
   Lock, Eye, EyeOff, Edit2, Save, X, Check,
-  BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2
+  BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2, GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
@@ -33,10 +33,18 @@ interface ProfileData {
     total_started: number;
     avg_progress?: number;
     clubs_count: number;
+    study_groups_count?: number;
     books_authored: number;
   } | null;
   is_own?: boolean;
   is_private?: boolean;
+}
+
+function fmtDate(dateStr: string) {
+  const d = new Date(dateStr);
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString(undefined, opts);
 }
 
 export default function ProfilePage() {
@@ -299,11 +307,12 @@ export default function ProfilePage() {
 
       {/* Stats row */}
       {data.stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
           {[
             { label: 'Books Read', value: data.stats.total_read, icon: CheckCircle2 },
             { label: 'In Progress', value: data.stats.total_started - data.stats.total_read, icon: BookMarked },
             { label: 'Clubs', value: data.stats.clubs_count, icon: Users },
+            { label: 'Study Groups', value: data.stats.study_groups_count ?? 0, icon: GraduationCap },
             { label: 'Authored', value: data.stats.books_authored, icon: BookOpen },
           ].map(stat => (
             <div key={stat.label} className="bg-surface border-2 border-theme rounded-xl p-4 text-center">
@@ -338,8 +347,8 @@ export default function ProfilePage() {
                       </Link>
                       <p className="text-xs text-muted">
                         {r.book?.author?.display_name || ''}
-                        {r.started_at && <> · Started {new Date(r.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</>}
-                        {r.last_read_at && <> · Last read {new Date(r.last_read_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+                        {r.started_at && <> · Started {fmtDate(r.started_at)}</>}
+                        {r.last_read_at && <> · Last read {fmtDate(r.last_read_at)}</>}
                       </p>
                       <div className="mt-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
                         <div className="h-full bg-accent rounded-full" style={{ width: `${r.percent_complete}%` }} />
@@ -367,7 +376,7 @@ export default function ProfilePage() {
                         : <BookOpen className="h-6 w-6 text-muted m-auto mt-6" />}
                     </div>
                     <p className="text-xs text-theme truncate leading-tight">{r.book?.title}</p>
-                    {r.completed_at && <p className="text-[10px] text-muted mt-0.5">{new Date(r.completed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>}
+                    {r.completed_at && <p className="text-[10px] text-muted mt-0.5">{fmtDate(r.completed_at)}</p>}
                   </Link>
                 ))}
               </div>

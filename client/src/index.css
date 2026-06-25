@@ -222,6 +222,43 @@ body {
   margin: 1.5rem 0;
 }
 
+/* Task list (checklist) */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0.75rem;
+}
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0;
+  cursor: pointer;
+}
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: var(--color-accent, #6366f1);
+}
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+/* Strike-through text when checked */
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+/* Nested task lists indented via tab */
+.ProseMirror ul[data-type="taskList"] ul[data-type="taskList"] {
+  padding-left: 1.5rem;
+  margin-top: 0.25rem;
+}
+
 /* Suppress TipTap's default blue box on selected atom nodes — we handle selection via ring classes */
 .ProseMirror-selectednode {
   outline: none !important;

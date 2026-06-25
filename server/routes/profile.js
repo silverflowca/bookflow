@@ -48,7 +48,7 @@ router.get('/me', authenticate, async (req, res) => {
       .from('club_members')
       .select(`
         id, role, joined_at,
-        club:book_clubs(id, name, cover_image_url, visibility, max_members)
+        club:book_clubs(id, name, cover_image_url, visibility, max_members, club_type)
       `)
       .eq('user_id', userId)
       .not('invite_accepted_at', 'is', null)
@@ -60,18 +60,20 @@ router.get('/me', authenticate, async (req, res) => {
     const avgProgress = totalStarted > 0
       ? Math.round((progressRows || []).reduce((s, r) => s + r.percent_complete, 0) / totalStarted)
       : 0;
+    const allClubs = (clubMembers || []).map(cm => ({ ...cm.club, role: cm.role, joined_at: cm.joined_at }));
 
     res.json({
       profile,
       authored_books: authoredBooks || [],
       currently_reading: currentlyReading,
       completed_books: completedBooks,
-      clubs: (clubMembers || []).map(cm => ({ ...cm.club, role: cm.role, joined_at: cm.joined_at })),
+      clubs: allClubs,
       stats: {
         total_read: totalRead,
         total_started: totalStarted,
         avg_progress: avgProgress,
-        clubs_count: (clubMembers || []).length,
+        clubs_count: allClubs.filter(c => c.club_type !== 'study_group').length,
+        study_groups_count: allClubs.filter(c => c.club_type === 'study_group').length,
         books_authored: (authoredBooks || []).length,
       },
     });
@@ -198,7 +200,7 @@ router.get('/:userId', optionalAuth, async (req, res) => {
         .from('club_members')
         .select(`
           id, role, joined_at,
-          club:book_clubs(id, name, cover_image_url, visibility)
+          club:book_clubs(id, name, cover_image_url, visibility, club_type)
         `)
         .eq('user_id', userId)
         .not('invite_accepted_at', 'is', null)
@@ -220,7 +222,8 @@ router.get('/:userId', optionalAuth, async (req, res) => {
       stats: {
         total_read: totalRead,
         total_started: totalStarted,
-        clubs_count: clubs.length,
+        clubs_count: clubs.filter(c => c.club_type !== 'study_group').length,
+        study_groups_count: clubs.filter(c => c.club_type === 'study_group').length,
         books_authored: authoredBooks.length,
       },
       is_own: isOwnProfile,

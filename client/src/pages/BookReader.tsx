@@ -20,6 +20,14 @@ const ProgressContext = createContext<ProgressCtx>({ completions: new Set(), mar
 // Context for toggling inline component highlight visibility
 const HighlightsContext = createContext<boolean>(true);
 
+// Context for task-list checkbox state (per-chapter, persisted to localStorage)
+interface TaskChecksCtx {
+  checked: Set<string>;
+  toggle: (key: string) => void;
+  setChecked: (key: string, value: boolean) => void;
+}
+const TaskChecksContext = createContext<TaskChecksCtx>({ checked: new Set(), toggle: () => {}, setChecked: () => {} });
+
 // Context for coordinating media playback — enforces one playing + one PiP at a time
 interface MediaCtx {
   playingId: string | null;
@@ -512,6 +520,42 @@ export default function BookReader() {
   }, [user, bookId, book, isAuthor]);
 
   const progressEnabled = !!(user && (book?.settings?.enable_progress_tracking || (book as any)?.club_progress_tracking_enabled));
+
+  // Task-list checkbox state — persisted to localStorage per chapter
+  // Each item key: `task-<nodeKey>` = checked, `task-<nodeKey>:set` = reader has overridden author value
+  function taskChecksKey(cid: string) { return `bf-tasks-${cid}`; }
+  function loadTaskChecks(cid: string): Set<string> {
+    try { return new Set(JSON.parse(localStorage.getItem(taskChecksKey(cid)) || '[]')); }
+    catch { return new Set(); }
+  }
+  const [taskChecks, setTaskChecks] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (chapterId) setTaskChecks(loadTaskChecks(chapterId));
+  }, [chapterId]);
+  const saveTaskChecks = useCallback((next: Set<string>) => {
+    if (!chapterId) return;
+    localStorage.setItem(taskChecksKey(chapterId), JSON.stringify([...next]));
+  }, [chapterId]);
+  const toggleTaskCheck = useCallback((key: string) => {
+    if (!chapterId) return;
+    setTaskChecks(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      saveTaskChecks(next);
+      return next;
+    });
+  }, [chapterId, saveTaskChecks]);
+  // Set a specific value (used by reader to override author's saved checked state)
+  const setTaskCheckValue = useCallback((key: string, value: boolean) => {
+    if (!chapterId) return;
+    setTaskChecks(prev => {
+      const next = new Set(prev);
+      next.add(key + ':set'); // mark that reader has an explicit override
+      if (value) next.add(key); else next.delete(key);
+      saveTaskChecks(next);
+      return next;
+    });
+  }, [chapterId, saveTaskChecks]);
 
   // Load progress when chapterId, bookId, or settings become available.
   // Guard on book !== null so we don't clear stats before settings are known.
@@ -1218,6 +1262,7 @@ export default function BookReader() {
           <HighlightsContext.Provider value={showHighlights}>
           <MediaContext.Provider value={mediaCtx}>
           <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
+          <TaskChecksContext.Provider value={{ checked: taskChecks, toggle: toggleTaskCheck, setChecked: setTaskCheckValue }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
             <div className="flex items-start gap-3 mb-6">
               <h1 className="text-3xl font-bold flex-1">{chapter.title}</h1>
@@ -1341,6 +1386,7 @@ export default function BookReader() {
               )}
             </nav>
           </article>
+          </TaskChecksContext.Provider>
           </ProgressContext.Provider>
           </MediaContext.Provider>
           </HighlightsContext.Provider>
@@ -1709,12 +1755,19 @@ function ChapterContent({
     collectTextNodes(parsedContent.content, 'n');
 
     const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox'];
+    const blockMediaTypes = ['image', 'drawing'];
     const unmatched = inlineContent.filter(
-      ic => formTypes.includes(ic.content_type) && (!ic.position_in_chapter || ic.position_in_chapter === 'inline') && !ic.anchor_text && !assignedIds.has(ic.id)
+      ic => (formTypes.includes(ic.content_type) || blockMediaTypes.includes(ic.content_type)) &&
+            (!ic.position_in_chapter || ic.position_in_chapter === 'inline') &&
+            !ic.anchor_text &&
+            !assignedIds.has(ic.id)
     );
     // Highlights/notes/questions that couldn't be matched to a text node (e.g. span split by formatting)
     const unmatchedMarkers = inlineContent.filter(
-      ic => !assignedIds.has(ic.id) && !formTypes.includes(ic.content_type) && (!ic.position_in_chapter || ic.position_in_chapter === 'inline')
+      ic => !assignedIds.has(ic.id) &&
+            !formTypes.includes(ic.content_type) &&
+            !blockMediaTypes.includes(ic.content_type) &&
+            (!ic.position_in_chapter || ic.position_in_chapter === 'inline')
     );
 
     return (
@@ -1730,7 +1783,11 @@ function ChapterContent({
           />
         ))}
         {unmatched.map(ic => (
-          <div key={ic.id} id={`reader-inline-${ic.id}`} className="my-3 p-3 border border-theme rounded-lg bg-surface-hover">
+          <div key={ic.id} id={`reader-inline-${ic.id}`}
+            className={blockMediaTypes.includes(ic.content_type)
+              ? 'my-4'
+              : 'my-3 p-3 border border-theme rounded-lg bg-surface-hover'}
+          >
             <InlineFormElement content={ic} />
           </div>
         ))}
@@ -1971,6 +2028,7 @@ function TipTapNode({
   nodeKeyPrefix?: string;
 }) {
   const showHighlights = useContext(HighlightsContext);
+  const { checked: taskChecks, setChecked: setTaskChecksImperative } = useContext(TaskChecksContext);
 
   if (!node) return null;
 
@@ -1982,9 +2040,17 @@ function TipTapNode({
     ));
 
   switch (node.type) {
-    case 'paragraph':
+    case 'paragraph': {
       if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]">&nbsp;</p>;
+      // If paragraph contains only block-level widget nodes (image, drawing, etc.), render as div
+      // to avoid invalid HTML (<div> inside <p>) which breaks browser DOM parsing
+      const BLOCK_WIDGET_TYPES = new Set(['image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block']);
+      const isBlockWidget = node.content.length === 1 &&
+        node.content[0].type === 'inlineFormWidget' &&
+        BLOCK_WIDGET_TYPES.has(node.content[0].attrs?.contentType);
+      if (isBlockWidget) return <div className="mb-4">{renderChildren(node.content, nodeKeyPrefix || 'p')}</div>;
       return <p className="mb-4">{renderChildren(node.content, nodeKeyPrefix || 'p')}</p>;
+    }
 
     case 'heading': {
       const HeadingTag = `h${node.attrs?.level || 2}` as keyof JSX.IntrinsicElements;
@@ -2199,6 +2265,40 @@ function TipTapNode({
           {renderChildren(node.content || [], nodeKeyPrefix || 'cc')}
         </div>
       );
+
+    case 'taskList':
+      return (
+        <ul className="space-y-1.5 mb-4 pl-0" style={{ listStyle: 'none' }}>
+          {renderChildren(node.content || [], nodeKeyPrefix || 'tl')}
+        </ul>
+      );
+
+    case 'taskItem': {
+      const itemKey = `task-${nodeKeyPrefix}`;
+      const readerHasOverride = taskChecks.has(itemKey + ':set');
+      const isChecked = readerHasOverride ? taskChecks.has(itemKey) : !!node.attrs?.checked;
+      // Flatten: taskItem contains a paragraph node — render its children directly as inline
+      const innerNodes: any[] = [];
+      (node.content || []).forEach((child: any) => {
+        if (child.type === 'paragraph') innerNodes.push(...(child.content || []));
+        else innerNodes.push(child);
+      });
+      return (
+        <li className="flex items-center gap-3 leading-normal" style={{ listStyle: 'none' }}>
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={() => setTaskChecksImperative(itemKey, !isChecked)}
+            className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-500"
+          />
+          <span className={isChecked ? 'line-through text-muted' : ''}>
+            {innerNodes.map((child: any, i: number) => (
+              <TipTapNode key={i} node={child} {...childProps} nodeKeyPrefix={`${nodeKeyPrefix || 'ti'}-${i}`} />
+            ))}
+          </span>
+        </li>
+      );
+    }
 
     case 'hardBreak':
       return <br />;

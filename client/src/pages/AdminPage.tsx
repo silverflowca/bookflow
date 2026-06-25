@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore, Archive } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore, Archive, ImagePlus } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -21,6 +21,48 @@ interface AdminStats {
 }
 
 type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'feedback';
+
+function BookCover({ book, onUpdate }: { book: any; onUpdate: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useState<HTMLInputElement | null>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { cover_image_url } = await api.uploadBookCover(book.id, file);
+      onUpdate(cover_image_url);
+    } catch (err) {
+      console.error('Cover upload failed:', err);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <label className="relative group cursor-pointer shrink-0" title="Change cover">
+      <input type="file" accept="image/*" className="sr-only" onChange={handleFile} ref={el => { inputRef[0] = el; }} />
+      <div className="w-10 h-14 rounded overflow-hidden bg-surface-hover border border-theme flex items-center justify-center">
+        {book.cover_image_url
+          ? <img src={book.cover_image_url} alt="" className="w-full h-full object-cover" />
+          : <BookOpen className="h-4 w-4 text-muted" />
+        }
+        {uploading && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded">
+            <Loader2 className="h-3 w-3 animate-spin text-white" />
+          </div>
+        )}
+        {!uploading && (
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+            <ImagePlus className="h-3.5 w-3.5 text-white" />
+          </div>
+        )}
+      </div>
+    </label>
+  );
+}
 
 function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: (b: any[]) => void }) {
   const [actioning, setActioning] = useState<string | null>(null);
@@ -53,6 +95,10 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
     }
   }
 
+  function updateCover(bookId: string, url: string) {
+    onBooksChange(books.map(b => b.id === bookId ? { ...b, cover_image_url: url } : b));
+  }
+
   return (
     <div className="space-y-4">
       {/* Active books */}
@@ -60,7 +106,7 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
         {active.length === 0 && <p className="text-muted text-sm py-4 text-center">No active books.</p>}
         {active.map(book => (
           <div key={book.id} className="theme-section rounded-xl px-4 py-3 flex items-center gap-3">
-            <BookOpen className="h-5 w-5 text-muted shrink-0" />
+            <BookCover book={book} onUpdate={url => updateCover(book.id, url)} />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-theme text-sm truncate">{book.title}</p>
               <p className="text-xs text-muted">
@@ -95,7 +141,7 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
           <div className="space-y-2">
             {archived.map(book => (
               <div key={book.id} className="theme-section rounded-xl px-4 py-3 flex items-center gap-3 opacity-70">
-                <BookOpen className="h-5 w-5 text-muted shrink-0" />
+                <BookCover book={book} onUpdate={url => updateCover(book.id, url)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-theme text-sm truncate">{book.title}</p>
