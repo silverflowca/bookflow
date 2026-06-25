@@ -1310,6 +1310,14 @@ export default function BookEditor() {
                       </div>
                     </div>
                     <div className="flex gap-2 items-center">
+                      {/* Chapter responses button */}
+                      <Link
+                        to={`/edit/book/${bookId}/dashboard?chapter=${chapter.id}`}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded text-sm text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+                        title="View chapter responses"
+                      >
+                        <BarChart2 className="h-4 w-4" />
+                      </Link>
                       {/* Share button */}
                       <div className="relative">
                         <button

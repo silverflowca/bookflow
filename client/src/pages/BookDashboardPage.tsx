@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, BookOpen, Users, CheckCircle, TrendingUp,
   FileText, MessageSquare, Layers, Clock, BarChart2, Loader2,
@@ -84,11 +84,13 @@ function wpm(words: number) {
 
 export default function BookDashboardPage() {
   const { bookId } = useParams<{ bookId: string }>();
+  const [searchParams] = useSearchParams();
+  const chapterParam = searchParams.get('chapter') || undefined;
   const [book, setBook] = useState<Book | null>(null);
   const [stats, setStats] = useState<BookStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'overview' | 'responses'>('overview');
+  const [tab, setTab] = useState<'overview' | 'responses'>(chapterParam ? 'responses' : 'overview');
 
   useEffect(() => {
     if (bookId) load();
@@ -194,7 +196,7 @@ export default function BookDashboardPage() {
             <h2 className="text-sm font-semibold text-theme">All Reader Responses</h2>
           </div>
           <div className="p-4">
-            <BookResponsesViewer bookId={bookId} />
+            <BookResponsesViewer bookId={bookId} chapterId={chapterParam} />
           </div>
         </div>
       )}
