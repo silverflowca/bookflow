@@ -137,12 +137,6 @@ export default function Home() {
 
         {/* Text block — sits above carousel, never overlapped */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-16 pb-0 text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase mb-5"
-            style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', color: '#7c3aed' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }} />
-            The Interactive Book Platform
-          </div>
 
           <h1 className="text-4xl md:text-6xl font-extrabold mb-4 sm:mb-5 leading-tight tracking-tight text-gray-900">
             Interactive Books,<br className="hidden sm:block" />{' '}
