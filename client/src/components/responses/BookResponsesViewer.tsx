@@ -139,12 +139,63 @@ function ResponseRow({ r, type }: { r: any; type: string }) {
   );
 }
 
+// ── Options list (shows original options + correct answer marker) ─────────────
+
+function OptionsList({ item }: { item: BookResponseItem }) {
+  const cd = item.content_data || {};
+  const options: { id: string; text: string }[] = cd.options || [];
+  if (options.length === 0) return null;
+
+  const correctAnswer = cd.correct_answer;
+  const correctIds = new Set<string>(
+    Array.isArray(correctAnswer) ? correctAnswer : correctAnswer ? [correctAnswer] : []
+  );
+
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Options</p>
+      <div className="flex flex-col gap-1">
+        {options.map(opt => {
+          const isCorrect = correctIds.has(opt.id);
+          return (
+            <div
+              key={opt.id}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border ${
+                isCorrect
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-gray-50 border-gray-100 text-gray-700'
+              }`}
+            >
+              <span className={`h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center ${
+                isCorrect ? 'border-green-500 bg-green-500' : 'border-gray-300 bg-white'
+              }`}>
+                {isCorrect && <CheckCircle className="h-3 w-3 text-white" />}
+              </span>
+              <span className="flex-1">{opt.text}</span>
+              {isCorrect && (
+                <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide shrink-0">Correct</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {cd.explanation && (
+        <div className="mt-1 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+          <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-wide mb-0.5">Explanation</p>
+          <p className="text-xs text-blue-800">{cd.explanation}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Single question/form card ─────────────────────────────────────────────────
 
 function ItemCard({ item, searchQuery }: { item: BookResponseItem; searchQuery: string }) {
   const [expanded, setExpanded] = useState(true);
   const isChoice = ['select', 'multiselect', 'radio', 'checkbox', 'poll'].includes(item.content_type);
   const isText = ['textbox', 'textarea'].includes(item.content_type);
+  const hasOptions = !!(item.content_data?.options?.length);
 
   const label =
     item.content_data?.question ||
@@ -180,6 +231,11 @@ function ItemCard({ item, searchQuery }: { item: BookResponseItem; searchQuery: 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <TypeBadge type={item.content_type} />
+            {item.content_data?.type && (
+              <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md capitalize">
+                {item.content_data.type.replace(/_/g, ' ')}
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
               item.total > 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'
             }`}>
@@ -187,20 +243,47 @@ function ItemCard({ item, searchQuery }: { item: BookResponseItem; searchQuery: 
               {item.total} {item.total === 1 ? 'response' : 'responses'}
             </span>
           </div>
+          {/* Original question/prompt — the key thing a teacher needs to see */}
           <p className="text-sm font-semibold text-gray-900 leading-snug">{highlightedLabel}</p>
         </div>
       </button>
 
       {/* Card body */}
       {expanded && (
-        <div className="px-5 pb-4 border-t border-gray-100">
-          {isChoice && <AggregateChart item={item} />}
+        <div className="px-5 pb-5 border-t border-gray-100">
 
+          {/* Original options + correct answer (for questions/polls/radio/checkbox/select) */}
+          {hasOptions && <OptionsList item={item} />}
+
+          {/* Aggregate bar chart for choice types */}
+          {isChoice && (
+            <div className={hasOptions ? 'mt-4 pt-4 border-t border-gray-100' : ''}>
+              {hasOptions && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Results</p>}
+              <AggregateChart item={item} />
+            </div>
+          )}
+
+          {/* Individual text/open-answer responses */}
           {(isText || item.content_type === 'question') && item.total > 0 && (
-            <div className="mt-3 divide-y divide-gray-100 max-h-72 overflow-y-auto">
-              {item.responses.map((r: any) => (
-                <ResponseRow key={r.id} r={r} type={item.content_type} />
-              ))}
+            <div className={`${hasOptions ? 'mt-4 pt-4 border-t border-gray-100' : 'mt-3'}`}>
+              {hasOptions && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Responses</p>}
+              <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+                {item.responses.map((r: any) => (
+                  <ResponseRow key={r.id} r={r} type={item.content_type} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Choice types also show per-user responses below the chart */}
+          {isChoice && item.total > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Individual Responses</p>
+              <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
+                {item.responses.map((r: any) => (
+                  <ResponseRow key={r.id} r={r} type={item.content_type} />
+                ))}
+              </div>
             </div>
           )}
 
