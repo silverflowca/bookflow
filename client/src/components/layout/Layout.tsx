@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles, HelpCircle } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 import FeedbackButton from '../feedback/FeedbackButton';
@@ -409,10 +409,13 @@ export default function Layout() {
                     <Video className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Live</span>
                   </span>
-                  {/* Tutorial + Admin — only on xl screens */}
+                  {/* Tutorial + Help + Admin — only on xl screens */}
                   <button id="bf-tutorial-btn" onClick={() => setTutorialActive(true)} className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <GraduationCap className="h-4 w-4" /> Tutorial
                   </button>
+                  <Link to="/docs" className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <HelpCircle className="h-4 w-4" /> Help
+                  </Link>
                   {profile?.system_role === 'super_admin' && (
                     <Link to="/admin" className="hidden xl:flex items-center gap-1 text-purple-500 hover:text-purple-700 dark:hover:text-purple-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                       <Shield className="h-4 w-4" /> Admin
@@ -522,6 +525,9 @@ export default function Layout() {
                   >
                     <MessageSquarePlus className="h-5 w-5 text-accent flex-shrink-0" /> Feedback
                   </button>
+                  <Link to="/docs" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                    <HelpCircle className="h-5 w-5 text-accent flex-shrink-0" /> Help & Documentation
+                  </Link>
                   {profile?.system_role === 'super_admin' && (
                     <Link to="/admin" className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-purple-500 hover:bg-surface-hover transition-colors">
                       <Shield className="h-5 w-5 flex-shrink-0" /> Admin Panel
@@ -662,7 +668,7 @@ export default function Layout() {
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-xs text-muted hover:text-theme transition-colors">About</a>
-              <a href="#" className="text-xs text-muted hover:text-theme transition-colors">Help</a>
+              <Link to="/docs" className="text-xs text-muted hover:text-theme transition-colors">Help</Link>
             </div>
           </div>
         </div>
