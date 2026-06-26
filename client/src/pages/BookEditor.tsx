@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2, Star, Share2, QrCode, ExternalLink } from 'lucide-react';
+import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2, Star, Share2, QrCode, ExternalLink, BookOpen } from 'lucide-react';
 import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
@@ -493,6 +493,7 @@ function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
   const directUrl = `${origin}/book/${bookId}`;
 
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [inviteEmails, setInviteEmails] = useState('');
   const [inviteMsg, setInviteMsg] = useState('');
@@ -507,9 +508,12 @@ function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
 
   const handlePublish = async () => {
     setPublishing(true);
+    setPublishError(null);
     try {
       const r = await api.publishBook(bookId);
       onPublished(r);
+    } catch (err: any) {
+      setPublishError(err.message || 'Publish failed. Please try again.');
     } finally { setPublishing(false); }
   };
 
@@ -557,8 +561,37 @@ function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
         <div className="p-6 space-y-5">
           {/* Status + action */}
           {!isPublished ? (
-            <div>
-              <p className="text-muted text-sm mb-4">Publishing makes your book publicly accessible via a unique URL. You can unpublish at any time.</p>
+            <div className="space-y-4">
+              {/* What publishing does */}
+              <div className="rounded-xl border border-theme bg-surface-hover p-4 space-y-3">
+                <p className="text-sm font-semibold text-theme">What happens when you publish?</p>
+                <ul className="space-y-2 text-sm text-muted">
+                  <li className="flex items-start gap-2"><Globe className="h-4 w-4 text-green-500 shrink-0 mt-0.5" /><span>Your book becomes <strong className="text-theme">publicly accessible</strong> via a unique URL that you can share with anyone.</span></li>
+                  <li className="flex items-start gap-2"><Lock className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" /><span>A <strong className="text-theme">private share link</strong> is also generated — share it with specific people without making the book fully public.</span></li>
+                  <li className="flex items-start gap-2"><BookOpen className="h-4 w-4 text-violet-500 shrink-0 mt-0.5" /><span>Only chapters marked as <strong className="text-theme">Published</strong> are visible to readers. Draft chapters stay hidden.</span></li>
+                  <li className="flex items-start gap-2"><Check className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" /><span>A <strong className="text-theme">snapshot version</strong> of your book is saved automatically at the time of publishing.</span></li>
+                </ul>
+              </div>
+
+              {/* Checklist before publishing */}
+              <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Before you publish — checklist</p>
+                <ul className="space-y-1.5 text-sm text-amber-800 dark:text-amber-300">
+                  <li className="flex items-center gap-2"><span className="w-4 h-4 rounded border border-amber-400 shrink-0 inline-block" />Your book title and description are complete</li>
+                  <li className="flex items-center gap-2"><span className="w-4 h-4 rounded border border-amber-400 shrink-0 inline-block" />At least one chapter is published (not draft)</li>
+                  <li className="flex items-center gap-2"><span className="w-4 h-4 rounded border border-amber-400 shrink-0 inline-block" />You've proofread all published chapters</li>
+                  <li className="flex items-center gap-2"><span className="w-4 h-4 rounded border border-amber-400 shrink-0 inline-block" />Cover image is set (optional but recommended)</li>
+                </ul>
+              </div>
+
+              <p className="text-xs text-muted text-center">You can unpublish at any time — this will immediately remove public access.</p>
+
+              {publishError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+                  {publishError}
+                </div>
+              )}
+
               <button onClick={handlePublish} disabled={publishing} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-base disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
                 {publishing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Globe className="h-5 w-5" />}
                 {publishing ? 'Publishing…' : 'Publish Now'}
@@ -646,16 +679,16 @@ function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
             </div>
           )}
 
-          {/* Unpublish + go to stores */}
+          {/* Unpublish + close */}
           <div className="flex gap-2 pt-1">
             {isPublished && (
               <button onClick={handleUnpublish} disabled={publishing} className="flex-1 px-4 py-2 rounded-lg border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors">
                 Unpublish
               </button>
             )}
-            <Link to={`/edit/book/${bookId}/submit`} onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-theme text-muted text-sm font-medium hover:bg-surface-hover transition-colors text-center flex items-center justify-center gap-1.5">
-              <Send className="h-3.5 w-3.5" /> Submit to Stores
-            </Link>
+            <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-theme text-muted text-sm font-medium hover:bg-surface-hover transition-colors">
+              Cancel
+            </button>
           </div>
         </div>
       </div>

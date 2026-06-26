@@ -862,12 +862,15 @@ export default function BookReader() {
   }
 
   async function handleShareChapter() {
-    // Build share URL: prefer /bl/<book-slug>?chapter=<chapter-slug>, fallback to direct reader URL
+    // Build share URL: prefer /bl/<book-slug>?chapter=<chapter-slug>
+    // Only use /bl/ route when we have real slugs (not UUIDs); otherwise use direct reader URL
     let url: string;
     if (book?.slug && chapter?.slug) {
       url = `${window.location.origin}/bl/${book.slug}?chapter=${chapter.slug}`;
     } else if (book?.slug) {
       url = `${window.location.origin}/bl/${book.slug}`;
+    } else if (book?.id && chapter?.id) {
+      url = `${window.location.origin}/book/${book.id}/chapter/${chapter.id}`;
     } else {
       url = window.location.href;
     }
@@ -1278,7 +1281,7 @@ export default function BookReader() {
             </div>
 
             {/* Start of Chapter Content */}
-            <StartOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} />
+            <StartOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} defaultVisibility={book?.user_in_shared_club ? 'shared' : book?.visibility === 'public' ? 'private' : 'private'} />
 
             <div
               className={`reader-content text-lg text-theme leading-relaxed${ttsPlaying ? ' tts-active' : ''}`}
@@ -1351,7 +1354,7 @@ export default function BookReader() {
             </div>
 
             {/* End of Chapter Questions */}
-            <EndOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} />
+            <EndOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} defaultVisibility={book?.user_in_shared_club ? 'shared' : book?.visibility === 'public' ? 'private' : 'private'} />
 
             {/* Navigation */}
             <nav className="flex justify-between items-center mt-12 pt-8 border-t">
@@ -1409,6 +1412,7 @@ export default function BookReader() {
               onClose={() => setActiveContent(null)}
               isAuthor={isAuthor}
               userId={user?.id}
+              defaultVisibility={book?.user_in_shared_club ? 'shared' : 'private'}
             />
           </MediaContext.Provider>
         </ProgressContext.Provider>
@@ -2268,7 +2272,7 @@ function TipTapNode({
 
     case 'taskList':
       return (
-        <ul className="space-y-1.5 mb-4 pl-0" style={{ listStyle: 'none' }}>
+        <ul className="space-y-1 mt-1 pl-0" style={{ listStyle: 'none' }}>
           {renderChildren(node.content || [], nodeKeyPrefix || 'tl')}
         </ul>
       );
@@ -2277,25 +2281,31 @@ function TipTapNode({
       const itemKey = `task-${nodeKeyPrefix}`;
       const readerHasOverride = taskChecks.has(itemKey + ':set');
       const isChecked = readerHasOverride ? taskChecks.has(itemKey) : !!node.attrs?.checked;
-      // Flatten: taskItem contains a paragraph node — render its children directly as inline
-      const innerNodes: any[] = [];
-      (node.content || []).forEach((child: any) => {
-        if (child.type === 'paragraph') innerNodes.push(...(child.content || []));
-        else innerNodes.push(child);
-      });
+      const children = node.content || [];
+      // First child is the paragraph with label text; rest are nested taskLists
+      const labelPara = children[0]?.type === 'paragraph' ? children[0] : null;
+      const labelNodes = labelPara ? (labelPara.content || []) : [];
+      const rest = labelPara ? children.slice(1) : children;
       return (
-        <li className="flex items-center gap-3 leading-normal" style={{ listStyle: 'none' }}>
-          <input
-            type="checkbox"
-            checked={isChecked}
-            onChange={() => setTaskChecksImperative(itemKey, !isChecked)}
-            className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-500"
-          />
-          <span className={isChecked ? 'line-through text-muted' : ''}>
-            {innerNodes.map((child: any, i: number) => (
-              <TipTapNode key={i} node={child} {...childProps} nodeKeyPrefix={`${nodeKeyPrefix || 'ti'}-${i}`} />
-            ))}
-          </span>
+        <li className="task-item">
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => setTaskChecksImperative(itemKey, !isChecked)}
+              className="h-4 w-4 mt-1 shrink-0 cursor-pointer accent-indigo-500"
+            />
+            <div className="flex-1">
+              <span className={isChecked ? 'line-through text-muted' : ''}>
+                {labelNodes.map((child: any, i: number) => (
+                  <TipTapNode key={i} node={child} {...childProps} nodeKeyPrefix={`${nodeKeyPrefix || 'ti'}-${i}`} />
+                ))}
+              </span>
+              {rest.map((child: any, i: number) => (
+                <TipTapNode key={i} node={child} {...childProps} nodeKeyPrefix={`${nodeKeyPrefix || 'ti'}-r-${i}`} />
+              ))}
+            </div>
+          </div>
         </li>
       );
     }
@@ -2309,7 +2319,7 @@ function TipTapNode({
   }
 }
 
-function StartOfChapterContent({ items, isAuthor, userId }: { items: InlineContent[]; isAuthor: boolean; userId?: string }) {
+function StartOfChapterContent({ items, isAuthor, userId, defaultVisibility = 'shared' }: { items: InlineContent[]; isAuthor: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const startItems = items.filter(item => item.position_in_chapter === 'start_of_chapter');
   if (startItems.length === 0) return null;
 
@@ -2325,14 +2335,14 @@ function StartOfChapterContent({ items, isAuthor, userId }: { items: InlineConte
               ↓ Jump to "{item.anchor_text}" in text
             </button>
           )}
-          <InlineContentBlock content={item} isAuthor={isAuthor} userId={userId} />
+          <InlineContentBlock content={item} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />
         </div>
       ))}
     </div>
   );
 }
 
-function EndOfChapterContent({ items, isAuthor, userId }: { items: InlineContent[]; isAuthor: boolean; userId?: string }) {
+function EndOfChapterContent({ items, isAuthor, userId, defaultVisibility = 'shared' }: { items: InlineContent[]; isAuthor: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const endItems = items.filter(item => item.position_in_chapter === 'end_of_chapter');
   if (endItems.length === 0) return null;
 
@@ -2348,19 +2358,19 @@ function EndOfChapterContent({ items, isAuthor, userId }: { items: InlineContent
               ↑ Jump to "{item.anchor_text}" in text
             </button>
           )}
-          <InlineContentBlock content={item} isAuthor={isAuthor} userId={userId} />
+          <InlineContentBlock content={item} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />
         </div>
       ))}
     </div>
   );
 }
 
-function InlineContentBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function InlineContentBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   if (content.content_type === 'question') {
-    return <QuestionBlock content={content} />;
+    return <QuestionBlock content={content} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'poll') {
-    return <PollBlock content={content} />;
+    return <PollBlock content={content} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'audio' || content.content_type === 'video') {
     return <MediaBlock content={content} />;
@@ -2375,22 +2385,22 @@ function InlineContentBlock({ content, isAuthor = false, userId }: { content: In
     return <HighlightBlock content={content} />;
   }
   if (content.content_type === 'select') {
-    return <SelectBlock content={content} isAuthor={isAuthor} userId={userId} />;
+    return <SelectBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'multiselect') {
-    return <MultiselectBlock content={content} isAuthor={isAuthor} userId={userId} />;
+    return <MultiselectBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'textbox') {
-    return <TextboxBlock content={content} isAuthor={isAuthor} userId={userId} />;
+    return <TextboxBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'textarea') {
-    return <TextareaBlock content={content} isAuthor={isAuthor} userId={userId} />;
+    return <TextareaBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'radio') {
-    return <RadioBlock content={content} isAuthor={isAuthor} userId={userId} />;
+    return <RadioBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'checkbox') {
-    return <CheckboxBlock content={content} isAuthor={isAuthor} userId={userId} />;
+    return <CheckboxBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   if (content.content_type === 'code_block') {
     return <CodeBlockDisplay content={content} />;
@@ -2407,7 +2417,7 @@ function InlineContentBlock({ content, isAuthor = false, userId }: { content: In
   return null;
 }
 
-function QuestionBlock({ content }: { content: InlineContent }) {
+function QuestionBlock({ content, defaultVisibility = 'shared' }: { content: InlineContent; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   // Support both field naming conventions:
   //   {question, type:'open'} (editor-created) and
   //   {question_text, question_type:'free_response'} (SQL-seeded)
@@ -2442,13 +2452,13 @@ function QuestionBlock({ content }: { content: InlineContent }) {
   const save = useCallback(async (text: string) => {
     setSaveStatus('saving');
     try {
-      await api.answerQuestion(content.id, { answer_text: text });
+      await api.answerQuestion(content.id, { answer_text: text, visibility: defaultVisibility });
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch {
       setSaveStatus('error');
     }
-  }, [content.id]);
+  }, [content.id, defaultVisibility]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -2508,6 +2518,59 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const [loaded, setLoaded] = useState(false);
   const [sticky, setSticky] = useState(false);
 
+  // Draggable PiP position — null = use default corner (bottom-right)
+  const PIP_W = 280;
+  const PIP_H = 200; // video + controls
+  const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const getDefaultPos = () => ({
+    x: window.innerWidth - PIP_W - 16,
+    y: window.innerHeight - PIP_H - 16,
+  });
+
+  const snapToEdge = (x: number, y: number) => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 16;
+    // Snap X to nearest wall
+    const snapX = x + PIP_W / 2 < vw / 2 ? margin : vw - PIP_W - margin;
+    // Snap Y — clamp but don't force to wall, just keep in bounds
+    const snapY = Math.max(margin, Math.min(y, vh - PIP_H - margin));
+    return { x: snapX, y: snapY };
+  };
+
+  const onPipPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only drag on the video/header area, not buttons
+    if ((e.target as HTMLElement).closest('button,input')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const pos = pipPos ?? getDefaultPos();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+  };
+
+  const onPipPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const x = Math.max(0, Math.min(dragRef.current.origX + dx, vw - PIP_W));
+    const y = Math.max(0, Math.min(dragRef.current.origY + dy, vh - PIP_H));
+    setPipPos({ x, y });
+  };
+
+  const onPipPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const rawX = Math.max(0, Math.min(dragRef.current.origX + dx, vw - PIP_W));
+    const rawY = Math.max(0, Math.min(dragRef.current.origY + dy, vh - PIP_H));
+    setPipPos(snapToEdge(rawX, rawY));
+    dragRef.current = null;
+  };
+
   // Show PiP when block scrolls out of view (once activated by playing); dismiss only when back in view or closed
   const hasPlayedRef = useRef(false);
   useEffect(() => { if (playing) hasPlayedRef.current = true; }, [playing]);
@@ -2515,6 +2578,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const closePip = useCallback(() => {
     setSticky(false);
     hasPlayedRef.current = false;
+    setPipPos(null);
   }, []);
 
   useEffect(() => {
@@ -2663,7 +2727,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 onPause={() => setPlaying(false)}
                 onEnded={() => setPlaying(false)}
                 style={sticky
-                  ? { position: 'fixed', bottom: '40px', right: '1rem', width: '280px', maxHeight: '200px', objectFit: 'contain', zIndex: 52, display: 'block', background: '#000', borderRadius: '8px 8px 0 0' }
+                  ? (() => { const p = pipPos ?? getDefaultPos(); return { position: 'fixed', top: p.y, left: p.x, width: `${PIP_W}px`, maxHeight: '160px', objectFit: 'contain', zIndex: 52, display: 'block', background: '#000', borderRadius: '8px 8px 0 0' }; })()
                   : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)', borderRadius: '8px' }}
               />
 
@@ -2691,8 +2755,13 @@ function MediaBlock({ content }: { content: InlineContent }) {
 
             {/* PiP overlay controls — shown fixed when sticky, video element itself is already fixed above */}
             {sticky && (
-              <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', width: '280px', zIndex: 53, borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', pointerEvents: 'none' }}>
-                {/* Spacer matching video height */}
+              <div
+                onPointerDown={onPipPointerDown}
+                onPointerMove={onPipPointerMove}
+                onPointerUp={onPipPointerUp}
+                style={{ position: 'fixed', top: (pipPos ?? getDefaultPos()).y, left: (pipPos ?? getDefaultPos()).x, width: `${PIP_W}px`, zIndex: 53, borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', pointerEvents: 'all', cursor: 'grab', userSelect: 'none' }}
+              >
+                {/* Drag handle — the video area itself */}
                 <div style={{ height: '160px', pointerEvents: 'none' }} />
 
                 {/* X — top right */}
@@ -3028,7 +3097,7 @@ function SidebarRating({ bookId }: { bookId: string }) {
   );
 }
 
-function PollBlock({ content }: { content: InlineContent }) {
+function PollBlock({ content, defaultVisibility = 'shared' }: { content: InlineContent; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as PollData;
   const [selected, setSelected] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, number>>({});
@@ -3060,7 +3129,7 @@ function PollBlock({ content }: { content: InlineContent }) {
     if (!selected) return;
     if (!api.getToken()) { requestAuth(); return; }
     try {
-      const res = await api.votePoll(content.id, selected);
+      const res = await api.votePoll(content.id, selected, defaultVisibility);
       setResults(res.results);
       setTotalVotes(res.total_votes);
       setVoted(true);
@@ -3230,7 +3299,7 @@ function ResponseSummary({ result, type }: { result: AllFormResponsesResult; typ
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Select dropdown block
-function SelectBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function SelectBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as SelectData;
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -3251,7 +3320,7 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
     if (!userId) return;
     if (newValue) markComplete(itemKey, 'form');
     setSaveStatus('saving');
-    api.submitFormResponse(content.id, { value: newValue })
+    api.submitFormResponse(content.id, { value: newValue }, defaultVisibility)
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
@@ -3288,7 +3357,7 @@ function SelectBlock({ content, isAuthor = false, userId }: { content: InlineCon
 }
 
 // Multiselect block
-function MultiselectBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function MultiselectBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as MultiselectData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -3312,7 +3381,7 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
     // Update progress immediately
     if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
-    api.submitFormResponse(content.id, { value: newSelected })
+    api.submitFormResponse(content.id, { value: newSelected }, defaultVisibility)
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
@@ -3359,7 +3428,7 @@ function MultiselectBlock({ content, isAuthor = false, userId }: { content: Inli
 }
 
 // Text input block
-function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function TextboxBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as TextboxData;
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -3382,7 +3451,7 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
     // Update progress immediately
     if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
-    api.submitFormResponse(content.id, { value: newValue })
+    api.submitFormResponse(content.id, { value: newValue }, defaultVisibility)
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
@@ -3421,7 +3490,7 @@ function TextboxBlock({ content, isAuthor = false, userId }: { content: InlineCo
 }
 
 // Textarea block
-function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function TextareaBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as TextareaData;
   const [value, setValue] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -3457,7 +3526,7 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
     // Update progress immediately
     if (newValue.trim()) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
-    api.submitFormResponse(content.id, { value: newValue })
+    api.submitFormResponse(content.id, { value: newValue }, defaultVisibility)
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
@@ -3499,7 +3568,7 @@ function TextareaBlock({ content, isAuthor = false, userId }: { content: InlineC
 }
 
 // Radio button block
-function RadioBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function RadioBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as RadioData;
   const [selected, setSelected] = useState(data.default_value || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -3515,7 +3584,7 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
           setSelected(r.response_data.value);
         } else if (data.default_value && data.options?.length === 1) {
           // Single option pre-selected — auto-save
-          api.submitFormResponse(content.id, { value: data.default_value }).catch(() => {});
+          api.submitFormResponse(content.id, { value: data.default_value }, defaultVisibility).catch(() => {});
         }
       })
       .catch(() => {});
@@ -3527,7 +3596,7 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
     if (!userId) return;
     markComplete(itemKey, 'form');
     setSaveStatus('saving');
-    api.submitFormResponse(content.id, { value: optId })
+    api.submitFormResponse(content.id, { value: optId }, defaultVisibility)
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
@@ -3575,7 +3644,7 @@ function RadioBlock({ content, isAuthor = false, userId }: { content: InlineCont
 }
 
 // Checkbox block
-function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineContent; isAuthor?: boolean; userId?: string }) {
+function CheckboxBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as CheckboxData;
   const [selected, setSelected] = useState<string[]>(data.default_values || []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -3599,7 +3668,7 @@ function CheckboxBlock({ content, isAuthor = false, userId }: { content: InlineC
     // Update progress immediately
     if (newSelected.length > 0) markComplete(itemKey, 'form'); else markIncomplete(itemKey);
     setSaveStatus('saving');
-    api.submitFormResponse(content.id, { value: newSelected })
+    api.submitFormResponse(content.id, { value: newSelected }, defaultVisibility)
       .then(() => { setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); })
       .catch(() => setSaveStatus('error'));
   };
@@ -4330,11 +4399,13 @@ function InlineContentPanel({
   onClose,
   isAuthor,
   userId,
+  defaultVisibility = 'shared',
 }: {
   content: InlineContent;
   onClose: () => void;
   isAuthor?: boolean;
   userId?: string;
+  defaultVisibility?: 'private' | 'shared' | 'public';
 }) {
   return (
     <div className="fixed inset-y-0 right-0 w-80 bg-surface border-l border-theme shadow-lg z-30 flex flex-col">
@@ -4360,7 +4431,7 @@ function InlineContentPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <InlineContentBlock content={content} isAuthor={isAuthor} userId={userId} />
+        <InlineContentBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />
       </div>
     </div>
   );

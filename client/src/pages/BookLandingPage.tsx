@@ -28,7 +28,7 @@ export default function BookLandingPage() {
       setBook(data);
       // If a chapter slug was requested, navigate straight to it
       if (chapterSlugParam) {
-        const target = data.chapters.find((c: any) => c.slug === chapterSlugParam);
+        const target = data.chapters.find((c: any) => c.slug === chapterSlugParam || c.id === chapterSlugParam);
         if (target) {
           navigate(`/book/${data.id}/chapter/${target.id}`, { replace: true });
           return;

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight, Search, X, LayoutGrid, LayoutList } from 'lucide-react';
+import { Plus, BookOpen, Edit, Trash2, Settings, MoreVertical, Upload, Loader2, Globe, Lock, Copy, Check, Users, LayoutDashboard, ChevronRight, Search, X, LayoutGrid, LayoutList, Share2 } from 'lucide-react';
 import api from '../lib/api';
 import type { Book } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -691,8 +691,29 @@ function BookCard({ book, coverSize = 'medium', onDelete, onCoverUpdate, onUpdat
 
 function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSize }) {
   const chapterCount = (() => { const n = (book.chapters as any)?.[0]?.count ?? book.chapters?.length ?? 0; return `${n} ${n === 1 ? 'chapter' : 'chapters'}`; })();
+  const [copied, setCopied] = useState(false);
+
+  const shareUrl = (book as any).slug
+    ? `${window.location.origin}/bl/${(book as any).slug}`
+    : `${window.location.origin}/book/${book.id}`;
+
+  async function handleShare(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: book.title, text: book.subtitle || book.title, url: shareUrl });
+      } catch { /* user cancelled */ }
+    } else {
+      // Fallback: clipboard copy
+      navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
 
   if (coverSize === 'small') {
+    // List mode
     return (
       <Link to={`/book/${book.id}`} className="theme-card rounded-xl flex gap-3 p-2.5 items-center hover:shadow-md transition-shadow group">
         <div className="w-10 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-surface-hover flex items-center justify-center">
@@ -712,12 +733,20 @@ function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSiz
             <span className="text-xs text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
           </div>
         </div>
+        <button
+          onClick={handleShare}
+          title="Copy link"
+          className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-accent hover:bg-surface-hover transition-colors"
+        >
+          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Share2 className="h-4 w-4" />}
+        </button>
       </Link>
     );
   }
 
+  // Card mode
   return (
-    <Link to={`/book/${book.id}`} className="theme-card rounded-xl block hover:shadow-md transition-shadow group">
+    <Link to={`/book/${book.id}`} className="theme-card rounded-xl block hover:shadow-md transition-shadow group relative">
       <div className="aspect-[2/3] rounded-t-xl overflow-hidden bg-surface-hover flex items-center justify-center">
         {book.cover_image_url
           ? <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
@@ -734,6 +763,14 @@ function DiscoverBookCard({ book, coverSize }: { book: Book; coverSize: CoverSiz
           <span className="text-xs text-green-600 flex items-center gap-1"><Globe className="h-3 w-3" /> Public</span>
         </div>
       </div>
+      {/* Share button — top-right corner */}
+      <button
+        onClick={handleShare}
+        title="Copy link"
+        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors opacity-0 group-hover:opacity-100"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Share2 className="h-3.5 w-3.5" />}
+      </button>
     </Link>
   );
 }
