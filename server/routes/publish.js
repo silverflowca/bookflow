@@ -35,7 +35,7 @@ async function uniqueSlug(base, bookId) {
 }
 
 // POST /api/books/:bookId/publish
-router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res) => {
+router.post('/publish', authenticate, requireRole(['owner', 'author']), async (req, res) => {
   const bookId = req.params.bookId;
 
   try {
