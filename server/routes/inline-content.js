@@ -306,7 +306,7 @@ router.delete('/inline-content/:id', authenticate, async (req, res) => {
 
 // Vote in poll
 router.post('/polls/:id/vote', authenticate, async (req, res) => {
-  const { selected_option } = req.body;
+  const { selected_option, visibility } = req.body;
 
   try {
     // Verify this is a poll
@@ -334,7 +334,8 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
       .upsert({
         inline_content_id: req.params.id,
         user_id: req.user.id,
-        selected_option
+        selected_option,
+        ...(visibility && ['private', 'shared', 'public'].includes(visibility) ? { visibility } : {}),
       }, { onConflict: 'inline_content_id,user_id' })
       .select()
       .single();
@@ -404,7 +405,7 @@ router.get('/polls/:id/results', optionalAuth, async (req, res) => {
 
 // Answer question
 router.post('/questions/:id/answer', authenticate, async (req, res) => {
-  const { answer_text, selected_options } = req.body;
+  const { answer_text, selected_options, visibility } = req.body;
 
   try {
     // Verify this is a question
@@ -442,6 +443,7 @@ router.post('/questions/:id/answer', authenticate, async (req, res) => {
         answer_text,
         selected_options,
         is_correct,
+        ...(visibility && ['private', 'shared', 'public'].includes(visibility) ? { visibility } : {}),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'inline_content_id,user_id' })
       .select()

@@ -918,14 +918,14 @@ export default function ClubDetailPage() {
             ) : (
               <div className="space-y-2">
                 {club.books?.slice(0, 4).map(cb => (
-                  <div key={cb.id} className="flex items-center gap-2">
+                  <Link key={cb.id} to={`/book/${cb.book?.id}`} className="flex items-center gap-2 hover:bg-surface-hover rounded px-1 -mx-1 transition-colors">
                     {cb.book?.cover_image_url
                       ? <img src={cb.book.cover_image_url} alt={cb.book.title} className="h-8 w-6 object-cover rounded" />
                       : <div className="h-8 w-6 bg-indigo-500/20 rounded" />
                     }
                     <span className="text-sm text-theme flex-1 truncate">{cb.book?.title}</span>
                     {cb.is_current && <Star className="h-3.5 w-3.5 text-yellow-500" />}
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

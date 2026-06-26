@@ -235,10 +235,10 @@ class ApiClient {
   }
 
   // Polls
-  async votePoll(pollId: string, selectedOption: string): Promise<{ vote: any; results: Record<string, number>; total_votes: number }> {
+  async votePoll(pollId: string, selectedOption: string, visibility?: 'private' | 'shared' | 'public'): Promise<{ vote: any; results: Record<string, number>; total_votes: number }> {
     return this.request(`/polls/${pollId}/vote`, {
       method: 'POST',
-      body: JSON.stringify({ selected_option: selectedOption }),
+      body: JSON.stringify({ selected_option: selectedOption, ...(visibility ? { visibility } : {}) }),
     });
   }
 
@@ -247,7 +247,7 @@ class ApiClient {
   }
 
   // Questions
-  async answerQuestion(questionId: string, data: { answer_text?: string; selected_options?: string[] }): Promise<any> {
+  async answerQuestion(questionId: string, data: { answer_text?: string; selected_options?: string[]; visibility?: 'private' | 'shared' | 'public' }): Promise<any> {
     return this.request(`/questions/${questionId}/answer`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -275,10 +275,10 @@ class ApiClient {
   }
 
   // Form Responses
-  async submitFormResponse(contentId: string, responseData: any): Promise<FormResponse> {
+  async submitFormResponse(contentId: string, responseData: any, visibility?: 'private' | 'shared' | 'public'): Promise<FormResponse> {
     return this.request(`/form-responses/${contentId}`, {
       method: 'POST',
-      body: JSON.stringify({ response_data: responseData }),
+      body: JSON.stringify({ response_data: responseData, ...(visibility ? { visibility } : {}) }),
     });
   }
 

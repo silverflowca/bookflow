@@ -43,6 +43,8 @@ export interface Book {
   collaborators?: BookCollaborator[];
   rating_average?: number;
   rating_count?: number;
+  club_progress_tracking_enabled?: boolean;
+  user_in_shared_club?: boolean;
 }
 
 export interface BookSettings {

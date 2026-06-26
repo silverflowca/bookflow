@@ -230,6 +230,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
           if (clubProgressEnabled) {
             book.club_progress_tracking_enabled = true;
           }
+          book.user_in_shared_club = true;
         } else {
           return res.status(403).json({ error: 'Not authorized to view this book' });
         }
@@ -268,6 +269,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
           if (clubProgressEnabled) {
             book.club_progress_tracking_enabled = true;
           }
+          book.user_in_shared_club = true;
         }
       }
     }

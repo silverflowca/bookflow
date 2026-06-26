@@ -96,6 +96,27 @@ export default function ChapterEditor() {
     ],
     content: '',
     editorProps: {
+      handleKeyDown(view, event) {
+        if (event.key === 'Tab') {
+          const { state } = view;
+          const { $from } = state.selection;
+          // Only let Tab through if cursor is inside a list or task list
+          const inList = $from.depth > 0 && (() => {
+            for (let d = $from.depth; d > 0; d--) {
+              const node = $from.node(d);
+              if (['taskList', 'bulletList', 'orderedList', 'listItem', 'taskItem'].includes(node.type.name)) {
+                return true;
+              }
+            }
+            return false;
+          })();
+          if (!inList) {
+            event.preventDefault();
+            return true; // consumed — do nothing
+          }
+        }
+        return false;
+      },
       transformPastedHTML(html) {
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;

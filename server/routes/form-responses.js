@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Upsert own response for a form element
 router.post('/form-responses/:contentId', authenticate, async (req, res) => {
-  const { response_data } = req.body;
+  const { response_data, visibility } = req.body;
   const { contentId } = req.params;
 
   if (!response_data) {
@@ -36,6 +36,7 @@ router.post('/form-responses/:contentId', authenticate, async (req, res) => {
         inline_content_id: contentId,
         user_id: req.user.id,
         response_data,
+        ...(visibility && ['private', 'shared', 'public'].includes(visibility) ? { visibility } : {}),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'inline_content_id,user_id' })
       .select()
