@@ -14,7 +14,7 @@ export interface CarouselSettings {
   secondsPerRev: number; // 4–30
   maxBooks: number;      // 4–20
 }
-export const CAROUSEL_DEFAULTS: CarouselSettings = { secondsPerRev: 10, maxBooks: 12 };
+export const CAROUSEL_DEFAULTS: CarouselSettings = { secondsPerRev: 18, maxBooks: 12 };
 
 export function loadCarouselSettings(): CarouselSettings {
   try {
@@ -102,6 +102,9 @@ export default function Home() {
     }
   }
 
+  const writeBookTo = user ? '/dashboard' : '/register';
+  const qrCodeTo = user ? '/dashboard' : '/register';
+
   return (
     <div>
       {/* Hero Section */}
@@ -183,6 +186,124 @@ export default function Home() {
             {toast.msg}
           </div>
         )}
+      </section>
+
+      <section className="bg-surface py-[2.8rem] sm:py-[3.7rem]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative overflow-hidden rounded-[2.25rem] border border-sky-200/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,255,0.96))]" />
+            <div className="pointer-events-none absolute -left-20 top-10 h-48 w-48 rounded-full bg-fuchsia-200/35 blur-3xl" />
+            <div className="pointer-events-none absolute right-0 top-6 h-52 w-52 rounded-full bg-sky-200/35 blur-3xl" />
+            <div className="pointer-events-none absolute left-1/2 top-24 h-56 w-56 -translate-x-1/2 rounded-full bg-violet-100/40 blur-3xl" />
+
+            <div className="relative px-6 py-[2.1rem] sm:px-10 sm:py-[2.3rem] lg:px-12 lg:py-[2.8rem]">
+              <div className="mb-8 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.42em] text-slate-400">
+                  Lets get started
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(350px,1fr)_230px_minmax(350px,1fr)] md:grid-rows-[auto_auto] md:items-center md:gap-x-10 md:gap-y-5">
+                <Link
+                  to={writeBookTo}
+                  className="group relative flex min-h-[92px] w-full items-center overflow-hidden rounded-[1.7rem] border border-white/20 bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-600 px-7 py-2.5 text-left text-white shadow-[0_22px_45px_rgba(124,58,237,0.22)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_52px_rgba(124,58,237,0.28)]"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_45%)] opacity-70" />
+                  <div className="relative flex items-center gap-4 sm:gap-5">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/10 bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm sm:h-16 sm:w-16">
+                      <PenLine className="h-8 w-8 text-white transition-transform duration-200 group-hover:scale-110" />
+                    </span>
+                    <span className="block">
+                      <span className="block whitespace-nowrap text-[1.55rem] font-bold leading-tight sm:text-[1.72rem]">Write a Book</span>
+                      <span className="mt-0.5 block text-sm font-medium text-white/78">Shape your next story</span>
+                    </span>
+                  </div>
+                </Link>
+
+                <div className="md:row-span-2">
+                  <div className="mx-auto flex h-full min-h-[240px] max-w-[240px] items-center justify-center">
+                    <div className="relative flex h-52 w-52 items-center justify-center rounded-full border border-violet-100 bg-white shadow-[0_30px_80px_rgba(124,58,237,0.16)]">
+                      <div className="absolute inset-5 rounded-full border border-dashed border-violet-200/80" />
+                      <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.16),transparent_58%)]" />
+                      <div className="relative text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.3rem] bg-gradient-to-br from-purple-600 via-indigo-600 to-pink-500 text-white shadow-[0_18px_36px_rgba(124,58,237,0.28)]">
+                          <BookOpen className="h-8 w-8" />
+                        </div>
+                        <div className="text-[2rem] font-bold tracking-tight text-slate-900">BookFlow</div>
+                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Start here</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <a
+                  href="#books"
+                  className="group relative flex min-h-[92px] w-full items-center overflow-hidden rounded-[1.7rem] border border-white/20 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 px-7 py-2.5 text-left text-white shadow-[0_22px_45px_rgba(14,165,233,0.20)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_52px_rgba(14,165,233,0.26)]"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_45%)] opacity-70" />
+                  <div className="relative flex items-center gap-4 sm:gap-5">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/10 bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm sm:h-16 sm:w-16">
+                      <BookMarked className="h-8 w-8 text-white transition-transform duration-200 group-hover:scale-110" />
+                    </span>
+                    <span className="block">
+                      <span className="block whitespace-nowrap text-[1.55rem] font-bold leading-tight sm:text-[1.72rem]">Read a book</span>
+                      <span className="mt-0.5 block text-sm font-medium text-white/78">Explore published stories</span>
+                    </span>
+                  </div>
+                </a>
+
+                <Link
+                  to="/clubs"
+                  className="group relative flex min-h-[92px] w-full items-center overflow-hidden rounded-[1.7rem] border border-white/20 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 px-7 py-2.5 text-left text-white shadow-[0_22px_45px_rgba(16,185,129,0.18)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_52px_rgba(16,185,129,0.24)]"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_45%)] opacity-70" />
+                  <div className="relative flex items-center gap-4 sm:gap-5">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/10 bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm sm:h-16 sm:w-16">
+                      <Users className="h-8 w-8 text-white transition-transform duration-200 group-hover:scale-110" />
+                    </span>
+                    <span className="block">
+                      <span className="block whitespace-nowrap text-[1.4rem] font-bold leading-tight sm:text-[1.58rem]">Join a Book Club</span>
+                      <span className="mt-0.5 block text-sm font-medium text-white/78">Read together and discuss</span>
+                    </span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/clubs?tab=bookstudy"
+                  className="group relative flex min-h-[92px] w-full items-center overflow-hidden rounded-[1.7rem] border border-white/20 bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 px-7 py-2.5 text-left text-white shadow-[0_22px_45px_rgba(249,115,22,0.20)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_52px_rgba(249,115,22,0.26)]"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.14),transparent_45%)] opacity-70" />
+                  <div className="relative flex items-center gap-4 sm:gap-5">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.2rem] border border-white/10 bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm sm:h-16 sm:w-16">
+                      <GraduationCap className="h-8 w-8 text-white transition-transform duration-200 group-hover:scale-110" />
+                    </span>
+                    <span className="block">
+                      <span className="block whitespace-nowrap text-[1.28rem] font-bold leading-tight sm:text-[1.45rem]">Start a Study Group</span>
+                      <span className="mt-0.5 block text-sm font-medium text-white/78">Lead chapter by chapter</span>
+                    </span>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[1.2rem] border border-pink-200/70 bg-white shadow-[0_14px_28px_rgba(236,72,153,0.12)]">
+                    <img src="/books_silverflow_qr_code.png" alt="" className="h-11 w-11 rounded-lg object-cover" />
+                  </div>
+                  <Link
+                    to={qrCodeTo}
+                    className="group inline-flex min-h-[60px] items-center gap-3 rounded-full border border-pink-300/55 bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-600 px-6 py-3 text-white shadow-[0_16px_34px_rgba(236,72,153,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(236,72,153,0.26)]"
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+                      <Share2 className="h-5 w-5 text-white transition-transform duration-200 group-hover:rotate-6" />
+                    </span>
+                    <span className="whitespace-nowrap text-base font-bold sm:text-lg">Create a QR Code for your Book</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Role Promo Section */}
@@ -335,9 +456,18 @@ export default function Home() {
       {/* Published Books Section */}
       <section id="books" className="py-20 bg-surface-hover">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            Explore Published Books
-          </h2>
+          <div className="mb-12 flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between">
+            <h2 className="text-3xl font-bold text-center sm:text-left">
+              Explore Published Books
+            </h2>
+            <Link
+              to={writeBookTo}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(124,58,237,0.30)]"
+            >
+              <PenLine className="h-4 w-4" />
+              <span>Write a Book</span>
+            </Link>
+          </div>
 
           {loading ? (
             <div className="flex justify-center">
@@ -917,7 +1047,7 @@ function BookStudySection() {
 // ─── Spiral Carousel ─────────────────────────────────────────────────────────
 //
 // Books orbit an ellipse centred in the hero section.
-// Auto-rotates at 1 full revolution per 10 s; drag/swipe scrubs the angle.
+// Auto-rotates at the configured seconds-per-revolution; drag/swipe scrubs the angle.
 // Books closer to the viewer (bottom of ellipse) are larger and rendered last (on top).
 
 // Book size scales with screen — computed dynamically in getEllipse
