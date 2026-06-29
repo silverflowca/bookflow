@@ -230,13 +230,13 @@ body {
 }
 .ProseMirror ul[data-type="taskList"] li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
 }
 .ProseMirror ul[data-type="taskList"] li > label {
   flex-shrink: 0;
-  margin-top: 0;
+  margin-top: 0.2rem;
   cursor: pointer;
 }
 .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
@@ -247,6 +247,12 @@ body {
 }
 .ProseMirror ul[data-type="taskList"] li > div {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ProseMirror ul[data-type="taskList"] li > div > p {
+  margin: 0;
 }
 /* Strike-through text when checked */
 .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
@@ -257,6 +263,7 @@ body {
 .ProseMirror ul[data-type="taskList"] ul[data-type="taskList"] {
   padding-left: 1.5rem;
   margin-top: 0.25rem;
+  margin-bottom: 0;
 }
 
 /* Suppress TipTap's default blue box on selected atom nodes — we handle selection via ring classes */

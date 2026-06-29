@@ -125,9 +125,9 @@ export async function createChapter({ bookId, title, content, contentText, statu
     content_text:              contentText || null,
     status,
     order_index:               orderIndex ?? 0,
-    slug:                      slug || null,
     word_count:                words,
     estimated_read_time_minutes: readTime,
+    ...(slug ? { slug } : {}),
   };
 
   const { data, error } = await db.from('chapters').insert(row).select().single();
