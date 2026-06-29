@@ -5,6 +5,280 @@ import { postCompletionUpdate } from '../services/chat-status.js';
 
 const router = express.Router();
 
+function normalizeOne(value) {
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+async function getBookResponseContext(bookId, viewerId) {
+  const { data: book, error: bookErr } = await supabase
+    .schema('bookflow')
+    .from('books')
+    .select('id, author_id, visibility')
+    .eq('id', bookId)
+    .single();
+
+  if (bookErr) throw bookErr;
+
+  const viewerIsAuthor = !!viewerId && book.author_id === viewerId;
+
+  const { data: clubBookRows } = await supabase
+    .schema('bookflow')
+    .from('club_books')
+    .select('club_id')
+    .eq('book_id', bookId);
+
+  const clubIds = [...new Set((clubBookRows || []).map(row => row.club_id).filter(Boolean))];
+
+  let clubs = [];
+  let clubMembers = [];
+  if (clubIds.length) {
+    const [{ data: clubRows }, { data: memberRows }] = await Promise.all([
+      supabase
+        .schema('bookflow')
+        .from('book_clubs')
+        .select('id, name, club_type')
+        .in('id', clubIds),
+      supabase
+        .schema('bookflow')
+        .from('club_members')
+        .select('club_id, user_id, invite_accepted_at')
+        .in('club_id', clubIds)
+        .not('invite_accepted_at', 'is', null),
+    ]);
+    clubs = clubRows || [];
+    clubMembers = memberRows || [];
+  }
+
+  const { data: shareRows } = await supabase
+    .schema('bookflow')
+    .from('book_shares')
+    .select('user_id, profile:profiles!book_shares_user_id_fkey(id, display_name, avatar_url)')
+    .eq('book_id', bookId);
+
+  const sharedUsers = (shareRows || [])
+    .map(row => {
+      const profile = normalizeOne(row.profile);
+      return profile
+        ? { id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url ?? null }
+        : null;
+    })
+    .filter(Boolean);
+
+  const clubMetaById = new Map(clubs.map(club => [club.id, club]));
+  const clubsByUser = new Map();
+  for (const member of clubMembers) {
+    const club = clubMetaById.get(member.club_id);
+    if (!club) continue;
+    const current = clubsByUser.get(member.user_id) || [];
+    current.push(club);
+    clubsByUser.set(member.user_id, current);
+  }
+
+  const sharedUserIds = new Set(sharedUsers.map(user => user.id));
+  const viewerClubIds = new Set((clubsByUser.get(viewerId) || []).map(club => club.id));
+  const viewerHasDirectShare = !!viewerId && sharedUserIds.has(viewerId);
+
+  const canAccess = viewerIsAuthor
+    || book.visibility === 'public'
+    || (!!viewerId && (viewerHasDirectShare || viewerClubIds.size > 0));
+
+  return {
+    book,
+    canAccess,
+    viewerId,
+    viewerIsAuthor,
+    clubsByUser,
+    sharedUsers,
+    sharedUserIds,
+    viewerClubIds,
+    viewerHasDirectShare,
+  };
+}
+
+function canViewerSeeResponse(responseVisibility, respondentId, context) {
+  if (context.viewerIsAuthor) return true;
+  if (context.viewerId && respondentId === context.viewerId) return true;
+
+  if (responseVisibility === 'private') return false;
+  if (responseVisibility === 'public') return context.canAccess;
+  if (!context.viewerId) return false;
+
+  const respondentClubs = context.clubsByUser.get(respondentId) || [];
+  const sameClub = respondentClubs.some(club => context.viewerClubIds.has(club.id));
+  const directShareChannel = context.viewerHasDirectShare && context.sharedUserIds.has(respondentId);
+
+  return sameClub || directShareChannel;
+}
+
+function withResponseMeta(response, context) {
+  const respondentId = response.user_id;
+  const club_contexts = (context.clubsByUser.get(respondentId) || []).map(club => ({
+    id: club.id,
+    name: club.name,
+    club_type: club.club_type,
+  }));
+  const shared_with_users = context.sharedUserIds.has(respondentId)
+    ? context.sharedUsers.filter(user => user.id !== respondentId)
+    : [];
+
+  return {
+    ...response,
+    visibility: response.visibility || 'shared',
+    club_contexts,
+    shared_with_users,
+  };
+}
+
+async function buildBookResponses(bookId, { chapterId = null, viewerId = null, authorMode = false } = {}) {
+  const context = await getBookResponseContext(bookId, viewerId);
+  if (!authorMode && !context.canAccess) {
+    return { forbidden: true, items: [] };
+  }
+
+  let icQuery = supabase
+    .schema('bookflow')
+    .from('inline_content')
+    .select('id, content_type, content_data, position_in_chapter, order_index, chapter_id, chapters(title, order_index)')
+    .eq('book_id', bookId)
+    .order('order_index', { ascending: true });
+
+  if (chapterId) icQuery = icQuery.eq('chapter_id', chapterId);
+
+  const { data: items, error: icErr } = await icQuery;
+  if (icErr) throw icErr;
+  if (!items?.length) return { forbidden: false, items: [] };
+
+  const formIds = items.filter(i => ['select', 'multiselect', 'radio', 'checkbox', 'textbox', 'textarea'].includes(i.content_type)).map(i => i.id);
+  const pollIds = items.filter(i => i.content_type === 'poll').map(i => i.id);
+  const questionIds = items.filter(i => i.content_type === 'question').map(i => i.id);
+
+  const [frsRes, prsRes, qasRes] = await Promise.all([
+    formIds.length
+      ? supabase
+          .schema('bookflow')
+          .from('form_responses')
+          .select('inline_content_id, id, user_id, response_data, updated_at, visibility, user:profiles!form_responses_user_id_fkey(id, display_name, avatar_url)')
+          .in('inline_content_id', formIds)
+          .order('updated_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    pollIds.length
+      ? supabase
+          .schema('bookflow')
+          .from('poll_responses')
+          .select('inline_content_id, id, user_id, selected_option, created_at, visibility, user:profiles!poll_responses_user_id_fkey(id, display_name, avatar_url)')
+          .in('inline_content_id', pollIds)
+      : Promise.resolve({ data: [] }),
+    questionIds.length
+      ? supabase
+          .schema('bookflow')
+          .from('question_answers')
+          .select('inline_content_id, id, user_id, answer_text, selected_options, is_correct, created_at, visibility, user:profiles!question_answers_user_id_fkey(id, display_name, avatar_url)')
+          .in('inline_content_id', questionIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const formResponsesByItem = {};
+  for (const row of (frsRes.data || [])) {
+    if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    const enriched = withResponseMeta(row, context);
+    if (!formResponsesByItem[row.inline_content_id]) formResponsesByItem[row.inline_content_id] = [];
+    formResponsesByItem[row.inline_content_id].push(enriched);
+  }
+
+  const pollResponsesByItem = {};
+  for (const row of (prsRes.data || [])) {
+    if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    const enriched = withResponseMeta(row, context);
+    if (!pollResponsesByItem[row.inline_content_id]) pollResponsesByItem[row.inline_content_id] = [];
+    pollResponsesByItem[row.inline_content_id].push(enriched);
+  }
+
+  const questionAnswersByItem = {};
+  for (const row of (qasRes.data || [])) {
+    if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    const enriched = withResponseMeta(row, context);
+    if (!questionAnswersByItem[row.inline_content_id]) questionAnswersByItem[row.inline_content_id] = [];
+    questionAnswersByItem[row.inline_content_id].push(enriched);
+  }
+
+  const choiceTypes = ['select', 'multiselect', 'radio', 'checkbox'];
+  const result = items.map(item => {
+    const chap = normalizeOne(item.chapters) || {};
+    let responses = [];
+    let aggregates = null;
+    let total = 0;
+
+    if (item.content_type === 'poll') {
+      const prs = pollResponsesByItem[item.id] || [];
+      total = prs.length;
+      responses = prs;
+      const options = item.content_data?.options || [];
+      const counts = {};
+      options.forEach(option => { counts[option.id] = 0; });
+      prs.forEach(response => {
+        if (counts[response.selected_option] !== undefined) counts[response.selected_option]++;
+      });
+      aggregates = {
+        counts,
+        total,
+        options: options.map(option => ({
+          id: option.id,
+          text: option.text,
+          count: counts[option.id] || 0,
+          percent: total > 0 ? Math.round(((counts[option.id] || 0) / total) * 100) : 0,
+        })),
+      };
+    } else if (item.content_type === 'question') {
+      responses = questionAnswersByItem[item.id] || [];
+      total = responses.length;
+    } else if (choiceTypes.includes(item.content_type)) {
+      const frs = formResponsesByItem[item.id] || [];
+      total = frs.length;
+      responses = frs;
+      const options = item.content_data?.options || [];
+      const counts = {};
+      options.forEach(option => { counts[option.id] = 0; });
+      frs.forEach(response => {
+        const value = response.response_data?.value;
+        if (!value) return;
+        if (Array.isArray(value)) value.forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+        else if (counts[value] !== undefined) counts[value]++;
+      });
+      aggregates = {
+        counts,
+        total,
+        options: options.map(option => ({
+          id: option.id,
+          text: option.text,
+          count: counts[option.id] || 0,
+          percent: total > 0 ? Math.round(((counts[option.id] || 0) / total) * 100) : 0,
+        })),
+      };
+    } else {
+      responses = formResponsesByItem[item.id] || [];
+      total = responses.length;
+    }
+
+    return {
+      id: item.id,
+      content_type: item.content_type,
+      content_data: item.content_data,
+      position_in_chapter: item.position_in_chapter,
+      order_index: item.order_index,
+      chapter_id: item.chapter_id,
+      chapter_title: chap.title || '',
+      chapter_order: chap.order_index ?? 0,
+      total,
+      responses,
+      aggregates,
+    };
+  });
+
+  result.sort((a, b) => a.chapter_order - b.chapter_order || (a.order_index ?? 0) - (b.order_index ?? 0));
+  return { forbidden: false, items: result };
+}
+
 // Get all books (public + own)
 router.get('/', optionalAuth, async (req, res) => {
   const { status, visibility, author_id, search, limit = 50, offset = 0 } = req.query;
@@ -718,149 +992,42 @@ router.get('/:id/responses', authenticate, requireAuthor, async (req, res) => {
   const { chapter_id } = req.query;
 
   try {
-    // 1. Fetch inline content joined with chapter info
-    let icQuery = supabase
-      .schema('bookflow')
-      .from('inline_content')
-      .select('id, content_type, content_data, position_in_chapter, order_index, chapter_id, chapters(title, order_index)')
-      .eq('book_id', bookId)
-      .order('order_index', { ascending: true });
-
-    if (chapter_id) icQuery = icQuery.eq('chapter_id', chapter_id);
-
-    const { data: items, error: icErr } = await icQuery;
-    if (icErr) throw icErr;
-    if (!items?.length) return res.json([]);
-
-    const allIds = items.map(i => i.id);
-    const formIds = items.filter(i => ['select','multiselect','radio','checkbox','textbox','textarea'].includes(i.content_type)).map(i => i.id);
-    const pollIds = items.filter(i => i.content_type === 'poll').map(i => i.id);
-    const questionIds = items.filter(i => i.content_type === 'question').map(i => i.id);
-
-    // 2. Batch-fetch form responses
-    const formResponsesByItem = {};
-    if (formIds.length) {
-      const { data: frs } = await supabase
-        .schema('bookflow')
-        .from('form_responses')
-        .select('inline_content_id, id, user_id, response_data, updated_at, user:profiles!form_responses_user_id_fkey(id, display_name, avatar_url)')
-        .in('inline_content_id', formIds)
-        .order('updated_at', { ascending: false });
-      (frs || []).forEach(r => {
-        if (!formResponsesByItem[r.inline_content_id]) formResponsesByItem[r.inline_content_id] = [];
-        formResponsesByItem[r.inline_content_id].push(r);
-      });
-    }
-
-    // 3. Batch-fetch poll responses
-    const pollResponsesByItem = {};
-    if (pollIds.length) {
-      const { data: prs } = await supabase
-        .schema('bookflow')
-        .from('poll_responses')
-        .select('inline_content_id, id, user_id, selected_option, created_at, user:profiles!poll_responses_user_id_fkey(id, display_name, avatar_url)')
-        .in('inline_content_id', pollIds);
-      (prs || []).forEach(r => {
-        if (!pollResponsesByItem[r.inline_content_id]) pollResponsesByItem[r.inline_content_id] = [];
-        pollResponsesByItem[r.inline_content_id].push(r);
-      });
-    }
-
-    // 4. Batch-fetch question answers
-    const questionAnswersByItem = {};
-    if (questionIds.length) {
-      const { data: qas } = await supabase
-        .schema('bookflow')
-        .from('question_answers')
-        .select('inline_content_id, id, user_id, answer_text, selected_options, is_correct, created_at, user:profiles!question_answers_user_id_fkey(id, display_name, avatar_url)')
-        .in('inline_content_id', questionIds)
-        .order('created_at', { ascending: false });
-      (qas || []).forEach(r => {
-        if (!questionAnswersByItem[r.inline_content_id]) questionAnswersByItem[r.inline_content_id] = [];
-        questionAnswersByItem[r.inline_content_id].push(r);
-      });
-    }
-
-    // 5. Build response per item
-    const choiceTypes = ['select', 'multiselect', 'radio', 'checkbox'];
-    const result = items.map(item => {
-      const chap = item.chapters || {};
-      let responses = [];
-      let aggregates = null;
-      let total = 0;
-
-      if (item.content_type === 'poll') {
-        const prs = pollResponsesByItem[item.id] || [];
-        total = prs.length;
-        responses = prs;
-        // Build option-count aggregates
-        const options = item.content_data?.options || [];
-        const counts = {};
-        options.forEach(o => { counts[o.id] = 0; });
-        prs.forEach(r => { if (counts[r.selected_option] !== undefined) counts[r.selected_option]++; });
-        aggregates = {
-          counts,
-          total,
-          options: options.map(o => ({
-            id: o.id,
-            text: o.text,
-            count: counts[o.id] || 0,
-            percent: total > 0 ? Math.round(((counts[o.id] || 0) / total) * 100) : 0,
-          })),
-        };
-      } else if (item.content_type === 'question') {
-        responses = questionAnswersByItem[item.id] || [];
-        total = responses.length;
-      } else if (choiceTypes.includes(item.content_type)) {
-        const frs = formResponsesByItem[item.id] || [];
-        total = frs.length;
-        responses = frs;
-        const options = item.content_data?.options || [];
-        const counts = {};
-        options.forEach(o => { counts[o.id] = 0; });
-        frs.forEach(r => {
-          const val = r.response_data?.value;
-          if (!val) return;
-          if (Array.isArray(val)) val.forEach(v => { if (counts[v] !== undefined) counts[v]++; });
-          else if (counts[val] !== undefined) counts[val]++;
-        });
-        aggregates = {
-          counts,
-          total,
-          options: options.map(o => ({
-            id: o.id,
-            text: o.text,
-            count: counts[o.id] || 0,
-            percent: total > 0 ? Math.round(((counts[o.id] || 0) / total) * 100) : 0,
-          })),
-        };
-      } else {
-        // textbox / textarea / other
-        responses = formResponsesByItem[item.id] || [];
-        total = responses.length;
-      }
-
-      return {
-        id: item.id,
-        content_type: item.content_type,
-        content_data: item.content_data,
-        position_in_chapter: item.position_in_chapter,
-        order_index: item.order_index,
-        chapter_id: item.chapter_id,
-        chapter_title: chap.title || '',
-        chapter_order: chap.order_index ?? 0,
-        total,
-        responses,
-        aggregates,
-      };
+    const result = await buildBookResponses(bookId, {
+      chapterId: typeof chapter_id === 'string' ? chapter_id : null,
+      viewerId: req.user.id,
+      authorMode: true,
     });
 
-    // Sort by chapter order then item order
-    result.sort((a, b) => a.chapter_order - b.chapter_order || (a.order_index ?? 0) - (b.order_index ?? 0));
-
-    res.json(result);
+    res.json(result.items);
   } catch (err) {
     console.error('Book responses error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /books/:id/accessible-responses ───────────────────────────────────────
+// Returns response rows the current viewer is allowed to see:
+// - author: everything
+// - authenticated readers: own + shared + public
+// - guests on a public book: public only
+router.get('/:id/accessible-responses', optionalAuth, async (req, res) => {
+  const bookId = req.params.id;
+  const { chapter_id } = req.query;
+
+  try {
+    const result = await buildBookResponses(bookId, {
+      chapterId: typeof chapter_id === 'string' ? chapter_id : null,
+      viewerId: req.user?.id || null,
+      authorMode: false,
+    });
+
+    if (result.forbidden) {
+      return res.status(403).json({ error: 'Not authorized to view these responses' });
+    }
+
+    res.json(result.items);
+  } catch (err) {
+    console.error('Accessible book responses error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -295,6 +295,11 @@ class ApiClient {
     return this.request(`/books/${bookId}/responses${qs}`);
   }
 
+  async getAccessibleBookResponses(bookId: string, chapterId?: string): Promise<import('../types').BookResponseItem[]> {
+    const qs = chapterId ? `?chapter_id=${chapterId}` : '';
+    return this.request(`/books/${bookId}/accessible-responses${qs}`);
+  }
+
   // Reading Progress
   async getReadingProgress(bookId: string): Promise<ReadingProgress | null> {
     return this.request(`/books/${bookId}/progress`);

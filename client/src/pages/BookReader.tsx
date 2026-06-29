@@ -48,6 +48,7 @@ const AuthGateContext = createContext<() => void>(() => {});
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
+import BookResponsesViewer from '../components/responses/BookResponsesViewer';
 import TutorialOverlay from '../components/reader/TutorialOverlay';
 import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
 import { DEMO_BOOK_ID } from '../config/demoBook';
@@ -80,6 +81,7 @@ export default function BookReader() {
   const [showReaderModal, setShowReaderModal] = useState<{ type: InlineContentType } | null>(null);
   const [contentFilter, setContentFilter] = useState<'all' | 'author' | 'mine'>('all');
   const [showHighlights, setShowHighlights] = useState(true);
+  const [useMobileSelectionUi, setUseMobileSelectionUi] = useState(false);
 
   // TTS State
   const [ttsLoading, setTtsLoading] = useState(false);
@@ -95,6 +97,7 @@ export default function BookReader() {
   const chapterProgressTotalRef = useRef(0);
   const [bookChapterStats, setBookChapterStats] = useState<Map<string, { completed: number; total: number }>>(new Map());
   const [showProgressPanel, setShowProgressPanel] = useState(false);
+  const [showAccessibleResponses, setShowAccessibleResponses] = useState(false);
   // Live episode banner
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string; guest_invite_url?: string; live_shows?: { guest_invite_url?: string } } | null>(null);
   const [liveBannerDismissed, setLiveBannerDismissed] = useState(false);
@@ -225,6 +228,28 @@ export default function BookReader() {
   // Check if reader has any permissions
   const hasAnyPermission = canAddHighlight || canAddNote || canAddQuestion || canAddPoll || canAddAudio || canAddVideo || canAddLink;
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mediaQuery = window.matchMedia('(max-width: 767px), (pointer: coarse)');
+    const updateSelectionUi = () => setUseMobileSelectionUi(mediaQuery.matches);
+    updateSelectionUi();
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', updateSelectionUi);
+      return () => mediaQuery.removeEventListener('change', updateSelectionUi);
+    }
+    mediaQuery.addListener(updateSelectionUi);
+    return () => mediaQuery.removeListener(updateSelectionUi);
+  }, []);
+
+  useEffect(() => {
+    if (!showAccessibleResponses) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowAccessibleResponses(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showAccessibleResponses]);
+
   // Handle text selection for reader content creation
   const handleTextSelection = useCallback((e: MouseEvent) => {
     if (!hasAnyPermission && !isAuthor) return;
@@ -260,7 +285,7 @@ export default function BookReader() {
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
-    // Position toolbar above selection
+    // Position toolbar above selection (desktop). Mobile uses a bottom sheet.
     setToolbarPosition({
       x: rect.left + rect.width / 2,
       y: rect.top - 10
@@ -944,16 +969,15 @@ export default function BookReader() {
             {book.subtitle && <p className="text-sm text-muted">{book.subtitle}</p>}
             <p className="text-sm text-muted mt-1">by {book.author?.display_name}</p>
 
-            {/* Dashboard button — author only */}
-            {isAuthor && (
-              <Link
-                to={`/edit/book/${bookId}/dashboard`}
-                className="mt-2 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme text-sm text-muted hover:bg-surface-hover hover:text-theme transition-colors"
-              >
-                <BarChart2 className="h-4 w-4 shrink-0" />
-                <span>Dashboard</span>
-              </Link>
-            )}
+          {/* Answers button */}
+          <button
+            type="button"
+            onClick={() => setShowAccessibleResponses(true)}
+            className="mt-2 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme text-sm text-muted hover:bg-surface-hover hover:text-theme transition-colors"
+          >
+            <BarChart2 className="h-4 w-4 shrink-0" />
+            <span>Answers</span>
+          </button>
 
             {/* Progress button — shown when tracking is enabled */}
             {progressEnabled && (() => {
@@ -1404,7 +1428,7 @@ export default function BookReader() {
 
 
       {/* Inline Content Panel — hidden in focus mode */}
-      {activeContent && !focusMode && (
+      {activeContent && (
         <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
           <MediaContext.Provider value={mediaCtx}>
             <InlineContentPanel
@@ -1422,6 +1446,7 @@ export default function BookReader() {
       {showReaderToolbar && selectedText && (hasAnyPermission || isAuthor) && (
         <ReaderSelectionToolbar
           position={toolbarPosition}
+          mobile={useMobileSelectionUi}
           canAddHighlight={canAddHighlight || isAuthor}
           canAddNote={canAddNote || isAuthor}
           canAddQuestion={canAddQuestion || isAuthor}
@@ -1438,6 +1463,43 @@ export default function BookReader() {
             setSelectedText(null);
           }}
         />
+      )}
+
+      {showAccessibleResponses && (
+        <div className="fixed inset-0 z-[90]">
+          <button
+            type="button"
+            aria-label="Close answers panel"
+            className="absolute inset-0 bg-black/25"
+            onClick={() => setShowAccessibleResponses(false)}
+          />
+          <div className="absolute inset-y-0 right-0 flex w-full max-w-3xl flex-col bg-white shadow-2xl border-l border-gray-200">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-500">Responses</p>
+                <h3 className="truncate text-base font-semibold text-gray-900">
+                  {chapter?.title ? `${chapter.title} answers` : 'Accessible answers'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAccessibleResponses(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <BookResponsesViewer
+                bookId={bookId!}
+                chapterId={chapterId}
+                compact
+                mode="accessible"
+                viewerUserId={user?.id ?? null}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Reader Inline Content Modal */}
@@ -4611,6 +4673,7 @@ function HeaderComponentIcons({
 // Reader Selection Toolbar - appears when reader selects text
 function ReaderSelectionToolbar({
   position,
+  mobile = false,
   canAddHighlight,
   canAddNote,
   canAddQuestion,
@@ -4622,6 +4685,7 @@ function ReaderSelectionToolbar({
   onClose
 }: {
   position: { x: number; y: number };
+  mobile?: boolean;
   canAddHighlight: boolean;
   canAddNote: boolean;
   canAddQuestion: boolean;
@@ -4637,6 +4701,7 @@ function ReaderSelectionToolbar({
 
   // Adjust position to stay within viewport
   React.useEffect(() => {
+    if (mobile) return;
     if (toolbarRef.current) {
       const rect = toolbarRef.current.getBoundingClientRect();
       let x = position.x - rect.width / 2;
@@ -4653,10 +4718,11 @@ function ReaderSelectionToolbar({
 
       setAdjustedPosition({ x, y });
     }
-  }, [position]);
+  }, [mobile, position]);
 
   // Close on click outside
   React.useEffect(() => {
+    if (mobile) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
         onClose();
@@ -4664,7 +4730,7 @@ function ReaderSelectionToolbar({
     };
     setTimeout(() => document.addEventListener('click', handleClickOutside), 100);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [onClose]);
+  }, [mobile, onClose]);
 
   const buttons = [
     { type: 'highlight' as const, icon: Highlighter, label: 'Highlight', enabled: canAddHighlight, color: 'text-yellow-600 hover:bg-yellow-50' },
@@ -4677,6 +4743,41 @@ function ReaderSelectionToolbar({
   ].filter(b => b.enabled);
 
   if (buttons.length === 0) return null;
+
+  if (mobile) {
+    return (
+      <div className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+        <div className="mx-auto w-full max-w-lg rounded-t-2xl border border-gray-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-purple-500">Selected Text</p>
+              <p className="truncate text-sm font-medium text-gray-700">Choose what to add</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+            {buttons.map(({ type, icon: Icon, label, color }) => (
+              <button
+                key={type}
+                onClick={() => onSelect(type)}
+                className={`inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-2 text-sm font-medium transition-colors ${color}`}
+                title={label}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

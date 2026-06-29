@@ -393,6 +393,24 @@ export interface FormResponseWithUser extends FormResponse {
   user: { id: string; display_name: string; avatar_url?: string };
 }
 
+export interface ResponseClubContext {
+  id: string;
+  name: string;
+  club_type: 'club' | 'study_group';
+}
+
+export interface ResponseSharedUser {
+  id: string;
+  display_name: string;
+  avatar_url?: string | null;
+}
+
+export interface ResponseRecordMeta {
+  visibility?: 'private' | 'shared' | 'public';
+  club_contexts?: ResponseClubContext[];
+  shared_with_users?: ResponseSharedUser[];
+}
+
 export interface FormResponseAggregate {
   counts: Record<string, number>;
   total: number;
@@ -435,7 +453,7 @@ export interface BookResponseItem {
   chapter_title: string;
   chapter_order: number;
   total: number;
-  responses: (FormResponseWithUser & { selected_option?: string; answer_text?: string; selected_options?: string[]; is_correct?: boolean })[];
+  responses: (FormResponseWithUser & ResponseRecordMeta & { selected_option?: string; answer_text?: string; selected_options?: string[]; is_correct?: boolean })[];
   aggregates: FormResponseAggregate | null;
 }
 
