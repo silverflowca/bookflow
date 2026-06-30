@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core';
+import { getHighlightTheme } from '../../lib/highlightTheme';
 
 export interface InlineContentMarkOptions {
   HTMLAttributes: Record<string, any>;
@@ -84,7 +85,7 @@ export const InlineContentMark = Mark.create<InlineContentMarkOptions>({
     // For highlights, override the static yellow with the stored color
     const highlightColor = HTMLAttributes['data-highlight-color'];
     const extraStyle = (contentType === 'highlight' && highlightColor)
-      ? { style: `background-color: ${highlightColor};` }
+      ? { style: `background-color: ${getHighlightTheme(highlightColor).bg};` }
       : {};
 
     return [

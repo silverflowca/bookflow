@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2, Upload, Link as LinkIcon, Mic, Video, Square, Circle, Lock, Users, Globe } from 'lucide-react';
 import api from '../../lib/api';
+import { getHighlightTheme } from '../../lib/highlightTheme';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
@@ -419,10 +420,10 @@ function HighlightForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit
   const [note, setNote] = useState(initialData?.note || '');
 
   const colors = [
-    { value: 'yellow', label: 'Yellow', class: 'bg-yellow-300' },
-    { value: 'green', label: 'Green', class: 'bg-green-300' },
-    { value: 'blue', label: 'Blue', class: 'bg-blue-300' },
-    { value: 'pink', label: 'Pink', class: 'bg-pink-300' },
+    { value: 'yellow', label: 'Yellow' },
+    { value: 'green', label: 'Green' },
+    { value: 'blue', label: 'Blue' },
+    { value: 'pink', label: 'Pink' },
   ];
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -441,7 +442,8 @@ function HighlightForm({ onSubmit, onClose, initialData, isEditing }: { onSubmit
               key={c.value}
               type="button"
               onClick={() => setColor(c.value)}
-              className={`w-8 h-8 rounded-full ${c.class} ${color === c.value ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+              className={`w-8 h-8 rounded-full border border-white/70 shadow-sm ${color === c.value ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+              style={{ backgroundColor: getHighlightTheme(c.value).bg }}
               title={c.label}
             />
           ))}

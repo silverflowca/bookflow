@@ -4,6 +4,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
+  Crown,
   Filter,
   Globe,
   HelpCircle,
@@ -14,6 +15,7 @@ import {
   Search,
   Share2,
   SlidersHorizontal,
+  User,
   Users,
   X,
   XCircle,
@@ -55,6 +57,8 @@ type PassiveContentType =
   | 'video'
   | 'code_block'
   | 'scripture_block';
+
+type ResponseSectionKey = 'author' | 'reader';
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   question: { label: 'Question', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', icon: <HelpCircle className="h-3.5 w-3.5" /> },
@@ -200,6 +204,7 @@ function getItemLabel(item: BookResponseItem) {
     item.content_data?.question ||
     item.content_data?.label ||
     item.content_data?.title ||
+    item.anchor_text ||
     item.content_data?.placeholder ||
     `(${item.content_type})`
   );
@@ -268,13 +273,41 @@ function getResponseUser(response: ResponseRowData) {
   return response.user || null;
 }
 
+function sourceMeta(item: BookResponseItem) {
+  if (item.is_author_content) {
+    return {
+      label: 'Author',
+      icon: <Crown className="h-3 w-3" />,
+      className: 'bg-amber-50 text-amber-700 border-amber-200',
+    };
+  }
+  return {
+    label: 'Reader',
+    icon: <User className="h-3 w-3" />,
+    className: 'bg-blue-50 text-blue-700 border-blue-200',
+  };
+}
+
 function PassiveContentCard({ item }: { item: BookResponseItem }) {
   const data = item.content_data || {};
   const type = item.content_type as PassiveContentType;
+  const creator = item.creator || null;
+
+  const sourceHeader = (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      {creator && (
+        <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-2 py-1">
+          <Avatar name={creator.display_name} url={creator.avatar_url} />
+          <span className="text-xs font-medium text-gray-700">{creator.display_name}</span>
+        </div>
+      )}
+    </div>
+  );
 
   if (type === 'link') {
     return (
       <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+        {sourceHeader}
         <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700 mb-2">Link</p>
         <a
           href={data.url}
@@ -292,9 +325,10 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   if (type === 'highlight') {
     return (
       <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
+        {sourceHeader}
         <p className="text-xs font-semibold uppercase tracking-wide text-yellow-700 mb-2">Highlight</p>
-        {item.content_data?.anchor_text && (
-          <p className="text-sm italic text-yellow-900 mb-2">“{item.content_data.anchor_text}”</p>
+        {item.anchor_text && (
+          <p className="text-sm italic text-yellow-900 mb-2">“{item.anchor_text}”</p>
         )}
         {data.note && <p className="text-sm text-yellow-950/85">{data.note}</p>}
       </div>
@@ -304,6 +338,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   if (type === 'note') {
     return (
       <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+        {sourceHeader}
         <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 mb-2">
           {data.type ? `${String(data.type).replace(/_/g, ' ')} note` : 'Note'}
         </p>
@@ -315,6 +350,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   if (type === 'audio' || type === 'video') {
     return (
       <div className={`mt-4 rounded-xl border px-4 py-3 ${type === 'audio' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}`}>
+        {sourceHeader}
         <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${type === 'audio' ? 'text-orange-700' : 'text-red-700'}`}>
           {type === 'audio' ? 'Audio' : 'Video'}
         </p>
@@ -331,6 +367,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   if (type === 'code_block') {
     return (
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        {sourceHeader}
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-2">Code Block</p>
         <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
           <code>{data.code || ''}</code>
@@ -342,6 +379,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   if (type === 'scripture_block') {
     return (
       <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        {sourceHeader}
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">Scripture</p>
         <p className="text-sm font-semibold text-amber-900">{data.reference || 'Scripture block'}</p>
         {data.text && <p className="mt-2 text-sm italic text-amber-950/85">“{data.text}”</p>}
@@ -468,6 +506,8 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
   const hasOptions = !!item.content_data?.options?.length;
   const label = getItemLabel(item);
   const accent = typeAccent(item.content_type);
+  const source = sourceMeta(item);
+  const creator = item.creator || null;
 
   return (
     <div className={`rounded-2xl overflow-hidden border-2 shadow-sm transition-all hover:shadow-md ${accent.ring} bg-white`}>
@@ -481,6 +521,12 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <TypeBadge type={item.content_type} />
+            {item.is_author_content && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${source.className}`}>
+                {source.icon}
+                {source.label}
+              </span>
+            )}
             {!isPassive && (
               <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${item.total > 0 ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>
                 <Users className="h-3 w-3" />
@@ -488,6 +534,12 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
               </span>
             )}
           </div>
+          {!item.is_author_content && creator && (
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 px-2 py-1">
+              <Avatar name={creator.display_name} url={creator.avatar_url} />
+              <span className="text-xs font-medium text-gray-700">{creator.display_name}</span>
+            </div>
+          )}
           <p className="text-sm font-semibold text-gray-900 leading-snug">{highlightText(label, searchQuery)}</p>
         </div>
         <div className="mt-1 shrink-0 text-gray-400">
@@ -668,7 +720,7 @@ export default function BookResponsesViewer({
 
           if (!q) return true;
 
-          const name = response.user?.display_name?.toLowerCase() || '';
+          const name = getResponseUser(response)?.display_name?.toLowerCase() || '';
           const value = getResponseText(response, item.content_type).toLowerCase();
           const clubNames = (response.club_contexts || []).map(club => club.name.toLowerCase()).join(' ');
           const sharedNames = (response.shared_with_users || []).map(sharedUser => sharedUser.display_name.toLowerCase()).join(' ');
@@ -697,6 +749,35 @@ export default function BookResponsesViewer({
     }));
     return ids.size;
   }, [filtered]);
+
+  const groupedSections = useMemo(() => {
+    const sections: {
+      key: ResponseSectionKey;
+      title: string;
+      description: string;
+      className: string;
+      items: BookResponseItem[];
+    }[] = [
+      {
+        key: 'author',
+        title: 'Chapter Questions',
+        description: mode === 'accessible'
+          ? 'Questions and components built into the chapter, with reader answers grouped underneath.'
+          : 'Questions and components built into the chapter, with submitted answers grouped underneath.',
+        className: 'border-amber-200 bg-amber-50/70',
+        items: filtered.filter(item => item.is_author_content),
+      },
+      {
+        key: 'reader',
+        title: 'Questions from Readers',
+        description: 'Questions, notes, highlights, links, and other items added by readers while reading.',
+        className: 'border-blue-200 bg-blue-50/70',
+        items: filtered.filter(item => !item.is_author_content),
+      },
+    ];
+
+    return sections.filter(section => section.items.length > 0);
+  }, [filtered, mode]);
 
   const hasActiveFilters = !!activeChapterId || activeTypes.length > 0 || activeVisibilities.length > 0 || activeClubIds.length > 0 || activeSharedUserIds.length > 0 || !!search.trim();
 
@@ -974,30 +1055,46 @@ export default function BookResponsesViewer({
             </div>
           ) : (
             <div className="p-4 sm:p-5 space-y-4">
-              {chapters
-                .filter(chapter => filtered.some(item => item.chapter_id === chapter.id))
-                .map(chapter => {
-                  const chapterItems = filtered.filter(item => item.chapter_id === chapter.id);
-                  return (
-                    <div key={chapter.id}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex items-center gap-2 flex-1">
-                          <div className="h-5 w-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                            <span className="text-[9px] font-bold text-purple-600">{chapter.order + 1}</span>
+              {groupedSections.map(section => (
+                <section key={section.key} className={`rounded-2xl border px-4 py-4 sm:px-5 ${section.className}`}>
+                  <div className="mb-5">
+                    <h3 className="text-base font-bold text-gray-900">{section.title}</h3>
+                    <p className="mt-1 text-sm text-gray-600">{section.description}</p>
+                  </div>
+
+                  <div className="space-y-5">
+                    {chapters
+                      .filter(chapter => section.items.some(item => item.chapter_id === chapter.id))
+                      .map(chapter => {
+                        const chapterItems = section.items.filter(item => item.chapter_id === chapter.id);
+                        return (
+                          <div key={`${section.key}-${chapter.id}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="flex items-center gap-2 flex-1">
+                                <div className="h-5 w-5 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                  <span className="text-[9px] font-bold text-purple-600">{chapter.order + 1}</span>
+                                </div>
+                                <h4 className="text-sm font-bold text-gray-800 break-words">{chapter.title}</h4>
+                                <span className="text-xs text-gray-400">{chapterItems.length} {chapterItems.length === 1 ? 'item' : 'items'}</span>
+                              </div>
+                              <div className="hidden sm:block flex-1 h-px bg-gray-200" />
+                            </div>
+                            <div className="space-y-4">
+                              {chapterItems.map((item, index) => (
+                                <ItemCard
+                                  key={item.id}
+                                  item={item}
+                                  searchQuery={search}
+                                  itemNumber={index + 1}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <h3 className="text-sm font-bold text-gray-800 break-words">{chapter.title}</h3>
-                          <span className="text-xs text-gray-400">{chapterItems.length} {chapterItems.length === 1 ? 'item' : 'items'}</span>
-                        </div>
-                        <div className="hidden sm:block flex-1 h-px bg-gray-200" />
-                      </div>
-                      <div className="space-y-4 mb-6">
-                        {chapterItems.map((item, index) => (
-                          <ItemCard key={item.id} item={item} searchQuery={search} itemNumber={index + 1} />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                        );
+                      })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </div>

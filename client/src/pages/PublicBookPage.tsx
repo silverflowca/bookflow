@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { BookOpen, ChevronRight, ChevronLeft, Loader2, Lock, User, Clock, Globe } from 'lucide-react';
 import api from '../lib/api';
+import { getHighlightTheme } from '../lib/highlightTheme';
 import type { Book, Chapter } from '../types';
 
 export default function PublicBookPage() {
   const { slug, token } = useParams<{ slug?: string; token?: string }>();
+  const location = useLocation();
   const [book, setBook] = useState<Book | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [reading, setReading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const chapterSlugParam = new URLSearchParams(location.search).get('chapter');
 
   useEffect(() => {
     loadBook();
-  }, [slug, token]);
+  }, [slug, token, chapterSlugParam]);
 
   async function loadBook() {
     try {
@@ -28,7 +31,14 @@ export default function PublicBookPage() {
         setError('No book identifier provided.');
         return;
       }
+      const targetChapter = chapterSlugParam
+        ? data.chapters?.find(ch => ch.slug === chapterSlugParam || ch.id === chapterSlugParam) ?? null
+        : null;
       setBook(data);
+      if (targetChapter) {
+        setSelectedChapter(targetChapter);
+        setReading(true);
+      }
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
       setError(errMsg.includes('not found') ? 'This book is not available.' : errMsg);
@@ -384,7 +394,8 @@ function jsonContentToHtml(content: unknown): string {
       if (mark.type === 'underline') text = `<u>${text}</u>`;
       if (mark.type === 'highlight') {
         const c = (mark as any).attrs?.color;
-        text = c ? `<mark style="background-color:${c};padding:0 2px;border-radius:2px">${text}</mark>` : `<mark>${text}</mark>`;
+        const theme = getHighlightTheme(c);
+        text = c ? `<mark style="background-color:${theme.bg};padding:0 2px;border-radius:2px">${text}</mark>` : `<mark>${text}</mark>`;
       }
     }
     return text;

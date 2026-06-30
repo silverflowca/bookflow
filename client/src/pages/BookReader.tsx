@@ -46,6 +46,7 @@ const MediaContext = createContext<MediaCtx>({
 const AuthGateContext = createContext<() => void>(() => {});
 
 import api from '../lib/api';
+import { getHighlightCssVars, getHighlightTheme } from '../lib/highlightTheme';
 import { useAuth } from '../contexts/AuthContext';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import BookResponsesViewer from '../components/responses/BookResponsesViewer';
@@ -1789,7 +1790,7 @@ function ChapterContent({
     // Pre-assign each inline content item to exactly one text node, before any rendering.
     // This avoids mutating a Set during render (which breaks under React StrictMode double-invoke).
     const assignedIds = new Set<string>();
-    const assignmentMap = new Map<string, InlineContent[]>(); // nodeKey → items assigned to it
+    const assignmentMap = new Map<string, any[]>(); // nodeKey -> assigned text slices
 
     // Pre-mark any items already handled by inlineFormWidget atoms in the JSON
     // so the text-node matching path doesn't also render them (causing duplication)
@@ -1803,17 +1804,76 @@ function ChapterContent({
     }
     collectWidgetIds(parsedContent.content);
 
+    function collectHighlightMarkIds(nodes: any[]) {
+      nodes.forEach((node: any) => {
+        if (node.type === 'text' && Array.isArray(node.marks)) {
+          node.marks.forEach((mark: any) => {
+            if (mark.type === 'inlineContentMark' && mark.attrs?.contentType === 'highlight' && mark.attrs?.contentId) {
+              assignedIds.add(mark.attrs.contentId);
+            }
+          });
+        }
+        if (node.content) collectHighlightMarkIds(node.content);
+      });
+    }
+    collectHighlightMarkIds(parsedContent.content);
+
+    function assignInlineRangeToTextRun(nodes: any[], prefix: string) {
+      const textRuns: Array<{ key: string; text: string; start: number; end: number }> = [];
+      let cursor = 0;
+
+      nodes.forEach((node: any, i: number) => {
+        if (node.type === 'text' && node.text) {
+          const start = cursor;
+          const end = start + node.text.length;
+          textRuns.push({ key: `${prefix}-${i}`, text: node.text, start, end });
+          cursor = end;
+        } else if (node.type === 'hardBreak') {
+          cursor += 1;
+        }
+      });
+
+      if (textRuns.length === 0) return;
+
+      const combinedText = textRuns.map(run => run.text).join('');
+      if (!combinedText) return;
+
+      inlineContent
+        .filter(ic => ic.anchor_text && !assignedIds.has(ic.id))
+        .forEach(ic => {
+          const anchor = ic.anchor_text!;
+          const anchorStart = combinedText.indexOf(anchor);
+          if (anchorStart === -1) return;
+
+          const anchorEnd = anchorStart + anchor.length;
+          const overlappingRuns = textRuns.filter(run => anchorStart < run.end && anchorEnd > run.start);
+          if (overlappingRuns.length === 0) return;
+
+          overlappingRuns.forEach((run, runIndex) => {
+            const localStart = Math.max(0, anchorStart - run.start);
+            const localEnd = Math.min(run.text.length, anchorEnd - run.start);
+            if (localStart >= localEnd) return;
+
+            const existing = assignmentMap.get(run.key) || [];
+            existing.push({
+              content: ic,
+              start: localStart,
+              end: localEnd,
+              first: runIndex === 0,
+              last: runIndex === overlappingRuns.length - 1,
+            });
+            assignmentMap.set(run.key, existing as any);
+          });
+
+          assignedIds.add(ic.id);
+        });
+    }
+
     function collectTextNodes(nodes: any[], prefix: string) {
       nodes.forEach((node: any, i: number) => {
         const key = `${prefix}-${i}`;
-        if (node.type === 'text' && node.text) {
-          const matches = inlineContent.filter(
-            ic => ic.anchor_text && node.text.includes(ic.anchor_text) && !assignedIds.has(ic.id)
-          );
-          if (matches.length > 0) {
-            assignmentMap.set(key, matches);
-            matches.forEach(ic => assignedIds.add(ic.id));
-          }
+        if ((node.type === 'paragraph' || node.type === 'heading') && Array.isArray(node.content)) {
+          assignInlineRangeToTextRun(node.content, key);
         }
         if (node.content) collectTextNodes(node.content, key);
       });
@@ -1863,7 +1923,7 @@ function ChapterContent({
               const markerClass = showHighlights ? getInlineContentClass(ic.content_type) : '';
               const icon = getInlineContentIcon(ic.content_type);
               const hlStyle = (showHighlights && ic.content_type === 'highlight')
-                ? { backgroundColor: (ic.content_data as HighlightData)?.color ?? undefined }
+                ? getHighlightStyle((ic.content_data as HighlightData)?.color)
                 : undefined;
               return (
                 <span key={ic.id} id={`reader-inline-${ic.id}`}
@@ -1926,7 +1986,7 @@ function ChapterContent({
     }[marker.content_type as string] as string | undefined;
 
     const highlightStyle = (showHighlights && marker.content_type === 'highlight')
-      ? { backgroundColor: (marker.content_data as HighlightData)?.color ?? undefined }
+      ? getHighlightStyle((marker.content_data as HighlightData)?.color)
       : undefined;
 
     elements.push(
@@ -1989,6 +2049,10 @@ function getInlineContentClass(type: string): string {
   return classes[type] || '';
 }
 
+function getHighlightStyle(color?: string): React.CSSProperties {
+  return getHighlightCssVars(color);
+}
+
 // Helper to get icon for inline content type
 function getInlineContentIcon(type: string): React.ReactNode {
   const iconClass = "h-3 w-3 inline-block";
@@ -2030,6 +2094,7 @@ function getInlineContentIcon(type: string): React.ReactNode {
 
 // Helper to render text with TipTap marks (bold, italic, etc.)
 function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.ReactElement {
+  const showHighlights = useContext(HighlightsContext);
   let content: React.ReactNode = text;
 
   if (marks && marks.length > 0) {
@@ -2064,13 +2129,17 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
           break;
         case 'highlight': {
           const hlColor: string | undefined = mark.attrs?.color;
+          const theme = getHighlightTheme(hlColor);
           content = hlColor
-            ? <mark style={{ backgroundColor: hlColor, padding: '0 2px', borderRadius: '2px' }}>{content}</mark>
+            ? <mark style={{ backgroundColor: theme.bg, padding: '0 2px', borderRadius: '2px' }}>{content}</mark>
             : <mark className="bg-yellow-200 px-0.5 rounded">{content}</mark>;
           break;
         }
         case 'inlineContentMark':
-          // Handled by TipTapNode via anchor_text matching — skip to avoid double render
+          if (mark.attrs?.contentType === 'highlight' && showHighlights) {
+            const theme = getHighlightTheme(mark.attrs?.highlightColor);
+            content = <mark style={{ backgroundColor: theme.bg, padding: '0 2px', borderRadius: '2px' }}>{content}</mark>;
+          }
           break;
       }
     });
@@ -2159,8 +2228,15 @@ function TipTapNode({
       }
 
       const sortedMatches = matchingContent
-        .map(ic => ({ content: ic, index: nodeText.indexOf(ic.anchor_text!), length: ic.anchor_text!.length }))
-        .filter(m => m.index !== -1)
+        .map((match: any) => ({
+          content: match.content,
+          index: match.start,
+          end: match.end,
+          length: match.end - match.start,
+          first: match.first,
+          last: match.last,
+        }))
+        .filter(match => match.index >= 0 && match.end > match.index)
         .sort((a, b) => a.index - b.index || b.length - a.length);
 
       const segments: React.ReactNode[] = [];
@@ -2169,7 +2245,7 @@ function TipTapNode({
 
       sortedMatches.forEach((match, idx) => {
         const start = match.index;
-        const end = start + match.length;
+        const end = match.end;
         if (usedRanges.some(r => start < r.end && end > r.start)) return;
         usedRanges.push({ start, end });
 
@@ -2186,26 +2262,26 @@ function TipTapNode({
         const markerClass = showHighlights ? getInlineContentClass(ic.content_type) : '';
         const icon = getInlineContentIcon(ic.content_type);
         const hlColorStyle = (showHighlights && ic.content_type === 'highlight')
-          ? { backgroundColor: (ic.content_data as HighlightData)?.color ?? undefined }
+          ? getHighlightStyle((ic.content_data as HighlightData)?.color)
           : undefined;
 
         if (!ic.is_author_content) {
           // Reader-added content: show anchor text as a styled clickable marker only.
           // Highlights show their marked text; everything else shows the anchor + icon.
           // Clicking always opens the right-side panel — nothing renders inline.
-          const isHighlight = ic.content_type === 'highlight';
-          segments.push(
-            <span key={`reader-${ic.id}`} id={`reader-inline-${ic.id}`}
-              className={`${markerClass} cursor-pointer group`}
-              style={hlColorStyle}
-              onClick={() => onContentClick(ic)}
-              title={`Click to view ${ic.content_type}`}
-            >
-              <TextWithMarks text={segText} marks={node.marks} />
-              {showHighlights && !isHighlight && (
-                <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
-                  {icon}
-                  <User className="h-2.5 w-2.5 text-blue-500" />
+            const isHighlight = ic.content_type === 'highlight';
+            segments.push(
+              <span key={`reader-${ic.id}`} id={`reader-inline-${ic.id}`}
+                className={`${markerClass} cursor-pointer group`}
+                style={hlColorStyle}
+                onClick={() => onContentClick(ic)}
+                title={`Click to view ${ic.content_type}`}
+              >
+                <TextWithMarks text={segText} marks={node.marks} />
+                {showHighlights && !isHighlight && match.last && (
+                  <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
+                    {icon}
+                    <User className="h-2.5 w-2.5 text-blue-500" />
                 </span>
               )}
             </span>
@@ -2224,13 +2300,13 @@ function TipTapNode({
               <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-2">
                 {segText && showHighlights && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
                 {segText && !showHighlights && <TextWithMarks text={segText} marks={node.marks} />}
-                <InlineFormElement content={ic} />
+                {match.last && <InlineFormElement content={ic} />}
               </span>
             ) : (
               <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="inline-flex items-baseline gap-2 flex-wrap">
                 {segText && showHighlights && <mark className={`${markerClass} px-0.5 rounded`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
                 {segText && !showHighlights && <TextWithMarks text={segText} marks={node.marks} />}
-                <InlineFormElement content={ic} />
+                {match.last && <InlineFormElement content={ic} />}
               </span>
             )
           );
@@ -2242,7 +2318,7 @@ function TipTapNode({
               title={`Click to go to ${ic.content_type} at ${dest} of chapter`}
               onClick={() => { const t = document.getElementById(`reader-block-${ic.id}`); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); pulseElement(t); } }}>
               <TextWithMarks text={segText} marks={node.marks} />
-              {showHighlights && <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100">{icon}</span>}
+              {showHighlights && match.last && <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100">{icon}</span>}
             </span>
           );
         } else {
@@ -2251,7 +2327,7 @@ function TipTapNode({
             <span key={`click-${ic.id}`} id={`reader-inline-${ic.id}`} className={`${markerClass} cursor-pointer group`}
               onClick={() => onContentClick(ic)} title={`Click to view ${ic.content_type}`}>
               <TextWithMarks text={segText} marks={node.marks} />
-              {showHighlights && !isHighlight && (
+              {showHighlights && !isHighlight && match.last && (
                 <span className="inline-flex items-center ml-0.5 opacity-60 group-hover:opacity-100 gap-0.5">
                   {icon}
                   {ic.is_author_content ? <Crown className="h-2.5 w-2.5 text-amber-500" /> : <User className="h-2.5 w-2.5 text-blue-500" />}
@@ -2298,7 +2374,7 @@ function TipTapNode({
       const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
       const markerClass = getInlineContentClass(effectiveIc.content_type);
       const hlStyle = effectiveIc.content_type === 'highlight'
-        ? { backgroundColor: (effectiveIc.content_data as HighlightData)?.color ?? undefined }
+        ? getHighlightStyle((effectiveIc.content_data as HighlightData)?.color)
         : undefined;
       return isFullW ? (
         <span id={`reader-inline-${effectiveIc.id}`} className="block my-3">
@@ -3058,19 +3134,15 @@ function NoteBlock({ content }: { content: InlineContent }) {
 
 function HighlightBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as HighlightData;
-
-  const colorStyles: Record<string, string> = {
-    yellow: 'bg-yellow-100 border-yellow-300',
-    green: 'bg-green-100 border-green-300',
-    blue: 'bg-blue-100 border-blue-300',
-    pink: 'bg-pink-100 border-pink-300',
-  };
-  const style = colorStyles[data.color] || colorStyles.yellow;
+  const theme = getHighlightTheme(data.color);
 
   return (
-    <div className={`${style} border rounded-lg p-4`}>
+    <div
+      className="border rounded-lg p-4"
+      style={{ backgroundColor: theme.bg, borderColor: theme.border }}
+    >
       <div className="flex items-center gap-2 mb-2">
-        <Highlighter className="h-5 w-5 text-muted" />
+        <Highlighter className="h-5 w-5" style={{ color: theme.text }} />
         <span className="font-medium text-theme">Highlight</span>
       </div>
       {content.anchor_text && (
@@ -4806,4 +4878,5 @@ function ReaderSelectionToolbar({
     </div>
   );
 }
+
 

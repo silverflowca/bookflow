@@ -447,6 +447,10 @@ export interface BookResponseItem {
   id: string;
   content_type: string;
   content_data: any;
+  anchor_text?: string;
+  created_by?: string | null;
+  is_author_content: boolean;
+  creator?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'> | null;
   position_in_chapter: string;
   order_index: number;
   chapter_id: string;

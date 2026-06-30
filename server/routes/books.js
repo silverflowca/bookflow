@@ -138,7 +138,7 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
   let icQuery = supabase
     .schema('bookflow')
     .from('inline_content')
-    .select('id, content_type, content_data, position_in_chapter, order_index, chapter_id, chapters(title, order_index)')
+    .select('id, content_type, content_data, anchor_text, position_in_chapter, order_index, chapter_id, created_by, is_author_content, creator:profiles!inline_content_created_by_fkey(id, display_name, avatar_url), chapters(title, order_index)')
     .eq('book_id', bookId)
     .order('order_index', { ascending: true });
 
@@ -264,6 +264,10 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
       id: item.id,
       content_type: item.content_type,
       content_data: item.content_data,
+      anchor_text: item.anchor_text ?? null,
+      created_by: item.created_by ?? null,
+      is_author_content: item.is_author_content !== false,
+      creator: normalizeOne(item.creator),
       position_in_chapter: item.position_in_chapter,
       order_index: item.order_index,
       chapter_id: item.chapter_id,

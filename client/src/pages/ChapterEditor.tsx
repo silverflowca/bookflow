@@ -3,12 +3,13 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Save, Eye, HelpCircle, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
-  Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen,
+  Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
   LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
+import { getHighlightTheme } from '../lib/highlightTheme';
 import TipTapLink from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -58,10 +59,11 @@ export default function ChapterEditor() {
     selection?: { from: number; to: number; text: string };
     editingItem?: InlineContent;
   } | null>(null);
-  const [rightPanel, setRightPanel] = useState<'comments' | 'inline' | 'responses'>(
+  const [rightPanel, setRightPanel] = useState<'comments' | 'inline'>(
     () => searchParams.get('comments') === '1' ? 'comments' : 'inline'
   );
   const showComments = rightPanel === 'comments';
+  const [showResponsesPanel, setShowResponsesPanel] = useState(false);
   const [commentSelection, setCommentSelection] = useState<{ from: number; to: number; text: string } | null>(null);
   const [userRole, setUserRole] = useState<CollaboratorRole>('owner');
   const [bookSettings, setBookSettings] = useState<BookSettings | null>(null);
@@ -370,8 +372,28 @@ export default function ChapterEditor() {
       }
     });
 
-    // Re-apply each item by searching for anchor_text in the document
+    // Re-apply each item using stored offsets when available.
+    // Fallback to anchor_text search only for older records.
     contents.forEach((item) => {
+      const highlightColor = item.content_type === 'highlight'
+        ? (item.content_data as HighlightData)?.color ?? null
+        : null;
+      const mark = markType.create({ contentType: item.content_type, contentId: item.id, highlightColor });
+
+      const hasStoredOffsets = typeof item.start_offset === 'number'
+        && typeof item.end_offset === 'number'
+        && item.end_offset > item.start_offset;
+
+      if (hasStoredOffsets) {
+        const maxPos = doc.content.size;
+        const from = Math.max(0, Math.min(item.start_offset, maxPos));
+        const to = Math.max(from, Math.min(item.end_offset, maxPos));
+        if (to > from) {
+          tr.addMark(from, to, mark);
+          return;
+        }
+      }
+
       const anchor = item.anchor_text;
       if (!anchor) return;
 
@@ -382,10 +404,6 @@ export default function ChapterEditor() {
         if (idx === -1) return;
         const from = pos + idx;
         const to = from + anchor.length;
-        const highlightColor = item.content_type === 'highlight'
-          ? (item.content_data as HighlightData)?.color ?? null
-          : null;
-        const mark = markType.create({ contentType: item.content_type, contentId: item.id, highlightColor });
         tr.addMark(from, to, mark);
         found = true;
       });
@@ -923,6 +941,16 @@ export default function ChapterEditor() {
                 <Save className="h-4 w-4" />
                 <span className="hidden sm:inline">{saving ? 'Saving...' : 'Save'}</span>
               </button>
+              <button
+                onClick={() => setShowResponsesPanel(true)}
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded transition-colors text-sm ${
+                  showResponsesPanel ? 'bg-accent/10 text-accent' : 'text-muted hover:bg-surface-hover'
+                }`}
+                title="Responses"
+              >
+                <BarChart2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Responses</span>
+              </button>
               {commentSelection && (
                 <button
                   onClick={() => setRightPanel('comments')}
@@ -1251,7 +1279,7 @@ export default function ChapterEditor() {
           })()}
         </div>
 
-        {/* Right Panel — tabbed: Comments / Inline / Responses */}
+        {/* Right Panel — tabbed: Comments / Inline */}
         <div id="bf-editor-panel" className="w-80 flex-shrink-0 hidden lg:flex flex-col sticky top-20 h-[calc(100vh-6rem)]">
           {/* Tab bar */}
           <div className="flex border-2 border-theme rounded-t-lg overflow-hidden bg-surface flex-shrink-0">
@@ -1273,16 +1301,6 @@ export default function ChapterEditor() {
             >
               <StickyNote className="h-3.5 w-3.5" />
               Inline
-            </button>
-            <div className="w-px bg-theme" />
-            <button
-              onClick={() => setRightPanel('responses')}
-              className={`flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium transition-colors ${
-                rightPanel === 'responses' ? 'bg-accent/10 text-accent' : 'text-muted hover:text-theme hover:bg-surface-hover'
-              }`}
-            >
-              <BarChart2 className="h-3.5 w-3.5" />
-              Responses
             </button>
           </div>
 
@@ -1344,12 +1362,6 @@ export default function ChapterEditor() {
             </div>
           )}
 
-          {/* Responses panel */}
-          {rightPanel === 'responses' && bookId && chapterId && (
-            <div className="theme-card rounded-t-none border-t-0 flex-1 overflow-y-auto">
-              <BookResponsesViewer bookId={bookId} chapterId={chapterId} compact />
-            </div>
-          )}
         </div>
       </div>
 
@@ -1370,6 +1382,35 @@ export default function ChapterEditor() {
               pendingSelection={commentSelection}
               onSelectionUsed={() => setCommentSelection(null)}
             />
+          </div>
+        </div>
+      )}
+
+      {showResponsesPanel && bookId && chapterId && (
+        <div className="fixed inset-0 z-40">
+          <div
+            className="absolute inset-0 bg-black/20 lg:bg-transparent"
+            onClick={() => setShowResponsesPanel(false)}
+          />
+          <div className="absolute inset-y-0 right-0 flex w-full justify-end pointer-events-none">
+            <div className="pointer-events-auto h-full w-full max-w-[32rem] border-l border-theme bg-surface shadow-2xl flex flex-col">
+              <div className="flex items-center justify-between gap-3 border-b border-theme px-4 py-4">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-theme">Responses</h3>
+                  <p className="text-sm text-muted">Chapter answers and reader-added items</p>
+                </div>
+                <button
+                  onClick={() => setShowResponsesPanel(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-theme text-muted hover:bg-surface-hover hover:text-theme transition-colors"
+                  title="Close responses"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <BookResponsesViewer bookId={bookId} chapterId={chapterId} compact />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1781,15 +1822,13 @@ function ContentPreview({ item }: { item: InlineContent }) {
 
     case 'highlight': {
       const h = data as HighlightData;
-      const colorClass = {
-        yellow: 'bg-yellow-200',
-        green: 'bg-green-200',
-        blue: 'bg-blue-200',
-        pink: 'bg-pink-200',
-      }[h.color] || 'bg-yellow-200';
+      const highlightTheme = getHighlightTheme(h.color);
       return (
         <div className="text-sm">
-          <span className={`px-2 py-0.5 rounded ${colorClass}`}>
+          <span
+            className="px-2 py-0.5 rounded"
+            style={{ backgroundColor: highlightTheme.bg, color: highlightTheme.text }}
+          >
             {item.anchor_text || 'Highlighted text'}
           </span>
           {h.note && <p className="text-muted mt-1 text-xs">{h.note}</p>}

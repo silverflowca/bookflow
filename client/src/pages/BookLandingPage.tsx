@@ -20,6 +20,10 @@ export default function BookLandingPage() {
 
   // ?chapter=<slug> — jump directly to that chapter when book loads
   const chapterSlugParam = new URLSearchParams(location.search).get('chapter');
+  const getPublicReadUrl = useCallback((chapter?: { slug?: string; id?: string }) => {
+    const target = chapter?.slug || chapter?.id;
+    return `/read/${slug}${target ? `?chapter=${encodeURIComponent(target)}` : ''}`;
+  }, [slug]);
 
   const load = useCallback(async () => {
     if (!slug) return;
@@ -30,7 +34,12 @@ export default function BookLandingPage() {
       if (chapterSlugParam) {
         const target = data.chapters.find((c: any) => c.slug === chapterSlugParam || c.id === chapterSlugParam);
         if (target) {
-          navigate(`/book/${data.id}/chapter/${target.id}`, { replace: true });
+          navigate(
+            data.visibility === 'public' && !user
+              ? getPublicReadUrl(target)
+              : `/book/${data.id}/chapter/${target.id}`,
+            { replace: true },
+          );
           return;
         }
       }
@@ -41,7 +50,7 @@ export default function BookLandingPage() {
     } finally {
       setLoading(false);
     }
-  }, [slug, chapterSlugParam, navigate]);
+  }, [slug, chapterSlugParam, navigate, user, getPublicReadUrl]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -72,7 +81,9 @@ export default function BookLandingPage() {
   );
 
   const firstChapterId = book.chapters[0]?.id;
-  const readUrl = user ? `/book/${book.id}${firstChapterId ? `/chapter/${firstChapterId}` : ''}` : '/register';
+  const readUrl = user
+    ? `/book/${book.id}${firstChapterId ? `/chapter/${firstChapterId}` : ''}`
+    : getPublicReadUrl(book.chapters[0]);
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg,#0f0c29 0%,#1e1245 50%,#0d1b3e 100%)' }}>
@@ -201,7 +212,11 @@ export default function BookLandingPage() {
                   key={ch.id}
                   onClick={() => {
                     if (book.visibility === 'public' || user) {
-                      navigate(user ? `/book/${book.id}/chapter/${ch.id}` : '/register');
+                      navigate(
+                        user
+                          ? `/book/${book.id}/chapter/${ch.id}`
+                          : getPublicReadUrl(ch),
+                      );
                     }
                   }}
                   className="group w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
