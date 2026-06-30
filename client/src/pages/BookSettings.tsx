@@ -570,6 +570,13 @@ export default function BookSettings() {
               checked={settings.show_reader_content_filters ?? true}
               onChange={(v) => updateSetting('show_reader_content_filters', v)}
             />
+
+            <ToggleSetting
+              label="Auto play media"
+              description="When a reader starts a chapter audio or video item, continue through the chapter's native media items in content order."
+              checked={settings.auto_play_media ?? false}
+              onChange={(v) => updateSetting('auto_play_media', v)}
+            />
           </div>
         </div>
 

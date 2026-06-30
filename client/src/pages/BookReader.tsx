@@ -32,15 +32,20 @@ const TaskChecksContext = createContext<TaskChecksCtx>({ checked: new Set(), tog
 interface MediaCtx {
   playingId: string | null;
   pipId: string | null;
+  autoPlayEnabled: boolean;
   requestPlay: (id: string, pause: () => void) => void;
   requestPip: (id: string, close: () => void) => void;
   clearPlay: (id: string) => void;
   clearPip: (id: string) => void;
+  registerAutoPlay: (contentId: string, play: () => void) => void;
+  unregisterAutoPlay: (contentId: string) => void;
+  playNext: (contentId: string) => void;
 }
 const MediaContext = createContext<MediaCtx>({
-  playingId: null, pipId: null,
+  playingId: null, pipId: null, autoPlayEnabled: false,
   requestPlay: () => {}, requestPip: () => {},
   clearPlay: () => {}, clearPip: () => {},
+  registerAutoPlay: () => {}, unregisterAutoPlay: () => {}, playNext: () => {},
 });
 // Context that any interactive component can call to request a login/register modal
 const AuthGateContext = createContext<() => void>(() => {});
@@ -58,6 +63,22 @@ import type {
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
   AllFormResponsesResult,
 } from '../types';
+
+function getExternalEmbedUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`;
+  const vm = url.match(/vimeo\.com\/(\d+)/);
+  if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1`;
+  return null;
+}
+
+function canAutoPlayInSequence(content: InlineContent) {
+  const data = content.content_data as Partial<MediaData> | undefined;
+  if (content.content_type === 'audio') return !!data?.url;
+  if (content.content_type === 'video') return !!data?.url && !getExternalEmbedUrl(data.url);
+  return false;
+}
 
 
 export default function BookReader() {
@@ -166,11 +187,30 @@ export default function BookReader() {
     setTimeout(() => setPendingTour({ bookId, chapterIdx }), 800);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, chapterId, book]);
+
+  // Get book settings for reader permissions
+  const settings = book?.settings;
+  const canAddHighlight = settings?.allow_reader_highlights ?? false;
+  const canAddNote = settings?.allow_reader_notes ?? false;
+  const canAddQuestion = settings?.allow_reader_questions ?? false;
+  const canAddPoll = settings?.allow_reader_polls ?? false;
+  const canAddAudio = settings?.allow_reader_audio ?? false;
+  const canAddVideo = settings?.allow_reader_video ?? false;
+  const canAddLink = settings?.allow_reader_links ?? false;
+  const showReaderContentFilters = settings?.show_reader_content_filters ?? true;
+  const autoPlayMedia = settings?.auto_play_media ?? false;
+
   const mediaPauseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaPipCloseCallbacks = useRef<Map<string, () => void>>(new Map());
+  const mediaAutoPlayCallbacks = useRef<Map<string, () => void>>(new Map());
+  const orderedAutoPlayMediaIds = useMemo(
+    () => inlineContent.filter(canAutoPlayInSequence).map(item => item.id),
+    [inlineContent]
+  );
   const mediaCtx = useMemo<MediaCtx>(() => ({
     playingId: mediaPlayingId,
     pipId: mediaPipId,
+    autoPlayEnabled: autoPlayMedia,
     requestPlay: (id, pause) => {
       // Stop TTS if it's playing
       const ttsEl = ttsAudioRef.current;
@@ -205,7 +245,26 @@ export default function BookReader() {
     },
     clearPlay: (id) => setMediaPlayingId(prev => prev === id ? null : prev),
     clearPip: (id) => setMediaPipId(prev => prev === id ? null : prev),
-  }), [mediaPlayingId, mediaPipId]);
+    registerAutoPlay: (contentId, play) => {
+      mediaAutoPlayCallbacks.current.set(contentId, play);
+    },
+    unregisterAutoPlay: (contentId) => {
+      mediaAutoPlayCallbacks.current.delete(contentId);
+    },
+    playNext: (contentId) => {
+      if (!autoPlayMedia) return;
+      const currentIndex = orderedAutoPlayMediaIds.indexOf(contentId);
+      if (currentIndex < 0) return;
+      for (let index = currentIndex + 1; index < orderedAutoPlayMediaIds.length; index += 1) {
+        const playNextItem = mediaAutoPlayCallbacks.current.get(orderedAutoPlayMediaIds[index]);
+        if (playNextItem) {
+          playNextItem();
+          return;
+        }
+      }
+      setMediaPlayingId(null);
+    },
+  }), [autoPlayMedia, mediaPlayingId, mediaPipId, orderedAutoPlayMediaIds]);
 
   // Check if current user can edit: owner, collaborator (author/editor), or super admin
   const isAuthor = book?.author_id === user?.id
@@ -213,19 +272,6 @@ export default function BookReader() {
     || !!(book?.collaborators?.some(
         c => c.user_id === user?.id && ['author', 'editor'].includes(c.role)
       ));
-
-  // Get book settings for reader permissions
-  const settings = book?.settings;
-
-  // Check what reader can add based on settings
-  const canAddHighlight = settings?.allow_reader_highlights ?? false;
-  const canAddNote = settings?.allow_reader_notes ?? false;
-  const canAddQuestion = settings?.allow_reader_questions ?? false;
-  const canAddPoll = settings?.allow_reader_polls ?? false;
-  const canAddAudio = settings?.allow_reader_audio ?? false;
-  const canAddVideo = settings?.allow_reader_video ?? false;
-  const canAddLink = settings?.allow_reader_links ?? false;
-  const showReaderContentFilters = settings?.show_reader_content_filters ?? true;
 
   // Check if reader has any permissions
   const hasAnyPermission = canAddHighlight || canAddNote || canAddQuestion || canAddPoll || canAddAudio || canAddVideo || canAddLink;
@@ -2644,7 +2690,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
-  const { requestPlay, requestPip, clearPlay, clearPip } = useContext(MediaContext);
+  const { requestPlay, requestPip, clearPlay, clearPip, registerAutoPlay, unregisterAutoPlay, playNext, autoPlayEnabled } = useContext(MediaContext);
   const mediaId = `media:${content.id}`;
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
@@ -2791,17 +2837,27 @@ function MediaBlock({ content }: { content: InlineContent }) {
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  const getEmbedUrl = (url: string): string | null => {
-    const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`;
-    const vm = url.match(/vimeo\.com\/(\d+)/);
-    if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1`;
-    return null;
-  };
-
-  const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
+  const embedUrl = !isAudio ? getExternalEmbedUrl(data.url) : null;
+  const canAutoPlayThisItem = isAudio || (!isAudio && !embedUrl);
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const sizePct = (data as any).size ?? 100;
+
+  const playSelf = useCallback(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    requestPlay(mediaId, pauseSelf);
+    const maybePlay = el.play();
+    if (maybePlay && typeof maybePlay.catch === 'function') {
+      maybePlay.catch(() => setPlaying(false));
+    }
+    setPlaying(true);
+  }, [mediaId, pauseSelf, requestPlay]);
+
+  useEffect(() => {
+    if (!canAutoPlayThisItem) return;
+    registerAutoPlay(content.id, playSelf);
+    return () => unregisterAutoPlay(content.id);
+  }, [canAutoPlayThisItem, content.id, playSelf, registerAutoPlay, unregisterAutoPlay]);
 
   return (
     <div ref={containerRef} className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined} style={sizePct < 100 ? { width: `${sizePct}%` } : undefined}>
@@ -2864,7 +2920,11 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 onLoadedMetadata={(e) => { setDuration((e.target as HTMLVideoElement).duration || 0); setLoaded(true); }}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
-                onEnded={() => setPlaying(false)}
+                onEnded={() => {
+                  setPlaying(false);
+                  clearPlay(mediaId);
+                  if (autoPlayEnabled && canAutoPlayThisItem) playNext(content.id);
+                }}
                 style={sticky
                   ? (() => { const p = pipPos ?? getDefaultPos(); return { position: 'fixed', top: p.y, left: p.x, width: `${PIP_W}px`, maxHeight: '160px', objectFit: 'contain', zIndex: 52, display: 'block', background: '#000', borderRadius: '8px 8px 0 0' }; })()
                   : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)', borderRadius: '8px' }}
@@ -2968,7 +3028,11 @@ function MediaBlock({ content }: { content: InlineContent }) {
             onLoadedMetadata={(e) => { setDuration((e.target as HTMLAudioElement).duration || 0); setLoaded(true); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
+            onEnded={() => {
+              setPlaying(false);
+              clearPlay(mediaId);
+              if (autoPlayEnabled && canAutoPlayThisItem) playNext(content.id);
+            }}
           />
         )}
 
@@ -3975,7 +4039,7 @@ function DrawingBlock({ content }: { content: InlineContent }) {
 function InlineMediaPlayer({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
-  const { requestPlay, clearPlay } = useContext(MediaContext);
+  const { requestPlay, clearPlay, registerAutoPlay, unregisterAutoPlay, playNext, autoPlayEnabled } = useContext(MediaContext);
   const { completions, markComplete } = useContext(ProgressContext);
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
@@ -4002,15 +4066,8 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
     if (completions.has(itemKey)) completedRef.current = true;
   }, [completions, itemKey]);
 
-  const getEmbedUrl = (url: string): string | null => {
-    const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`;
-    const vm = url.match(/vimeo\.com\/(\d+)/);
-    if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1`;
-    return null;
-  };
-
-  const embedUrl = !isAudio ? getEmbedUrl(data.url) : null;
+  const embedUrl = !isAudio ? getExternalEmbedUrl(data.url) : null;
+  const canAutoPlayThisItem = isAudio || (!isAudio && !embedUrl);
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const pauseSelf = useCallback(() => {
@@ -4018,13 +4075,28 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
     if (el && !el.paused) { el.pause(); setPlaying(false); }
   }, []);
 
+  const playSelf = useCallback(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    requestPlay(mediaId, pauseSelf);
+    const maybePlay = el.play();
+    if (maybePlay && typeof maybePlay.catch === 'function') {
+      maybePlay.catch(() => setPlaying(false));
+    }
+    setPlaying(true);
+  }, [mediaId, pauseSelf, requestPlay]);
+
+  useEffect(() => {
+    if (!canAutoPlayThisItem) return;
+    registerAutoPlay(content.id, playSelf);
+    return () => unregisterAutoPlay(content.id);
+  }, [canAutoPlayThisItem, content.id, playSelf, registerAutoPlay, unregisterAutoPlay]);
+
   const togglePlay = () => {
     const el = mediaRef.current;
     if (!el) return;
     if (el.paused) {
-      requestPlay(mediaId, pauseSelf);
-      el.play();
-      setPlaying(true);
+      playSelf();
     } else {
       el.pause();
       setPlaying(false);
@@ -4066,7 +4138,11 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
             onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
+            onEnded={() => {
+              setPlaying(false);
+              clearPlay(mediaId);
+              if (autoPlayEnabled && canAutoPlayThisItem) playNext(content.id);
+            }}
           />
           {!playing && (
             <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-surface-hover)]/40">
@@ -4086,7 +4162,11 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
           onLoadedMetadata={() => setDuration(mediaRef.current?.duration || 0)}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false);
+            clearPlay(mediaId);
+            if (autoPlayEnabled && canAutoPlayThisItem) playNext(content.id);
+          }}
         />
       )}
       {/* Controls */}

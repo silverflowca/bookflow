@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   BookOpen, ChevronDown, ChevronRight, Search, X,
   BookMarked, Users, BarChart2, Share2,
@@ -24,6 +25,15 @@ interface Section {
   bg: string;
   intro: string;
   faqs: FaqItem[];
+}
+
+interface NavigationResult {
+  id: string;
+  title: string;
+  description: string;
+  to: string;
+  icon: React.ReactNode;
+  tags?: string[];
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -614,6 +624,17 @@ const SECTIONS: Section[] = [
   },
 ];
 
+const NAVIGATION_RESULTS: NavigationResult[] = [
+  { id: 'books', title: 'Books', description: 'Open your dashboard and manage your books.', to: '/dashboard', icon: <BookOpen className="h-4 w-4" />, tags: ['books', 'dashboard', 'my books', 'read books'] },
+  { id: 'clubs', title: 'Clubs', description: 'Browse or manage your book clubs.', to: '/clubs', icon: <Users className="h-4 w-4" />, tags: ['clubs', 'book clubs', 'groups'] },
+  { id: 'study-groups', title: 'Study Groups', description: 'Jump to the study groups view inside clubs.', to: '/clubs?tab=bookstudy', icon: <Users className="h-4 w-4" />, tags: ['study groups', 'study', 'book study'] },
+  { id: 'live', title: 'Live', description: 'Open the live broadcasting and scheduling area.', to: '/live', icon: <Radio className="h-4 w-4" />, tags: ['live', 'streaming', 'broadcast'] },
+  { id: 'tutorial', title: 'Tutorial', description: 'Learn how BookFlow works with guided walkthroughs.', to: '/docs', icon: <Lightbulb className="h-4 w-4" />, tags: ['tutorial', 'guide', 'walkthrough'] },
+  { id: 'settings', title: 'Settings', description: 'Manage your profile, preferences, and account settings.', to: '/settings', icon: <Settings className="h-4 w-4" />, tags: ['settings', 'profile', 'preferences', 'account'] },
+  { id: 'help', title: 'Help', description: 'Search BookFlow documentation and support articles.', to: '/docs', icon: <HelpCircle className="h-4 w-4" />, tags: ['help', 'docs', 'documentation', 'faq'] },
+  { id: 'admin', title: 'Admin', description: 'Open administration tools for system managers.', to: '/admin', icon: <Shield className="h-4 w-4" />, tags: ['admin', 'system administration', 'management'] },
+];
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function FaqEntry({ faq }: { faq: FaqItem }) {
@@ -661,6 +682,27 @@ function SectionCard({ section, active, onClick }: { section: Section; active: b
   );
 }
 
+function NavigationResultCard({ item }: { item: NavigationResult }) {
+  return (
+    <Link
+      to={item.to}
+      className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-gray-50"
+    >
+      <div className="mt-0.5 rounded-lg bg-purple-50 p-2 text-purple-600">
+        {item.icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">Navigation</span>
+        </div>
+        <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+      </div>
+      <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-gray-400" />
+    </Link>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function DocsPage() {
@@ -704,7 +746,17 @@ export default function DocsPage() {
       : s.faqs,
   })).filter(s => s.faqs.length > 0);
 
+  const filteredNavigation = q
+    ? NAVIGATION_RESULTS.filter(item =>
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        (item.tags || []).some(tag => tag.toLowerCase().includes(q))
+      )
+    : [];
+
   const totalFaqs = SECTIONS.reduce((n, s) => n + s.faqs.length, 0);
+  const totalDocResults = filteredSections.reduce((n, s) => n + s.faqs.length, 0);
+  const totalSearchResults = totalDocResults + filteredNavigation.length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -717,8 +769,8 @@ export default function DocsPage() {
               <BookOpen className="h-7 w-7 text-purple-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">BookFlow Help Centre</h1>
-              <p className="text-sm text-gray-500">Documentation & Frequently Asked Questions</p>
+              <h1 className="text-2xl font-bold text-gray-900">Search BookFlow</h1>
+              <p className="text-sm text-gray-500">Documentation, FAQs, and app navigation in one search.</p>
             </div>
           </div>
 
@@ -729,7 +781,7 @@ export default function DocsPage() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search documentation…"
+              placeholder="Search BookFlow…"
               className="w-full pl-11 pr-10 py-3 text-sm border border-gray-300 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none"
             />
             {search && (
@@ -745,7 +797,7 @@ export default function DocsPage() {
             <span className="flex items-center gap-1.5"><HelpCircle className="h-4 w-4 text-purple-400" /> {totalFaqs} questions answered</span>
             {q && (
               <span className="flex items-center gap-1.5 text-purple-600 font-medium">
-                <Search className="h-4 w-4" /> {filteredSections.reduce((n, s) => n + s.faqs.length, 0)} results for "{search}"
+                <Search className="h-4 w-4" /> {totalSearchResults} results for "{search}"
               </span>
             )}
           </div>
@@ -773,12 +825,35 @@ export default function DocsPage() {
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-12">
 
-          {filteredSections.length === 0 && (
+          {q && filteredNavigation.length > 0 && (
+            <section className="space-y-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-purple-500">Navigation</p>
+                <h2 className="mt-1 text-xl font-semibold text-gray-900">Go to a page</h2>
+                <p className="mt-1 text-sm text-gray-500">Quick links to BookFlow areas that match your search.</p>
+              </div>
+              <div className="grid gap-3">
+                {filteredNavigation.map(item => (
+                  <NavigationResultCard key={item.id} item={item} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {q && filteredSections.length === 0 && filteredNavigation.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Search className="h-10 w-10 text-gray-300 mb-3" />
               <p className="text-base font-semibold text-gray-600">No results found</p>
               <p className="text-sm text-gray-400 mt-1">Try different keywords</p>
               <button onClick={() => setSearch('')} className="mt-3 text-sm text-purple-600 hover:underline">Clear search</button>
+            </div>
+          )}
+
+          {q && filteredSections.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-purple-500 mb-2">Help Results</p>
+              <h2 className="text-xl font-semibold text-gray-900">Documentation matches</h2>
+              <p className="mt-1 text-sm text-gray-500">Answers from the BookFlow help documentation.</p>
             </div>
           )}
 

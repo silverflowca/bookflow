@@ -210,6 +210,10 @@ function getItemLabel(item: BookResponseItem) {
   );
 }
 
+function normalizeDisplayText(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
 function getResponseText(response: ResponseRowData, type: string) {
   if (type === 'poll') return response.selected_option || '—';
   if (type === 'question') return response.answer_text || response.selected_options?.join(', ') || '—';
@@ -292,6 +296,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   const data = item.content_data || {};
   const type = item.content_type as PassiveContentType;
   const creator = item.creator || null;
+  const headerLabel = normalizeDisplayText(getItemLabel(item));
 
   const sourceHeader = (
     <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -305,6 +310,8 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   );
 
   if (type === 'link') {
+    const linkLabel = data.title || data.url || 'Open link';
+    const showLinkLabel = normalizeDisplayText(linkLabel) !== headerLabel;
     return (
       <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3">
         {sourceHeader}
@@ -315,7 +322,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
           rel="noreferrer"
           className="block text-sm font-medium text-cyan-800 hover:underline break-all"
         >
-          {data.title || data.url || 'Open link'}
+          {showLinkLabel ? linkLabel : data.url || 'Open link'}
         </a>
         {data.description && <p className="mt-2 text-sm text-cyan-900/80">{data.description}</p>}
       </div>
@@ -348,13 +355,17 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   }
 
   if (type === 'audio' || type === 'video') {
+    const mediaTitle = data.title || data.url || `${type} item`;
+    const showMediaTitle = normalizeDisplayText(mediaTitle) !== headerLabel;
     return (
       <div className={`mt-4 rounded-xl border px-4 py-3 ${type === 'audio' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}`}>
         {sourceHeader}
         <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${type === 'audio' ? 'text-orange-700' : 'text-red-700'}`}>
           {type === 'audio' ? 'Audio' : 'Video'}
         </p>
-        <p className={`text-sm font-medium ${type === 'audio' ? 'text-orange-950/85' : 'text-red-950/85'}`}>{data.title || data.url || `${type} item`}</p>
+        {showMediaTitle && (
+          <p className={`text-sm font-medium ${type === 'audio' ? 'text-orange-950/85' : 'text-red-950/85'}`}>{mediaTitle}</p>
+        )}
         {data.url && (
           <a href={data.url} target="_blank" rel="noreferrer" className={`mt-2 inline-block text-sm hover:underline break-all ${type === 'audio' ? 'text-orange-800' : 'text-red-800'}`}>
             {data.url}

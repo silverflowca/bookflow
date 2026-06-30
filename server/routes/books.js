@@ -699,6 +699,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     show_ratings,
     show_component_panel,
     show_reader_content_filters,
+    auto_play_media,
   } = req.body;
 
   try {
@@ -717,6 +718,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         show_ratings,
         show_component_panel,
         show_reader_content_filters,
+        auto_play_media,
       })
       .eq('book_id', req.params.id)
       .select()

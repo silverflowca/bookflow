@@ -69,6 +69,7 @@ export interface BookSettings {
   show_ratings?: boolean;
   show_component_panel?: boolean;
   show_reader_content_filters?: boolean;
+  auto_play_media?: boolean;
   enable_chapter_qr_codes?: boolean;
   /** 'live' = render inline components identical to the reader; 'minimal' = compact pill/badge view */
   editor_preview_mode?: 'live' | 'minimal';
