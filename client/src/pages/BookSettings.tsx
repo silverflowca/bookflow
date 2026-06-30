@@ -563,6 +563,13 @@ export default function BookSettings() {
               checked={settings.allow_reader_polls}
               onChange={(v) => updateSetting('allow_reader_polls', v)}
             />
+
+            <ToggleSetting
+              label="Show reader source filters"
+              description="Display the All / Author / Mine filter buttons in the live reader header. Defaults to All selected."
+              checked={settings.show_reader_content_filters ?? true}
+              onChange={(v) => updateSetting('show_reader_content_filters', v)}
+            />
           </div>
         </div>
 

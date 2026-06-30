@@ -1322,26 +1322,28 @@ export default function BookEditor() {
                 >
                   <div className="flex items-start gap-3 p-4 hover:bg-surface-hover">
                     <GripVertical className="mt-1 h-5 w-5 shrink-0 text-muted cursor-grab active:cursor-grabbing" />
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                        className="block font-medium hover:text-accent break-words"
-                      >
-                        Chapter {index + 1}: {chapter.title}
-                      </Link>
-                      <div className="mt-1 flex gap-3 text-xs text-muted flex-wrap">
-                        <span>{chapter.word_count || 0} words</span>
-                        <span>{chapter.estimated_read_time_minutes || 1} min read</span>
-                        <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
-                          {chapter.status}
-                        </span>
-                        {chapter.updated_at && (
-                          <span title={new Date(chapter.updated_at).toLocaleString()}>
-                            edited {fmtRelative(new Date(chapter.updated_at))}
+                    <div className="min-w-0 flex-1 md:flex md:items-start md:justify-between md:gap-4">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to={`/edit/book/${bookId}/chapter/${chapter.id}`}
+                          className="block font-medium hover:text-accent break-words"
+                        >
+                          Chapter {index + 1}: {chapter.title}
+                        </Link>
+                        <div className="mt-1 flex gap-3 text-xs text-muted flex-wrap">
+                          <span>{chapter.word_count || 0} words</span>
+                          <span>{chapter.estimated_read_time_minutes || 1} min read</span>
+                          <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
+                            {chapter.status}
                           </span>
-                        )}
+                          {chapter.updated_at && (
+                            <span title={new Date(chapter.updated_at).toLocaleString()}>
+                              edited {fmtRelative(new Date(chapter.updated_at))}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5 md:mt-0 md:ml-4 md:flex-shrink-0">
                       {/* Chapter responses button */}
                       <Link
                         to={`/edit/book/${bookId}/dashboard?chapter=${chapter.id}`}

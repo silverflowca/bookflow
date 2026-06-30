@@ -415,17 +415,35 @@ export default function ProfilePage() {
               </h2>
               <div className="space-y-2">
                 {data.clubs.map((club: any) => (
-                  <Link key={club.id} to={`/clubs/${club.id}`} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-hover transition-colors border border-theme">
+                  <div key={club.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-surface-hover transition-colors border border-theme">
                     <div className="h-10 w-10 rounded-lg bg-surface-hover border border-theme overflow-hidden flex-shrink-0 flex items-center justify-center">
                       {club.cover_image_url
                         ? <img src={club.cover_image_url} alt="" className="h-full w-full object-cover" />
                         : <Users className="h-5 w-5 text-muted" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-theme truncate">{club.name}</p>
+                      <Link to={`/clubs/${club.id}`} className="block text-sm font-medium text-theme truncate hover:text-accent transition-colors">
+                        {club.name}
+                      </Link>
                       <p className="text-xs text-muted capitalize">{club.role}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Link
+                          to={`/clubs/${club.id}?tab=books`}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-theme px-2.5 py-1 text-xs font-medium text-theme hover:bg-surface-hover transition-colors"
+                        >
+                          <BookOpen className="h-3.5 w-3.5 text-accent" />
+                          Books
+                        </Link>
+                        <Link
+                          to={`/clubs/${club.id}?tab=members`}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-theme px-2.5 py-1 text-xs font-medium text-theme hover:bg-surface-hover transition-colors"
+                        >
+                          <Users className="h-3.5 w-3.5 text-accent" />
+                          Members
+                        </Link>
+                      </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </section>

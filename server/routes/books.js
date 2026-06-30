@@ -698,6 +698,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     enable_progress_tracking,
     show_ratings,
     show_component_panel,
+    show_reader_content_filters,
   } = req.body;
 
   try {
@@ -715,6 +716,7 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         enable_progress_tracking,
         show_ratings,
         show_component_panel,
+        show_reader_content_filters,
       })
       .eq('book_id', req.params.id)
       .select()

@@ -225,6 +225,7 @@ export default function BookReader() {
   const canAddAudio = settings?.allow_reader_audio ?? false;
   const canAddVideo = settings?.allow_reader_video ?? false;
   const canAddLink = settings?.allow_reader_links ?? false;
+  const showReaderContentFilters = settings?.show_reader_content_filters ?? true;
 
   // Check if reader has any permissions
   const hasAnyPermission = canAddHighlight || canAddNote || canAddQuestion || canAddPoll || canAddAudio || canAddVideo || canAddLink;
@@ -1208,7 +1209,7 @@ export default function BookReader() {
           <div className="border-t border-theme">
             <div className="max-w-3xl mx-auto px-4 py-1.5 flex items-center gap-2 overflow-x-auto">
               {/* Content filter pills */}
-              {(isAuthor || inlineContent.some(ic => ic.created_by === user?.id)) && (
+              {showReaderContentFilters && (isAuthor || inlineContent.some(ic => ic.created_by === user?.id)) && (
                 <div className="flex items-center gap-1 shrink-0 border-r border-theme pr-2 mr-1">
                   <span className="text-xs text-muted">Show:</span>
                   {(['all', 'author', 'mine'] as const).map((f) => (

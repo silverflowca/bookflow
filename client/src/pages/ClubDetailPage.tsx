@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   Users, BookOpen, MessageSquare, Settings, Plus, Trash2,
   Crown, Shield, UserMinus, ChevronRight, Loader2, Send,
@@ -655,13 +655,21 @@ function JoinRequestRow({
 
 type PanelTab = 'overview' | 'members' | 'books' | 'chat' | 'settings' | 'progress';
 
+function isPanelTab(value: string | null): value is PanelTab {
+  return value === 'overview' || value === 'members' || value === 'books' || value === 'chat' || value === 'settings' || value === 'progress';
+}
+
 export default function ClubDetailPage() {
   const { clubId } = useParams<{ clubId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<PanelTab>('overview');
+  const [tab, setTab] = useState<PanelTab>(() => {
+    const requestedTab = searchParams.get('tab');
+    return isPanelTab(requestedTab) ? requestedTab : 'overview';
+  });
   const { counts: chatUnread, clearClub: clearChatUnread } = useChatUnread();
   const [showInvite, setShowInvite] = useState(false);
   const [showAddBook, setShowAddBook] = useState(false);
@@ -681,6 +689,33 @@ export default function ClubDetailPage() {
   useEffect(() => {
     if (clubId) loadClub();
   }, [clubId]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (isPanelTab(requestedTab) && requestedTab !== tab) {
+      setTab(requestedTab);
+      return;
+    }
+
+    if (!requestedTab && tab !== 'overview') {
+      setTab('overview');
+    }
+  }, [searchParams, tab]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (tab === 'overview') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', tab);
+    }
+
+    const currentParams = searchParams.toString();
+    const targetParams = nextParams.toString();
+    if (currentParams !== targetParams) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [tab, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (tab === 'progress' && clubId && !progressData) loadProgress();
@@ -1084,15 +1119,15 @@ export default function ClubDetailPage() {
                         <BookOpen className="h-5 w-5 text-indigo-400" />
                       </div>
                   }
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-theme text-sm truncate">{cb.book?.title}</p>
+                  <Link to={`/clubs/${clubId}/read/${cb.book?.id}`} className="flex-1 min-w-0 block group">
+                    <p className="font-medium text-theme text-sm truncate group-hover:text-accent transition-colors">{cb.book?.title}</p>
                     {cb.book?.author && <p className="text-xs text-muted">{cb.book.author.display_name}</p>}
                     {cb.is_current && (
                       <span className="inline-flex items-center gap-1 text-xs text-yellow-500 mt-1">
                         <Star className="h-3 w-3" /> Currently reading
                       </span>
                     )}
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/clubs/${clubId}/read/${cb.book?.id}`}
