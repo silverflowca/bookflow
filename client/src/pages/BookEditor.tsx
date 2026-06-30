@@ -1320,16 +1320,16 @@ export default function BookEditor() {
                   onDragEnd={handleChapterDragEnd}
                   className={dragOverId === chapter.id ? 'border-t-2 border-accent' : ''}
                 >
-                  <div className="flex items-center gap-4 p-4 hover:bg-surface-hover">
-                    <GripVertical className="h-5 w-5 text-muted cursor-grab active:cursor-grabbing" />
-                    <div className="flex-1">
+                  <div className="flex items-start gap-3 p-4 hover:bg-surface-hover">
+                    <GripVertical className="mt-1 h-5 w-5 shrink-0 text-muted cursor-grab active:cursor-grabbing" />
+                    <div className="min-w-0 flex-1">
                       <Link
                         to={`/edit/book/${bookId}/chapter/${chapter.id}`}
-                        className="font-medium hover:text-accent"
+                        className="block font-medium hover:text-accent break-words"
                       >
                         Chapter {index + 1}: {chapter.title}
                       </Link>
-                      <div className="flex gap-3 text-xs text-muted flex-wrap">
+                      <div className="mt-1 flex gap-3 text-xs text-muted flex-wrap">
                         <span>{chapter.word_count || 0} words</span>
                         <span>{chapter.estimated_read_time_minutes || 1} min read</span>
                         <span className={chapter.status === 'published' ? 'text-green-600' : 'text-yellow-600'}>
@@ -1341,8 +1341,7 @@ export default function BookEditor() {
                           </span>
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-2 items-center">
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
                       {/* Chapter responses button */}
                       <Link
                         to={`/edit/book/${bookId}/dashboard?chapter=${chapter.id}`}
@@ -1402,6 +1401,7 @@ export default function BookEditor() {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       )}
+                      </div>
                     </div>
                   </div>
 
