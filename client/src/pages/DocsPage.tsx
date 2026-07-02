@@ -8,6 +8,7 @@ import {
   Zap,
   UserPlus, Lightbulb,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ interface NavigationResult {
   to: string;
   icon: React.ReactNode;
   tags?: string[];
+  adminOnly?: boolean;
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -630,9 +632,14 @@ const NAVIGATION_RESULTS: NavigationResult[] = [
   { id: 'study-groups', title: 'Study Groups', description: 'Jump to the study groups view inside clubs.', to: '/clubs?tab=bookstudy', icon: <Users className="h-4 w-4" />, tags: ['study groups', 'study', 'book study'] },
   { id: 'live', title: 'Live', description: 'Open the live broadcasting and scheduling area.', to: '/live', icon: <Radio className="h-4 w-4" />, tags: ['live', 'streaming', 'broadcast'] },
   { id: 'tutorial', title: 'Tutorial', description: 'Learn how BookFlow works with guided walkthroughs.', to: '/docs', icon: <Lightbulb className="h-4 w-4" />, tags: ['tutorial', 'guide', 'walkthrough'] },
-  { id: 'settings', title: 'Settings', description: 'Manage your profile, preferences, and account settings.', to: '/settings', icon: <Settings className="h-4 w-4" />, tags: ['settings', 'profile', 'preferences', 'account'] },
+  { id: 'my-settings', title: 'Settings', description: 'Manage your profile, preferences, and account settings.', to: '/settings', icon: <Settings className="h-4 w-4" />, tags: ['settings', 'profile', 'preferences', 'account'] },
   { id: 'help', title: 'Help', description: 'Search BookFlow documentation and support articles.', to: '/docs', icon: <HelpCircle className="h-4 w-4" />, tags: ['help', 'docs', 'documentation', 'faq'] },
-  { id: 'admin', title: 'Admin', description: 'Open administration tools for system managers.', to: '/admin', icon: <Shield className="h-4 w-4" />, tags: ['admin', 'system administration', 'management'] },
+  { id: 'admin-users', title: 'Admin · Users', description: 'Manage users and super admin access.', to: '/admin?tab=users', icon: <Shield className="h-4 w-4" />, tags: ['admin', 'users', 'system administration', 'management'], adminOnly: true },
+  { id: 'admin-books', title: 'Admin · Books', description: 'Review, archive, and manage books system-wide.', to: '/admin?tab=books', icon: <BookOpen className="h-4 w-4" />, tags: ['admin', 'books', 'archive'], adminOnly: true },
+  { id: 'admin-clubs', title: 'Admin · Clubs', description: 'Inspect and manage clubs across the platform.', to: '/admin?tab=clubs', icon: <Users className="h-4 w-4" />, tags: ['admin', 'clubs', 'book clubs'], adminOnly: true },
+  { id: 'admin-carousel', title: 'Admin · Carousel', description: 'Adjust the home-page carousel settings.', to: '/admin?tab=carousel', icon: <Radio className="h-4 w-4" />, tags: ['admin', 'carousel', 'home page'], adminOnly: true },
+  { id: 'admin-settings', title: 'Admin · Settings', description: 'Open the admin settings area.', to: '/admin?tab=settings', icon: <Settings className="h-4 w-4" />, tags: ['admin', 'settings', 'system settings'], adminOnly: true },
+  { id: 'admin-feedback', title: 'Admin · Feedback', description: 'Review feedback, bug reports, and feature requests.', to: '/admin?tab=feedback', icon: <Shield className="h-4 w-4" />, tags: ['admin', 'feedback', 'bugs', 'feature requests'], adminOnly: true },
 ];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -694,7 +701,9 @@ function NavigationResultCard({ item }: { item: NavigationResult }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">Navigation</span>
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+            {item.adminOnly ? 'Admin' : 'Navigation'}
+          </span>
         </div>
         <p className="mt-1 text-sm text-gray-600">{item.description}</p>
       </div>
@@ -706,9 +715,11 @@ function NavigationResultCard({ item }: { item: NavigationResult }) {
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function DocsPage() {
+  const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isSuperAdmin = profile?.system_role === 'super_admin';
 
   // Scroll to section
   function scrollTo(id: string) {
@@ -747,11 +758,14 @@ export default function DocsPage() {
   })).filter(s => s.faqs.length > 0);
 
   const filteredNavigation = q
-    ? NAVIGATION_RESULTS.filter(item =>
-        item.title.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q) ||
-        (item.tags || []).some(tag => tag.toLowerCase().includes(q))
-      )
+    ? NAVIGATION_RESULTS.filter(item => {
+        if (item.adminOnly && !isSuperAdmin) return false;
+        return (
+          item.title.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q) ||
+          (item.tags || []).some(tag => tag.toLowerCase().includes(q))
+        );
+      })
     : [];
 
   const totalFaqs = SECTIONS.reduce((n, s) => n + s.faqs.length, 0);

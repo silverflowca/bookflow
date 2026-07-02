@@ -2226,7 +2226,7 @@ function TipTapNode({
       if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]">&nbsp;</p>;
       // If paragraph contains only block-level widget nodes (image, drawing, etc.), render as div
       // to avoid invalid HTML (<div> inside <p>) which breaks browser DOM parsing
-      const BLOCK_WIDGET_TYPES = new Set(['image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block']);
+      const BLOCK_WIDGET_TYPES = new Set(['question', 'poll', 'image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block']);
       const isBlockWidget = node.content.length === 1 &&
         node.content[0].type === 'inlineFormWidget' &&
         BLOCK_WIDGET_TYPES.has(node.content[0].attrs?.contentType);
@@ -2264,7 +2264,7 @@ function TipTapNode({
 
     case 'text': {
       const nodeText = node.text || '';
-      const FORM_TYPES_SET = new Set(['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block']);
+      const FORM_TYPES_SET = new Set(['question', 'poll', 'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block']);
       const MEDIA_TYPES_SET = new Set(['audio', 'video', 'image', 'drawing']);
 
       // Look up pre-assigned matches for this exact node key (computed before render, no mutation)
@@ -2341,7 +2341,8 @@ function TipTapNode({
             </span>
           );
         } else if (isFormType && position === 'inline') {
-          const isFullW2 = (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
+          const isBlockFormType = ic.content_type === 'question' || ic.content_type === 'poll';
+          const isFullW2 = isBlockFormType || (ic.content_data as any)?.width === 'full' || (!((ic.content_data as any)?.width) && ic.content_type === 'textarea');
           segments.push(
             isFullW2 ? (
               <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-2">
@@ -2416,7 +2417,7 @@ function TipTapNode({
         return <span>{anchorText}</span>;
       }
       // Block-level types must render as block, not inline-flex
-      const BLOCK_TYPES = new Set(['image', 'audio', 'video', 'code_block', 'scripture_block']);
+      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block']);
       const isBlock = BLOCK_TYPES.has(effectiveIc.content_type);
       const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
       const markerClass = getInlineContentClass(effectiveIc.content_type);
@@ -2860,16 +2861,16 @@ function MediaBlock({ content }: { content: InlineContent }) {
   }, [canAutoPlayThisItem, content.id, playSelf, registerAutoPlay, unregisterAutoPlay]);
 
   return (
-    <div ref={containerRef} className={progressEnabled ? `progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : undefined} style={sizePct < 100 ? { width: `${sizePct}%` } : undefined}>
-      <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)]">
+    <div ref={containerRef} className={progressEnabled ? `progress-item media-progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : 'media-progress-item'} style={sizePct < 100 ? { width: `${sizePct}%` } : undefined}>
+      <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-transparent">
 
         {/* Embed (YouTube/Vimeo) */}
         {!isAudio && embedUrl && (
           <>
-            <div className="aspect-video w-full">
+            <div className="aspect-video w-full bg-black">
               <iframe
                 src={embedUrl}
-                className="w-full h-full"
+                className="w-full h-full block bg-black"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 title={data.title || 'Video'}
@@ -2908,7 +2909,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
           <>
             {/* Inline placeholder — keeps layout space while video is in PiP */}
             <div
-              className="relative group bg-[var(--color-surface-hover)] p-2"
+              className="relative group bg-black"
               style={sticky ? { minHeight: '160px' } : undefined}
             >
               {/* Always-mounted video — moves to PiP via fixed positioning, never unmounts */}
@@ -2927,7 +2928,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 }}
                 style={sticky
                   ? (() => { const p = pipPos ?? getDefaultPos(); return { position: 'fixed', top: p.y, left: p.x, width: `${PIP_W}px`, maxHeight: '160px', objectFit: 'contain', zIndex: 52, display: 'block', background: '#000', borderRadius: '8px 8px 0 0' }; })()
-                  : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: 'var(--color-surface-hover)', borderRadius: '8px' }}
+                  : { width: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block', background: '#000', borderRadius: '8px' }}
               />
 
               {/* Fullscreen button — inline only */}
@@ -2943,7 +2944,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
               {!playing && !sticky && (
                 <button
                   onClick={togglePlay}
-                  className="absolute inset-0 flex items-center justify-center transition-colors hover:bg-[var(--color-surface-hover)]/40"
+                  className="absolute inset-0 flex items-center justify-center transition-colors"
                 >
                   <span className="w-14 h-14 rounded-full bg-black/30 border border-white/30 flex items-center justify-center shadow-md backdrop-blur-sm">
                     <Play className="h-6 w-6 text-white ml-1" />
@@ -4113,9 +4114,9 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
 
   if (!isAudio && embedUrl) {
     return (
-      <span className="block w-full rounded-xl overflow-hidden border border-[var(--color-border)] my-1">
-        <span className="block aspect-video bg-[var(--color-surface-hover)]">
-          <iframe src={embedUrl} className="w-full h-full rounded-xl"
+      <span className="block w-full rounded-xl overflow-hidden border border-[var(--color-border)] my-1 bg-black">
+        <span className="block aspect-video bg-black">
+          <iframe src={embedUrl} className="w-full h-full rounded-xl block bg-black"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen title={data.title || 'Video'} />
         </span>
@@ -4125,7 +4126,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
   }
 
   return (
-    <span className="block w-full rounded-xl overflow-hidden my-1 border border-[var(--color-border)] bg-[var(--color-surface)]">
+    <span className="block w-full rounded-xl overflow-hidden my-1 border border-[var(--color-border)] bg-transparent">
       {!isAudio && (
         <span className="block relative group bg-black">
           <video
@@ -4145,7 +4146,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
             }}
           />
           {!playing && (
-            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-surface-hover)]/40">
+            <span onClick={togglePlay} className="absolute inset-0 flex items-center justify-center cursor-pointer transition-colors">
               <span className="w-12 h-12 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center shadow-md">
                 <Play className="h-5 w-5 text-theme ml-0.5" />
               </span>
@@ -4198,6 +4199,10 @@ function InlineFormElement({ content }: { content: InlineContent }) {
   const type = content.content_type;
 
   switch (type) {
+    case 'question':
+      return <QuestionBlock content={content} />;
+    case 'poll':
+      return <PollBlock content={content} />;
     case 'select':
       return <InlineSelect content={content} />;
     case 'multiselect':

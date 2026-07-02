@@ -334,6 +334,10 @@ body {
   background-color: color-mix(in srgb, #22c55e 6%, transparent);
 }
 
+.media-progress-item.progress-item--done {
+  background-color: transparent;
+}
+
 /* Inline content markers */
 .inline-question {
   background-color: rgba(59, 130, 246, 0.15);
@@ -424,12 +428,12 @@ body {
 }
 
 .inline-video {
-  background-color: rgba(239, 68, 68, 0.15);
+  background-color: rgba(239, 68, 68, 0.06);
   border-bottom-color: #ef4444;
 }
 
 .inline-video:hover {
-  background-color: rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.12);
 }
 
 /* Interactive form inline styles */

@@ -658,10 +658,11 @@ export default function ChapterEditor() {
       setInlineContents(inlineContents.filter(i => i.id !== id));
 
       if (editor && item) {
-        const isFormType = INLINE_FORM_TYPES.includes(item.content_type);
+        const WIDGET_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'audio', 'video', 'image', 'drawing', 'code_block', 'scripture_block'];
+        const isWidgetType = WIDGET_TYPES.includes(item.content_type);
         const isInline = !item.position_in_chapter || item.position_in_chapter === 'inline';
 
-        if (isFormType && isInline) {
+        if (isWidgetType && isInline) {
           // Find and delete the InlineFormNode atom in the document
           const { state } = editor;
           const { tr } = state;
@@ -1897,17 +1898,32 @@ function ContentPreview({ item }: { item: InlineContent }) {
     case 'checkbox': {
       const c = data as CheckboxData;
       return (
-        <div className="text-sm">
-          <p className="font-medium text-theme">{c.label}</p>
-          <ul className="mt-1 text-xs text-muted">
-            {c.options?.slice(0, 3).map((opt, i) => (
-              <li key={i} className="flex items-center gap-1">
-                <span className="w-2 h-2 border border-strong"></span>
-                {opt.text}
-              </li>
+        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 text-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="font-medium text-teal-800">Select All That Apply</span>
+            {c.required && <span className="text-red-500 text-sm">*</span>}
+          </div>
+          {c.label && <p className="text-theme mb-2">{c.label}</p>}
+          <div className="space-y-2">
+            {(c.options || []).map((opt, i) => (
+              <label
+                key={opt.id ?? i}
+                className="flex items-center gap-2 p-2 rounded border bg-surface border-theme text-theme cursor-default"
+              >
+                <input
+                  type="checkbox"
+                  disabled
+                  className="rounded border-teal-400 text-teal-600 focus:ring-teal-500 accent-teal-600"
+                />
+                <span>{opt.text}</span>
+              </label>
             ))}
-            {(c.options?.length || 0) > 3 && <li className="text-muted">+{(c.options?.length || 0) - 3} more</li>}
-          </ul>
+          </div>
+          {c.min_selections && (
+            <p className="text-xs text-muted mt-2">
+              Select at least {c.min_selections} option{c.min_selections > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
       );
     }

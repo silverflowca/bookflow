@@ -21,6 +21,7 @@ import type {
   FeedbackConfig,
   FeedbackComment,
   AnnotationCommand,
+  ShareableUser,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -587,7 +588,15 @@ class ApiClient {
     return this.request(`/books/${bookId}/collaborators`);
   }
 
-  async inviteCollaborator(bookId: string, data: { email?: string; userId?: string; role: Exclude<CollaboratorRole, 'owner'> }): Promise<BookCollaborator & { invite_token?: string }> {
+  async searchShareableUsers(bookId: string, query: string): Promise<ShareableUser[]> {
+    const qs = `?q=${encodeURIComponent(query)}`;
+    return this.request(`/books/${bookId}/collaborators/search-users${qs}`);
+  }
+
+  async inviteCollaborator(
+    bookId: string,
+    data: { email?: string; userId?: string; role: Exclude<CollaboratorRole, 'owner'> }
+  ): Promise<BookCollaborator & { invite_token?: string; invite_url?: string; manual?: boolean; email_sent?: boolean; added_name?: string }> {
     return this.request(`/books/${bookId}/collaborators`, {
       method: 'POST',
       body: JSON.stringify(data),

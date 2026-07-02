@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore, Archive, ImagePlus } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -174,8 +174,14 @@ function BooksAdminTab({ books, onBooksChange }: { books: any[]; onBooksChange: 
 export default function AdminPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<Tab>('settings');
+  const [tab, setTab] = useState<Tab>(() => {
+    const requested = searchParams.get('tab');
+    return (requested && ['users', 'books', 'clubs', 'carousel', 'settings', 'feedback'].includes(requested))
+      ? requested as Tab
+      : 'settings';
+  });
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<Profile[]>([]);
   const [books, setBooks] = useState<any[]>([]);
@@ -197,6 +203,13 @@ export default function AdminPage() {
     loadAll();
   }, []);
 
+  useEffect(() => {
+    const requested = searchParams.get('tab');
+    if (requested && ['users', 'books', 'clubs', 'carousel', 'settings', 'feedback'].includes(requested) && requested !== tab) {
+      loadTab(requested as Tab);
+    }
+  }, [searchParams]);
+
   async function loadAll() {
     setLoading(true);
     setError(null);
@@ -213,6 +226,11 @@ export default function AdminPage() {
 
   async function loadTab(t: Tab) {
     setTab(t);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', t);
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
     if (t === 'books' && books.length === 0) {
       try {
         setBooks(await api.adminGetBooks());

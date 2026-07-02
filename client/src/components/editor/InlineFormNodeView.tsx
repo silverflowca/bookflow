@@ -107,16 +107,36 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
     case 'checkbox': {
       const d = contentData as CheckboxData;
       return (
-        <span className="inline-flex items-center gap-2 ml-1 align-middle" data-testid="inline-form-preview-checkbox">
-          {(d.options || []).slice(0, 3).map(opt => (
-            <label key={opt.id} className="inline-flex items-center gap-1 text-sm cursor-default">
-              <input type="checkbox" readOnly tabIndex={-1} disabled className="pointer-events-none" />
-              <span>{opt.text}</span>
-            </label>
-          ))}
-          {(d.options || []).length > 3 && (
-            <span className="text-xs text-gray-400">+{(d.options || []).length - 3} more</span>
-          )}
+        <span className="block w-full mt-1 align-middle" data-testid="inline-form-preview-checkbox">
+          <span className="block rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm">
+            <span className="flex items-center gap-2 mb-2">
+              <span className="font-medium text-teal-800">Select All That Apply</span>
+              {d.required && <span className="text-red-500 text-sm">*</span>}
+            </span>
+            {d.label && <span className="block text-gray-800 mb-2">{d.label}</span>}
+            <span className="flex flex-col gap-2">
+              {(d.options || []).map(opt => (
+                <label
+                  key={opt.id}
+                  className="flex items-center gap-2 rounded border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-800 cursor-default"
+                >
+                  <input
+                    type="checkbox"
+                    readOnly
+                    tabIndex={-1}
+                    disabled
+                    className="pointer-events-none accent-teal-600"
+                  />
+                  <span>{opt.text}</span>
+                </label>
+              ))}
+            </span>
+            {d.min_selections && (
+              <span className="block text-xs text-gray-500 mt-2">
+                Select at least {d.min_selections} option{d.min_selections > 1 ? 's' : ''}
+              </span>
+            )}
+          </span>
         </span>
       );
     }

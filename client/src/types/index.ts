@@ -123,6 +123,13 @@ export interface BookCollaborator {
   invited_by_user?: Pick<Profile, 'id' | 'display_name'>;
 }
 
+export interface ShareableUser {
+  id: string;
+  display_name: string;
+  email: string;
+  avatar_url?: string;
+}
+
 export interface BookVersion {
   id: string;
   book_id: string;
