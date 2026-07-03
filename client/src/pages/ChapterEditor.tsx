@@ -4,11 +4,13 @@ import {
   ChevronLeft, Save, Eye, HelpCircle, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
-  LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks
+  LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3
 } from 'lucide-react';
+import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
+import TextStyle from '@tiptap/extension-text-style';
 import { getHighlightTheme } from '../lib/highlightTheme';
 import TipTapLink from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
@@ -18,6 +20,8 @@ import TaskItem from '@tiptap/extension-task-item';
 import InlineContentMark from '../components/editor/InlineContentMark';
 import { InlineFormNode } from '../components/editor/InlineFormNode';
 import { ColumnLayout, ColumnCell } from '../components/editor/ColumnLayoutNode';
+import { PasteFormatting } from '../components/editor/PasteFormattingExtensions';
+import { Table, TableRow, TableCell, TableHeader } from '../components/editor/TableNodes';
 import api from '../lib/api';
 import type {
   Chapter, InlineContent, MediaData, QuestionData, PollData, NoteData, LinkData, HighlightData,
@@ -30,6 +34,7 @@ import BookResponsesViewer from '../components/responses/BookResponsesViewer';
 import { useAuth } from '../contexts/AuthContext';
 import { EditorPreviewContext } from '../contexts/EditorPreviewContext';
 import type { EditorPreviewMode } from '../contexts/EditorPreviewContext';
+import { getExternalEmbedUrl } from '../lib/videoEmbeds';
 
 function fmtRelative(date: Date): string {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -38,6 +43,258 @@ function fmtRelative(date: Date): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function normalizePastedHtml(html: string): string {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
+
+  wrapper.querySelectorAll('script, style, meta, link, xml, o\\:p').forEach(node => node.remove());
+
+  wrapper.querySelectorAll('mark').forEach(mark => {
+    mark.replaceWith(...Array.from(mark.childNodes));
+  });
+
+  wrapper.querySelectorAll('span[data-inline-content]').forEach(span => {
+    span.replaceWith(...Array.from(span.childNodes));
+  });
+
+  wrapper.querySelectorAll<HTMLElement>('*').forEach(element => {
+    Array.from(element.attributes).forEach(attribute => {
+      const name = attribute.name.toLowerCase();
+      if (
+        name === 'class' ||
+        name === 'lang' ||
+        name === 'xml:lang' ||
+        name.startsWith('xmlns') ||
+        name.startsWith('on') ||
+        (name.startsWith('data-') && name !== 'data-type')
+      ) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+
+    if (element.hasAttribute('style')) {
+      const style = element.style;
+      const keptStyles = [
+        ['color', style.color],
+        ['background-color', style.backgroundColor],
+        ['font-size', style.fontSize],
+        ['font-family', style.fontFamily],
+        ['font-weight', style.fontWeight],
+        ['font-style', style.fontStyle],
+        ['text-decoration', style.textDecoration],
+        ['text-align', style.textAlign],
+      ].filter(([, value]) => Boolean(value));
+
+      if (keptStyles.length > 0) {
+        element.setAttribute('style', keptStyles.map(([name, value]) => `${name}: ${value}`).join('; '));
+      } else {
+        element.removeAttribute('style');
+      }
+    }
+  });
+
+  wrapper.querySelectorAll('b').forEach(node => {
+    const strong = document.createElement('strong');
+    strong.replaceChildren(...Array.from(node.childNodes));
+    node.replaceWith(strong);
+  });
+
+  wrapper.querySelectorAll('i').forEach(node => {
+    const em = document.createElement('em');
+    em.replaceChildren(...Array.from(node.childNodes));
+    node.replaceWith(em);
+  });
+
+  const paragraphs = Array.from(wrapper.querySelectorAll('p'));
+  let currentUl: HTMLUListElement | null = null;
+
+  for (const paragraph of paragraphs) {
+    const text = paragraph.textContent?.replace(/\u00a0/g, ' ').trim() || '';
+    const match = text.match(/^[\u2022\-\*]\s+(.*)$/u);
+    if (match) {
+      if (!currentUl) {
+        currentUl = document.createElement('ul');
+        paragraph.parentNode?.insertBefore(currentUl, paragraph);
+      }
+      const li = document.createElement('li');
+      li.textContent = match[1];
+      currentUl.appendChild(li);
+      paragraph.remove();
+    } else {
+      currentUl = null;
+    }
+  }
+
+  return wrapper.innerHTML;
+}
+
+function normalizePastedText(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .trimEnd();
+}
+
+type TableContext = {
+  tablePos: number;
+  tableNode: any;
+  rowPos: number;
+  rowNode: any;
+  rowIndex: number;
+  cellIndex: number;
+};
+
+function getActiveTableContext(editor: Editor | null): TableContext | null {
+  if (!editor) return null;
+  const { $from } = editor.state.selection;
+  let tableDepth = -1;
+  let rowDepth = -1;
+  let cellDepth = -1;
+
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const nodeName = $from.node(depth).type.name;
+    if (cellDepth === -1 && ['tableCell', 'tableHeader'].includes(nodeName)) cellDepth = depth;
+    if (rowDepth === -1 && nodeName === 'tableRow') rowDepth = depth;
+    if (tableDepth === -1 && nodeName === 'table') tableDepth = depth;
+  }
+
+  if (tableDepth === -1 || rowDepth === -1 || cellDepth === -1) return null;
+
+  return {
+    tablePos: $from.before(tableDepth),
+    tableNode: $from.node(tableDepth),
+    rowPos: $from.before(rowDepth),
+    rowNode: $from.node(rowDepth),
+    rowIndex: $from.index(tableDepth),
+    cellIndex: $from.index(rowDepth),
+  };
+}
+
+function createTableCell(editor: Editor, cellTypeName = 'tableCell') {
+  const cellType = editor.schema.nodes[cellTypeName] || editor.schema.nodes.tableCell;
+  const paragraph = editor.schema.nodes.paragraph.create();
+  return cellType.create(null, paragraph);
+}
+
+function insertTable(editor: Editor | null) {
+  editor?.chain().focus().insertContent({
+    type: 'table',
+    content: [
+      {
+        type: 'tableRow',
+        content: ['Verse', 'Phrase', 'Meaning'].map(text => ({
+          type: 'tableHeader',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+        })),
+      },
+      {
+        type: 'tableRow',
+        content: ['', '', ''].map(() => ({
+          type: 'tableCell',
+          content: [{ type: 'paragraph' }],
+        })),
+      },
+      {
+        type: 'tableRow',
+        content: ['', '', ''].map(() => ({
+          type: 'tableCell',
+          content: [{ type: 'paragraph' }],
+        })),
+      },
+    ],
+  }).run();
+}
+
+function addTableRow(editor: Editor | null) {
+  const context = getActiveTableContext(editor);
+  if (!editor || !context) return;
+
+  const cells = Array.from({ length: context.rowNode.childCount }, () => createTableCell(editor));
+  const row = editor.schema.nodes.tableRow.create(null, cells);
+  const tr = editor.state.tr.insert(context.rowPos + context.rowNode.nodeSize, row).scrollIntoView();
+  editor.view.dispatch(tr);
+  editor.view.focus();
+}
+
+function deleteTableRow(editor: Editor | null) {
+  const context = getActiveTableContext(editor);
+  if (!editor || !context) return;
+
+  const tr = context.tableNode.childCount <= 1
+    ? editor.state.tr.delete(context.tablePos, context.tablePos + context.tableNode.nodeSize)
+    : editor.state.tr.delete(context.rowPos, context.rowPos + context.rowNode.nodeSize);
+
+  editor.view.dispatch(tr.scrollIntoView());
+  editor.view.focus();
+}
+
+function addTableColumn(editor: Editor | null) {
+  const context = getActiveTableContext(editor);
+  if (!editor || !context) return;
+
+  const insertions: { pos: number; node: any }[] = [];
+  let rowPos = context.tablePos + 1;
+
+  for (let rowIndex = 0; rowIndex < context.tableNode.childCount; rowIndex++) {
+    const row = context.tableNode.child(rowIndex);
+    const insertIndex = Math.min(context.cellIndex + 1, row.childCount);
+    let insertPos = rowPos + 1;
+
+    for (let cellIndex = 0; cellIndex < insertIndex; cellIndex++) {
+      insertPos += row.child(cellIndex).nodeSize;
+    }
+
+    const referenceCell = row.child(Math.min(context.cellIndex, row.childCount - 1));
+    const cellTypeName = referenceCell?.type.name === 'tableHeader' ? 'tableHeader' : 'tableCell';
+    insertions.push({ pos: insertPos, node: createTableCell(editor, cellTypeName) });
+    rowPos += row.nodeSize;
+  }
+
+  let tr = editor.state.tr;
+  insertions.reverse().forEach(({ pos, node }) => {
+    tr = tr.insert(pos, node);
+  });
+  editor.view.dispatch(tr.scrollIntoView());
+  editor.view.focus();
+}
+
+function deleteTableColumn(editor: Editor | null) {
+  const context = getActiveTableContext(editor);
+  if (!editor || !context) return;
+
+  const maxColumnCount = Math.max(...Array.from({ length: context.tableNode.childCount }, (_, index) => context.tableNode.child(index).childCount));
+  if (maxColumnCount <= 1) {
+    const tr = editor.state.tr.delete(context.tablePos, context.tablePos + context.tableNode.nodeSize);
+    editor.view.dispatch(tr.scrollIntoView());
+    editor.view.focus();
+    return;
+  }
+
+  const deletions: { from: number; to: number }[] = [];
+  let rowPos = context.tablePos + 1;
+
+  for (let rowIndex = 0; rowIndex < context.tableNode.childCount; rowIndex++) {
+    const row = context.tableNode.child(rowIndex);
+    if (context.cellIndex < row.childCount) {
+      let cellPos = rowPos + 1;
+      for (let cellIndex = 0; cellIndex < context.cellIndex; cellIndex++) {
+        cellPos += row.child(cellIndex).nodeSize;
+      }
+      const cell = row.child(context.cellIndex);
+      deletions.push({ from: cellPos, to: cellPos + cell.nodeSize });
+    }
+    rowPos += row.nodeSize;
+  }
+
+  let tr = editor.state.tr;
+  deletions.reverse().forEach(({ from, to }) => {
+    tr = tr.delete(from, to);
+  });
+  editor.view.dispatch(tr.scrollIntoView());
+  editor.view.focus();
 }
 
 export default function ChapterEditor() {
@@ -84,6 +341,8 @@ export default function ChapterEditor() {
     extensions: [
       StarterKit,
       Highlight.configure({ multicolor: true }),
+      TextStyle.configure({ mergeNestedSpanStyles: true }),
+      PasteFormatting,
       TipTapLink.configure({ openOnClick: false }),
       Underline,
       Placeholder.configure({
@@ -95,6 +354,10 @@ export default function ChapterEditor() {
       InlineFormNode,
       ColumnLayout,
       ColumnCell,
+      Table,
+      TableRow,
+      TableCell,
+      TableHeader,
     ],
     content: '',
     editorProps: {
@@ -120,6 +383,8 @@ export default function ChapterEditor() {
         return false;
       },
       transformPastedHTML(html) {
+        if (html) return normalizePastedHtml(html);
+
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;
 
@@ -157,6 +422,7 @@ export default function ChapterEditor() {
 
         return wrapper.innerHTML;
       },
+      transformPastedText: normalizePastedText,
     },
     onUpdate: ({ editor }) => {
       // Auto-save after 2 seconds of inactivity
@@ -652,43 +918,36 @@ export default function ChapterEditor() {
 
   async function handleDeleteInlineContent(id: string) {
     try {
-      const item = inlineContents.find(i => i.id === id);
-
       await api.deleteInlineContent(id);
       setInlineContents(inlineContents.filter(i => i.id !== id));
 
-      if (editor && item) {
-        const WIDGET_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'audio', 'video', 'image', 'drawing', 'code_block', 'scripture_block'];
-        const isWidgetType = WIDGET_TYPES.includes(item.content_type);
-        const isInline = !item.position_in_chapter || item.position_in_chapter === 'inline';
+      if (editor) {
+        const { state } = editor;
+        const markType = editor.schema.marks.inlineContentMark;
+        let tr = state.tr;
+        const nodeDeletions: { from: number; to: number }[] = [];
 
-        if (isWidgetType && isInline) {
-          // Find and delete the InlineFormNode atom in the document
-          const { state } = editor;
-          const { tr } = state;
-          let found = false;
-          state.doc.descendants((node, pos) => {
-            if (found) return;
-            if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
-              tr.replaceWith(pos, pos + node.nodeSize, state.schema.text(item.anchor_text || ''));
-              found = true;
-            }
-          });
-          if (found) editor.view.dispatch(tr);
-        } else {
-          // Remove the Mark from anchor text range
-          try {
-            if (item.start_offset !== undefined && item.end_offset !== undefined) {
-              editor
-                .chain()
-                .setTextSelection({ from: item.start_offset, to: item.end_offset })
-                .unsetInlineContentMark()
-                .run();
-              editor.commands.setTextSelection(0);
-            }
-          } catch {
-            // Ignore invalid positions
+        state.doc.descendants((node, pos) => {
+          if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
+            nodeDeletions.push({ from: pos, to: pos + node.nodeSize });
+            return false;
           }
+
+          if (markType && node.isText) {
+            const hasTargetMark = node.marks.some(mark => mark.type === markType && mark.attrs.contentId === id);
+            if (hasTargetMark) {
+              tr = tr.removeMark(pos, pos + node.nodeSize, markType);
+            }
+          }
+        });
+
+        nodeDeletions.reverse().forEach(({ from, to }) => {
+          tr = tr.delete(from, to);
+        });
+
+        if (tr.docChanged) {
+          editor.view.dispatch(tr.scrollIntoView());
+          editor.commands.setTextSelection(Math.min(editor.state.doc.content.size, 0));
         }
       }
     } catch (err) {
@@ -896,6 +1155,8 @@ export default function ChapterEditor() {
   }
 
   const editorPreviewMode: EditorPreviewMode = (bookSettings?.editor_preview_mode ?? 'live');
+  const tableContext = getActiveTableContext(editor);
+  const isTableActive = Boolean(tableContext);
 
   return (
     <EditorPreviewContext.Provider value={{ mode: editorPreviewMode }}>
@@ -1210,6 +1471,51 @@ export default function ChapterEditor() {
             >
               <Pencil className="h-4 w-4" />
             </ToolbarButton>
+            <div className="w-px bg-surface-hover mx-1" />
+            <ToolbarButton
+              onClick={() => insertTable(editor)}
+              active={isTableActive}
+              title="Insert Table"
+              className="text-indigo-600"
+            >
+              <Table2 className="h-4 w-4" />
+            </ToolbarButton>
+            {isTableActive && (
+              <>
+                <ToolbarButton
+                  onClick={() => addTableRow(editor)}
+                  title="Add Row"
+                  className="text-indigo-600"
+                >
+                  <Rows3 className="h-4 w-4" />
+                  <span className="text-xs">+</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => deleteTableRow(editor)}
+                  title="Delete Row"
+                  className="text-red-600"
+                >
+                  <Rows3 className="h-4 w-4" />
+                  <span className="text-xs">-</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => addTableColumn(editor)}
+                  title="Add Column"
+                  className="text-indigo-600"
+                >
+                  <Columns3 className="h-4 w-4" />
+                  <span className="text-xs">+</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => deleteTableColumn(editor)}
+                  title="Delete Column"
+                  className="text-red-600"
+                >
+                  <Columns3 className="h-4 w-4" />
+                  <span className="text-xs">-</span>
+                </ToolbarButton>
+              </>
+            )}
             <div className="w-px bg-surface-hover mx-1" />
             {/* Column Layout picker */}
             <div className="relative" ref={colPickerRef}>
@@ -1714,6 +2020,43 @@ function InlineContentItem({
   );
 }
 
+function EditorVideoPreview({ media, compact = false }: { media: Partial<MediaData> | null | undefined; compact?: boolean }) {
+  const url = media?.url;
+  const title = media?.title || 'Video';
+  const embedUrl = getExternalEmbedUrl(url);
+
+  if (!url) {
+    return <p className="text-xs text-muted italic">No video URL set</p>;
+  }
+
+  if (embedUrl) {
+    return (
+      <div className="w-full overflow-hidden rounded-xl bg-black" contentEditable={false}>
+        <div className="aspect-video w-full">
+          <iframe
+            src={embedUrl}
+            title={title}
+            className="block h-full w-full bg-black"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <video
+      src={url}
+      controls
+      className="w-full rounded-xl bg-black"
+      preload="metadata"
+      style={compact ? { maxHeight: 140, objectFit: 'contain' } : { maxHeight: 320, objectFit: 'contain' }}
+      controlsList="nodownload"
+    />
+  );
+}
+
 // Preview component for different content types
 function ContentPreview({ item }: { item: InlineContent }) {
   const data = item.content_data;
@@ -1762,14 +2105,7 @@ function ContentPreview({ item }: { item: InlineContent }) {
           {isAudio ? (
             <audio src={m.url} controls className="w-full h-8" preload="metadata" />
           ) : (
-            <video
-              src={m.url}
-              preload="metadata"
-              className="w-full block rounded-xl"
-              style={{ maxHeight: '140px', objectFit: 'contain', background: 'black' }}
-              controlsList="nodownload"
-              controls
-            />
+            <EditorVideoPreview media={m} compact />
           )}
           {m.duration && (
             <p className={`text-xs mt-1 ${isAudio ? 'text-orange-600' : 'text-slate-400 px-3 pb-2'}`}>
@@ -2051,9 +2387,7 @@ function InlineFormPreviewItem({ item }: { item: InlineContent }) {
         return (
           <div className="flex flex-col gap-1 w-full">
             {m?.title && <p className="text-xs font-medium text-red-700">{m.title}</p>}
-            {m?.url
-              ? <video src={m.url} controls className="w-full rounded" preload="metadata" style={{ maxHeight: 140 }} />
-              : <p className="text-xs text-muted italic">No video URL set</p>}
+            <EditorVideoPreview media={m} compact />
           </div>
         );
       }

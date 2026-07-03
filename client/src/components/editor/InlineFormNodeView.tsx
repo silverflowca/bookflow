@@ -5,6 +5,7 @@ import type {
   TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData, ScriptureBlockData,
 } from '../../types/index';
 import { useEditorPreviewMode } from '../../contexts/EditorPreviewContext';
+import { getExternalEmbedUrl } from '../../lib/videoEmbeds';
 
 type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block' | 'drawing';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
@@ -157,7 +158,32 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
     }
     case 'video': {
       const src = (contentData as any)?.url || (contentData as any)?.src;
+      const title = (contentData as any)?.title || 'Video';
+      const embedUrl = getExternalEmbedUrl(src);
       if (!src) return <span className="text-xs opacity-60 ml-1">[no video]</span>;
+      if (embedUrl) {
+        return (
+          <div style={{ display: 'block', width: '100%' }} contentEditable={false}>
+            <div
+              style={{
+                width: '100%',
+                borderRadius: 8,
+                overflow: 'hidden',
+                background: '#000',
+                aspectRatio: '16 / 9',
+              }}
+            >
+              <iframe
+                src={embedUrl}
+                title={title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ display: 'block', width: '100%', height: '100%', border: 0, background: '#000' }}
+              />
+            </div>
+          </div>
+        );
+      }
       return (
         <div style={{ display: 'block', width: '100%' }} contentEditable={false}>
           <video

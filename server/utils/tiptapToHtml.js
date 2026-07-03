@@ -11,6 +11,52 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function sanitizeColor(value) {
+  if (typeof value !== 'string') return null;
+  const color = value.trim();
+  if (
+    /^#[0-9a-f]{3,8}$/i.test(color) ||
+    /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(color)
+  ) {
+    return color;
+  }
+  return null;
+}
+
+function sanitizeFontSize(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^(\d+(?:\.\d+)?)(px|pt|em|rem)$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount < 8 || amount > 96) return null;
+  return `${amount}${match[2].toLowerCase()}`;
+}
+
+function sanitizeFontFamily(value) {
+  if (typeof value !== 'string') return null;
+  const firstFamily = value
+    .split(',')
+    .map(part => part.trim().replace(/^["']|["']$/g, ''))
+    .find(Boolean);
+  const allowed = ['Arial', 'Calibri', 'Cambria', 'Georgia', 'Helvetica', 'Times New Roman', 'Verdana']
+    .find(font => font.toLowerCase() === String(firstFamily).toLowerCase());
+  return allowed || null;
+}
+
+function sanitizeTextAlign(value) {
+  if (typeof value !== 'string') return null;
+  const align = value.trim().toLowerCase();
+  return ['left', 'center', 'right', 'justify'].includes(align) ? align : null;
+}
+
+function styleAttr(styles) {
+  const css = Object.entries(styles)
+    .filter(([, value]) => Boolean(value))
+    .map(([name, value]) => `${name}:${value}`)
+    .join(';');
+  return css ? ` style="${escapeHtml(css)}"` : '';
+}
+
 function renderMarks(text, marks = []) {
   let result = escapeHtml(text);
   for (const mark of marks) {
@@ -28,6 +74,17 @@ function renderMarks(text, marks = []) {
       case 'link': {
         const href = escapeHtml(mark.attrs?.href || '#');
         result = `<a href="${href}">${result}</a>`;
+        break;
+      }
+      case 'textStyle': {
+        const attrs = mark.attrs || {};
+        const styles = {
+          color: sanitizeColor(attrs.color),
+          'font-size': sanitizeFontSize(attrs.fontSize),
+          'font-family': sanitizeFontFamily(attrs.fontFamily),
+        };
+        const style = styleAttr(styles);
+        if (style) result = `<span${style}>${result}</span>`;
         break;
       }
     }
@@ -50,17 +107,18 @@ function renderNode(node) {
 
   const inner = () => (node.content || []).map(renderInlineNode).join('');
   const block = (tag, attrs = '') => `<${tag}${attrs}>${inner()}</${tag}>\n`;
+  const alignStyle = styleAttr({ 'text-align': sanitizeTextAlign(node.attrs?.textAlign) });
 
   switch (node.type) {
     case 'doc':
       return (node.content || []).map(renderNode).join('');
 
     case 'paragraph':
-      return `<p>${inner()}</p>\n`;
+      return `<p${alignStyle}>${inner()}</p>\n`;
 
     case 'heading': {
       const level = node.attrs?.level || 1;
-      return `<h${level}>${inner()}</h${level}>\n`;
+      return `<h${level}${alignStyle}>${inner()}</h${level}>\n`;
     }
 
     case 'bulletList':
@@ -81,6 +139,18 @@ function renderNode(node) {
         (node.content || []).map(n => n.text || '').join('')
       )}</code></pre>\n`;
     }
+
+    case 'table':
+      return `<div class="table-scroll"><table>\n<tbody>\n${(node.content || []).map(renderNode).join('')}</tbody>\n</table></div>\n`;
+
+    case 'tableRow':
+      return `<tr>${(node.content || []).map(renderNode).join('')}</tr>\n`;
+
+    case 'tableHeader':
+      return `<th>${(node.content || []).map(renderNode).join('')}</th>\n`;
+
+    case 'tableCell':
+      return `<td>${(node.content || []).map(renderNode).join('')}</td>\n`;
 
     case 'horizontalRule':
       return '<hr>\n';
@@ -140,6 +210,11 @@ export function buildBookHtml(book, chapters) {
   code { font-family: monospace; background: #f4f4f4; padding: 0 3px; }
   mark { padding: 0 2px; }
   ul, ol { padding-left: 2rem; }
+  .table-scroll { overflow-x: auto; margin: 1rem 0; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+  th { background: #f4f4f4; font-weight: 700; }
+  th > p, td > p { margin: 0; }
   img { max-width: 100%; }
   @media print { .chapter { page-break-before: always; } }
 </style>

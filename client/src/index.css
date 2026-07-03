@@ -221,6 +221,27 @@ body {
   border-top: 2px solid var(--color-border);
   margin: 1.5rem 0;
 }
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+  table-layout: auto;
+}
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid var(--color-border);
+  min-width: 6rem;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+}
+.ProseMirror th {
+  background: var(--color-surface-hover);
+  font-weight: 700;
+}
+.ProseMirror th > p,
+.ProseMirror td > p {
+  margin-bottom: 0;
+}
 
 /* Task list (checklist) */
 .ProseMirror ul[data-type="taskList"] {
@@ -584,6 +605,31 @@ body {
 }
 
 /* TTS active — pointer cursor signals click-to-seek */
+.reader-content .table-scroll {
+  margin: 1.25rem 0;
+  overflow-x: auto;
+}
+.reader-content table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 32rem;
+}
+.reader-content th,
+.reader-content td {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.reader-content th {
+  background: var(--color-surface-hover);
+  font-weight: 700;
+}
+.reader-content th > p,
+.reader-content td > p {
+  margin-bottom: 0;
+}
+
 .reader-content.tts-active {
   cursor: pointer;
 }

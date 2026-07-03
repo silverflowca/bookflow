@@ -7,6 +7,7 @@ import {
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
   Eye, EyeOff, HelpCircle, Share2
 } from 'lucide-react';
+import { getTextAlignStyle, getTextStyleAttributes } from '../components/editor/PasteFormattingExtensions';
 
 // Context for progress tracking — avoids prop-drilling into deeply nested block components
 interface ProgressCtx {
@@ -2182,6 +2183,13 @@ function TextWithMarks({ text, marks }: { text: string; marks?: any[] }): React.
             : <mark className="bg-yellow-200 px-0.5 rounded">{content}</mark>;
           break;
         }
+        case 'textStyle': {
+          const style = getTextStyleAttributes(mark.attrs);
+          if (Object.values(style).some(Boolean)) {
+            content = <span style={style}>{content}</span>;
+          }
+          break;
+        }
         case 'inlineContentMark':
           if (mark.attrs?.contentType === 'highlight' && showHighlights) {
             const theme = getHighlightTheme(mark.attrs?.highlightColor);
@@ -2223,21 +2231,22 @@ function TipTapNode({
 
   switch (node.type) {
     case 'paragraph': {
-      if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]">&nbsp;</p>;
+      const style = getTextAlignStyle(node.attrs);
+      if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]" style={style}>&nbsp;</p>;
       // If paragraph contains only block-level widget nodes (image, drawing, etc.), render as div
       // to avoid invalid HTML (<div> inside <p>) which breaks browser DOM parsing
       const BLOCK_WIDGET_TYPES = new Set(['question', 'poll', 'image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block']);
       const isBlockWidget = node.content.length === 1 &&
         node.content[0].type === 'inlineFormWidget' &&
         BLOCK_WIDGET_TYPES.has(node.content[0].attrs?.contentType);
-      if (isBlockWidget) return <div className="mb-4">{renderChildren(node.content, nodeKeyPrefix || 'p')}</div>;
-      return <p className="mb-4">{renderChildren(node.content, nodeKeyPrefix || 'p')}</p>;
+      if (isBlockWidget) return <div className="mb-4" style={style}>{renderChildren(node.content, nodeKeyPrefix || 'p')}</div>;
+      return <p className="mb-4" style={style}>{renderChildren(node.content, nodeKeyPrefix || 'p')}</p>;
     }
 
     case 'heading': {
       const HeadingTag = `h${node.attrs?.level || 2}` as keyof JSX.IntrinsicElements;
       const hClasses: Record<number, string> = { 1: 'text-3xl font-bold mb-4 mt-6', 2: 'text-2xl font-bold mb-3 mt-5', 3: 'text-xl font-semibold mb-2 mt-4', 4: 'text-lg font-semibold mb-2 mt-3' };
-      return <HeadingTag className={hClasses[node.attrs?.level] || hClasses[2]}>{renderChildren(node.content || [], nodeKeyPrefix || 'h')}</HeadingTag>;
+      return <HeadingTag className={hClasses[node.attrs?.level] || hClasses[2]} style={getTextAlignStyle(node.attrs)}>{renderChildren(node.content || [], nodeKeyPrefix || 'h')}</HeadingTag>;
     }
 
     case 'bulletList':
@@ -2258,6 +2267,24 @@ function TipTapNode({
           <code className="text-sm font-mono">{renderChildren(node.content || [], nodeKeyPrefix || 'cb')}</code>
         </pre>
       );
+
+    case 'table':
+      return (
+        <div className="my-5 overflow-x-auto">
+          <table className="min-w-full border-collapse text-left text-sm">
+            <tbody>{renderChildren(node.content || [], nodeKeyPrefix || 'table')}</tbody>
+          </table>
+        </div>
+      );
+
+    case 'tableRow':
+      return <tr>{renderChildren(node.content || [], nodeKeyPrefix || 'tr')}</tr>;
+
+    case 'tableHeader':
+      return <th className="border border-theme bg-surface-hover px-3 py-2 font-semibold align-top">{renderChildren(node.content || [], nodeKeyPrefix || 'th')}</th>;
+
+    case 'tableCell':
+      return <td className="border border-theme px-3 py-2 align-top">{renderChildren(node.content || [], nodeKeyPrefix || 'td')}</td>;
 
     case 'horizontalRule':
       return <hr className="my-6 border-theme" />;

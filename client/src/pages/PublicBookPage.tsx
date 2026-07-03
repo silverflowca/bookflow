@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from 'react-router-dom';
 import { BookOpen, ChevronRight, ChevronLeft, Loader2, Lock, User, Clock, Globe } from 'lucide-react';
 import api from '../lib/api';
 import { getHighlightTheme } from '../lib/highlightTheme';
+import { getTextAlignCss, getTextStyleCss } from '../components/editor/PasteFormattingExtensions';
 import type { Book, Chapter } from '../types';
 
 export default function PublicBookPage() {
@@ -369,21 +370,25 @@ export default function PublicBookPage() {
 }
 
 // Simple TipTap JSON → HTML converter for reading view
+function styleAttr(css: string): string {
+  return css ? ` style="${css}"` : '';
+}
+
 function jsonContentToHtml(content: unknown): string {
   if (!content || typeof content !== 'object') return '';
-  const node = content as { type?: string; text?: string; content?: unknown[]; marks?: { type: string }[] };
+  const node = content as { type?: string; text?: string; content?: unknown[]; marks?: { type: string; attrs?: Record<string, unknown> }[]; attrs?: Record<string, unknown> };
 
   if (node.type === 'doc') {
     return (node.content || []).map(n => jsonContentToHtml(n)).join('');
   }
   if (node.type === 'paragraph') {
     const inner = (node.content || []).map(n => jsonContentToHtml(n)).join('');
-    return `<p>${inner || '<br>'}</p>`;
+    return `<p${styleAttr(getTextAlignCss(node.attrs))}>${inner || '<br>'}</p>`;
   }
   if (node.type === 'heading') {
     const level = (node as { attrs?: { level?: number } }).attrs?.level || 2;
     const inner = (node.content || []).map(n => jsonContentToHtml(n)).join('');
-    return `<h${level}>${inner}</h${level}>`;
+    return `<h${level}${styleAttr(getTextAlignCss(node.attrs))}>${inner}</h${level}>`;
   }
   if (node.type === 'text') {
     let text = node.text || '';
@@ -396,6 +401,10 @@ function jsonContentToHtml(content: unknown): string {
         const c = (mark as any).attrs?.color;
         const theme = getHighlightTheme(c);
         text = c ? `<mark style="background-color:${theme.bg};padding:0 2px;border-radius:2px">${text}</mark>` : `<mark>${text}</mark>`;
+      }
+      if (mark.type === 'textStyle') {
+        const css = getTextStyleCss(mark.attrs);
+        if (css) text = `<span style="${css}">${text}</span>`;
       }
     }
     return text;
@@ -411,6 +420,18 @@ function jsonContentToHtml(content: unknown): string {
   }
   if (node.type === 'blockquote') {
     return `<blockquote>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</blockquote>`;
+  }
+  if (node.type === 'table') {
+    return `<div class="table-scroll"><table><tbody>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tbody></table></div>`;
+  }
+  if (node.type === 'tableRow') {
+    return `<tr>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tr>`;
+  }
+  if (node.type === 'tableHeader') {
+    return `<th>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</th>`;
+  }
+  if (node.type === 'tableCell') {
+    return `<td>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</td>`;
   }
   if (node.type === 'hardBreak') return '<br>';
   if (node.content) {
