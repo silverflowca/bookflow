@@ -49,6 +49,12 @@ function sanitizeTextAlign(value) {
   return ['left', 'center', 'right', 'justify'].includes(align) ? align : null;
 }
 
+function sanitizeIndentLevel(value) {
+  const level = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(level)) return null;
+  return Math.max(0, Math.min(8, Math.round(level)));
+}
+
 function styleAttr(styles) {
   const css = Object.entries(styles)
     .filter(([, value]) => Boolean(value))
@@ -107,7 +113,11 @@ function renderNode(node) {
 
   const inner = () => (node.content || []).map(renderInlineNode).join('');
   const block = (tag, attrs = '') => `<${tag}${attrs}>${inner()}</${tag}>\n`;
-  const alignStyle = styleAttr({ 'text-align': sanitizeTextAlign(node.attrs?.textAlign) });
+  const indentLevel = sanitizeIndentLevel(node.attrs?.indentLevel) || 0;
+  const alignStyle = styleAttr({
+    'text-align': sanitizeTextAlign(node.attrs?.textAlign),
+    'margin-left': indentLevel > 0 ? `${indentLevel * 2}rem` : null,
+  });
 
   switch (node.type) {
     case 'doc':

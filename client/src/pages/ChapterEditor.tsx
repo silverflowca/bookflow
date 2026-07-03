@@ -4,7 +4,8 @@ import {
   ChevronLeft, Save, Eye, HelpCircle, BarChart2, Highlighter, StickyNote, Link2, Play,
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
-  LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3
+  LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3,
+  Indent, Outdent
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -297,6 +298,49 @@ function deleteTableColumn(editor: Editor | null) {
   editor.view.focus();
 }
 
+function isInsideList(editor: Editor | null): boolean {
+  if (!editor) return false;
+  const { $from } = editor.state.selection;
+
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if (['taskList', 'bulletList', 'orderedList', 'listItem', 'taskItem'].includes($from.node(depth).type.name)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function updateBlockIndent(editor: Editor | null, direction: 1 | -1): boolean {
+  if (!editor) return false;
+
+  if (isInsideList(editor)) {
+    const itemType = editor.isActive('taskItem') ? 'taskItem' : 'listItem';
+    return direction > 0
+      ? editor.chain().focus().sinkListItem(itemType).run()
+      : editor.chain().focus().liftListItem(itemType).run();
+  }
+
+  const { state } = editor;
+  let tr = state.tr;
+  const { from, to } = state.selection;
+  const blockTypes = new Set(['paragraph', 'heading']);
+
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (!blockTypes.has(node.type.name)) return;
+    const current = Number(node.attrs.indentLevel || 0);
+    const next = Math.max(0, Math.min(8, current + direction));
+    if (next !== current) {
+      tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, indentLevel: next });
+    }
+  });
+
+  if (!tr.docChanged) return false;
+  editor.view.dispatch(tr.scrollIntoView());
+  editor.view.focus();
+  return true;
+}
+
 export default function ChapterEditor() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
   const [searchParams] = useSearchParams();
@@ -310,6 +354,7 @@ export default function ChapterEditor() {
   const [inlineContents, setInlineContents] = useState<InlineContent[]>([]);
   const inlineContentsRef = useRef<InlineContent[]>([]);
   const pendingContentRef = useRef<unknown>(null);
+  const editorRef = useRef<Editor | null>(null);
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInlineModal, setShowInlineModal] = useState<{
     type: InlineContent['content_type'];
@@ -361,24 +406,10 @@ export default function ChapterEditor() {
     ],
     content: '',
     editorProps: {
-      handleKeyDown(view, event) {
+      handleKeyDown(_view, event) {
         if (event.key === 'Tab') {
-          const { state } = view;
-          const { $from } = state.selection;
-          // Only let Tab through if cursor is inside a list or task list
-          const inList = $from.depth > 0 && (() => {
-            for (let d = $from.depth; d > 0; d--) {
-              const node = $from.node(d);
-              if (['taskList', 'bulletList', 'orderedList', 'listItem', 'taskItem'].includes(node.type.name)) {
-                return true;
-              }
-            }
-            return false;
-          })();
-          if (!inList) {
-            event.preventDefault();
-            return true; // consumed — do nothing
-          }
+          event.preventDefault();
+          return updateBlockIndent(editorRef.current, event.shiftKey ? -1 : 1);
         }
         return false;
       },
@@ -471,6 +502,10 @@ export default function ChapterEditor() {
       }
     },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   useEffect(() => {
     if (chapterId) {
@@ -1342,6 +1377,18 @@ export default function ChapterEditor() {
               title="Checklist"
             >
               <ListChecks className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => updateBlockIndent(editor, -1)}
+              title="Decrease Indent"
+            >
+              <Outdent className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => updateBlockIndent(editor, 1)}
+              title="Increase Indent"
+            >
+              <Indent className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBlockquote().run()}

@@ -51,6 +51,26 @@ function sanitizeTextAlign(value: unknown): string | null {
   return ['left', 'center', 'right', 'justify'].includes(align) ? align : null;
 }
 
+function sanitizeIndentLevel(value: unknown): number | null {
+  const level = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(level)) return null;
+  return Math.max(0, Math.min(8, Math.round(level)));
+}
+
+function parseIndentLevel(element: HTMLElement): number | null {
+  const stored = sanitizeIndentLevel(element.getAttribute('data-indent-level'));
+  if (stored !== null) return stored;
+
+  const margin = element.style.marginLeft || element.style.paddingLeft;
+  const match = margin.match(/^(\d+(?:\.\d+)?)(px|rem|em)$/i);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const pixels = unit === 'px' ? amount : amount * 16;
+  return sanitizeIndentLevel(Math.round(pixels / 32));
+}
+
 export const PasteFormatting = Extension.create({
   name: 'pasteFormatting',
 
@@ -99,6 +119,19 @@ export const PasteFormatting = Extension.create({
               return textAlign ? { style: `text-align: ${textAlign}` } : {};
             },
           },
+          indentLevel: {
+            default: 0,
+            parseHTML: element => parseIndentLevel(element as HTMLElement) ?? 0,
+            renderHTML: attributes => {
+              const indentLevel = sanitizeIndentLevel(attributes.indentLevel) ?? 0;
+              return indentLevel > 0
+                ? {
+                    'data-indent-level': indentLevel,
+                    style: `margin-left: ${indentLevel * 2}rem`,
+                  }
+                : {};
+            },
+          },
         },
       },
     ];
@@ -114,8 +147,10 @@ export function getTextStyleAttributes(attrs: Record<string, unknown> | undefine
 }
 
 export function getTextAlignStyle(attrs: Record<string, unknown> | undefined): CSSProperties {
+  const indentLevel = sanitizeIndentLevel(attrs?.indentLevel) ?? 0;
   return {
     textAlign: sanitizeTextAlign(attrs?.textAlign) as CSSProperties['textAlign'] | undefined,
+    marginLeft: indentLevel > 0 ? `${indentLevel * 2}rem` : undefined,
   };
 }
 
@@ -131,5 +166,9 @@ export function getTextStyleCss(attrs: Record<string, unknown> | undefined): str
 
 export function getTextAlignCss(attrs: Record<string, unknown> | undefined): string {
   const textAlign = sanitizeTextAlign(attrs?.textAlign);
-  return textAlign ? `text-align:${textAlign}` : '';
+  const indentLevel = sanitizeIndentLevel(attrs?.indentLevel) ?? 0;
+  return [
+    textAlign ? `text-align:${textAlign}` : '',
+    indentLevel > 0 ? `margin-left:${indentLevel * 2}rem` : '',
+  ].filter(Boolean).join(';');
 }
