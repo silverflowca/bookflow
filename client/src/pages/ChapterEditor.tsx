@@ -5,7 +5,7 @@ import {
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
   LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3,
-  Indent, Outdent
+  Indent, Outdent, MessageSquare
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -27,7 +27,7 @@ import api from '../lib/api';
 import type {
   Chapter, InlineContent, MediaData, QuestionData, PollData, NoteData, LinkData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, ImageData, CollaboratorRole, BookSettings
+  CodeBlockData, ScriptureBlockData, ImageData, CollaboratorRole, BookSettings, MediaResponsePromptData
 } from '../types';
 import InlineContentModal from '../components/editor/InlineContentModal';
 import CommentsSidebar from '../components/comments/CommentsSidebar';
@@ -832,7 +832,7 @@ export default function ChapterEditor() {
 
   const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll'];
   // Types that can be inserted as an atom node at the cursor (no text selection needed)
-  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block'];
+  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block', 'media_response'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
@@ -1306,7 +1306,7 @@ export default function ChapterEditor() {
         <div className="flex-1 min-w-0">
           {/* Start of Chapter Preview */}
           {(bookSettings?.show_inline_form_preview ?? true) && (() => {
-            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block'];
+            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block', 'media_response'];
             const startItems = inlineContents.filter(
               item => POSITIONED_TYPES.includes(item.content_type) && item.position_in_chapter === 'start_of_chapter'
             );
@@ -1446,6 +1446,13 @@ export default function ChapterEditor() {
               className="text-pink-600"
             >
               <Video className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => handleAddInlineContent('media_response')}
+              title="Add Reader Audio/Video Response"
+              className="text-blue-600"
+            >
+              <MessageSquare className="h-4 w-4" />
             </ToolbarButton>
             <div className="w-px bg-surface-hover mx-1" />
             <ToolbarButton
@@ -1612,7 +1619,7 @@ export default function ChapterEditor() {
 
           {/* End of Chapter Preview */}
           {(bookSettings?.show_inline_form_preview ?? true) && (() => {
-            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block'];
+            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block', 'media_response'];
             const endItems = inlineContents.filter(
               item => POSITIONED_TYPES.includes(item.content_type) && item.position_in_chapter === 'end_of_chapter'
             );
@@ -1684,6 +1691,9 @@ export default function ChapterEditor() {
                   </button>
                   <button onClick={() => handleAddInlineContent('video')} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Add Video">
                     <Video className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => handleAddInlineContent('media_response')} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Add Reader Response">
+                    <MessageSquare className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -1799,6 +1809,7 @@ export default function ChapterEditor() {
               { type: 'link',            icon: '🔗', label: 'Link' },
               { type: 'audio',           icon: '🎵', label: 'Audio' },
               { type: 'video',           icon: '🎬', label: 'Video' },
+              { type: 'media_response',  icon: 'Response', label: 'Response' },
               { type: 'image',           icon: '🖼️',  label: 'Image' },
               { type: 'textbox',         icon: '🔤', label: 'Text Input' },
               { type: 'textarea',        icon: '📄', label: 'Text Area' },
@@ -1900,6 +1911,7 @@ function InlineContentItem({
     audio: <Play className="h-4 w-4 text-orange-600" />,
     video: <Video className="h-4 w-4 text-red-600" />,
     image: <Image className="h-4 w-4 text-sky-600" />,
+    media_response: <MessageSquare className="h-4 w-4 text-blue-600" />,
   };
 
   const bgColors: Record<string, string> = {
@@ -1911,6 +1923,7 @@ function InlineContentItem({
     audio: 'bg-orange-50',
     video: 'bg-red-50',
     image: 'bg-sky-50',
+    media_response: 'bg-blue-50',
   };
 
   const isHidden = item.visibility === 'author_only';
@@ -2339,6 +2352,21 @@ function ContentPreview({ item }: { item: InlineContent }) {
       );
     }
 
+    case 'media_response': {
+      const mr = data as MediaResponsePromptData;
+      return (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+          <p className="font-medium text-blue-900">{mr.prompt || 'Share your response'}</p>
+          <p className="text-xs text-blue-700 mt-1">
+            {(mr.allow_text ?? true) ? 'Text' : ''}
+            {(mr.allow_audio ?? true) ? `${mr.allow_text ?? true ? ' · ' : ''}Audio` : ''}
+            {(mr.allow_video ?? true) ? `${(mr.allow_text ?? true) || (mr.allow_audio ?? true) ? ' · ' : ''}Video` : ''}
+            {' '}responses · max {mr.max_responses_per_user || 1}/reader
+          </p>
+        </div>
+      );
+    }
+
     default:
       return <p className="text-sm text-muted">Preview not available</p>;
   }
@@ -2456,17 +2484,32 @@ function InlineFormPreviewItem({ item }: { item: InlineContent }) {
           </div>
         );
       }
+      case 'media_response': {
+        return (
+          <div className="w-full rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-1">Reader Response</p>
+            <p className="text-sm font-medium text-blue-950">{data?.prompt || 'Share your response'}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(data?.allow_text ?? true) && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-700 border">Text</span>}
+              {(data?.allow_audio ?? true) && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-orange-700 border">Audio</span>}
+              {(data?.allow_video ?? true) && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-red-700 border">Video</span>}
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">max {data?.max_responses_per_user || 1}/reader</span>
+            </div>
+          </div>
+        );
+      }
       default:
         return null;
     }
   }
 
   // Audio/video/code/scripture: render full-width without the anchor mark structure
-  const FULL_WIDTH_TYPES = ['audio', 'video', 'code_block', 'scripture_block'];
+  const FULL_WIDTH_TYPES = ['audio', 'video', 'code_block', 'scripture_block', 'media_response'];
   if (FULL_WIDTH_TYPES.includes(item.content_type)) {
     const typeColors: Record<string, string> = {
       audio: 'text-orange-600', video: 'text-red-600',
       code_block: 'text-slate-600', scripture_block: 'text-amber-700',
+      media_response: 'text-blue-700',
     };
     return (
       <div id={`preview-${item.id}`} className="w-full scroll-mt-6">

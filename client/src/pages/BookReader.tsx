@@ -5,7 +5,7 @@ import {
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff, HelpCircle, Share2
+  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2
 } from 'lucide-react';
 import { getTextAlignStyle, getTextStyleAttributes } from '../components/editor/PasteFormattingExtensions';
 
@@ -62,7 +62,7 @@ import { DEMO_BOOK_ID } from '../config/demoBook';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
-  AllFormResponsesResult,
+  AllFormResponsesResult, MediaResponsePromptData, MediaResponseRecord,
 } from '../types';
 
 function getExternalEmbedUrl(url?: string | null): string | null {
@@ -2135,6 +2135,8 @@ function getInlineContentIcon(type: string): React.ReactNode {
       return <Code className={`${iconClass} text-slate-600`} />;
     case 'scripture_block':
       return <BookOpen className={`${iconClass} text-amber-700`} />;
+    case 'media_response':
+      return <MessageSquare className={`${iconClass} text-blue-600`} />;
     default:
       return null;
   }
@@ -2444,7 +2446,7 @@ function TipTapNode({
         return <span>{anchorText}</span>;
       }
       // Block-level types must render as block, not inline-flex
-      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block']);
+      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block', 'media_response']);
       const isBlock = BLOCK_TYPES.has(effectiveIc.content_type);
       const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
       const markerClass = getInlineContentClass(effectiveIc.content_type);
@@ -2588,6 +2590,9 @@ function InlineContentBlock({ content, isAuthor = false, userId, defaultVisibili
   if (content.content_type === 'audio' || content.content_type === 'video') {
     return <MediaBlock content={content} />;
   }
+  if (content.content_type === 'media_response') {
+    return <MediaResponseBlock content={content} userId={userId} />;
+  }
   if (content.content_type === 'link') {
     return <LinkBlock content={content} />;
   }
@@ -2709,6 +2714,262 @@ function QuestionBlock({ content, defaultVisibility = 'shared' }: { content: Inl
           placeholder={api.getToken() ? 'Write your response…' : 'Sign in to write your response…'}
           className="w-full p-3 theme-input rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
+      )}
+    </div>
+  );
+}
+
+function MediaResponseBlock({ content, userId }: { content: InlineContent; userId?: string }) {
+  const data = content.content_data as MediaResponsePromptData;
+  const requestAuth = useContext(AuthGateContext);
+  const [responses, setResponses] = useState<MediaResponseRecord[]>([]);
+  const [text, setText] = useState('');
+  const [mode, setMode] = useState<'text' | 'audio' | 'video' | null>(null);
+  const [recordingType, setRecordingType] = useState<'audio' | 'video' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const maxResponses = Math.max(1, data.max_responses_per_user || 1);
+  const maxDuration = Math.max(10, data.max_duration_seconds || 180);
+  const myActiveResponses = responses.filter(response => response.user_id === userId && response.status === 'active' && !response.parent_id);
+  const canAdd = myActiveResponses.length < maxResponses;
+
+  const loadResponses = useCallback(async () => {
+    if (!api.getToken()) return;
+    try {
+      const rows = await api.getMediaResponses(content.id);
+      setResponses(rows);
+    } catch {
+      setError('Could not load responses.');
+    }
+  }, [content.id]);
+
+  useEffect(() => {
+    loadResponses();
+    return () => {
+      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+      streamRef.current?.getTracks().forEach(track => track.stop());
+    };
+  }, [loadResponses]);
+
+  const ensureAuth = () => {
+    if (api.getToken()) return true;
+    requestAuth();
+    return false;
+  };
+
+  const submitText = async () => {
+    if (!ensureAuth() || !text.trim() || !canAdd) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await api.createMediaResponse(content.id, {
+        response_type: 'text',
+        body: text.trim(),
+      });
+      setResponses(prev => [...prev, created]);
+      setText('');
+      setMode(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save response.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startRecording = async (type: 'audio' | 'video') => {
+    if (!ensureAuth() || !canAdd) return;
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
+      const mimeType = type === 'video' ? 'video/webm' : 'audio/webm';
+      const recorder = new MediaRecorder(stream, MediaRecorder.isTypeSupported(mimeType) ? { mimeType } : undefined);
+      streamRef.current = stream;
+      chunksRef.current = [];
+      recorderRef.current = recorder;
+      setRecordingType(type);
+
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        stream.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+        setRecordingType(null);
+        if (!blob.size) return;
+        setBusy(true);
+        try {
+          const file = new File([blob], `reader-response-${Date.now()}.webm`, { type: mimeType });
+          const upload = await api.uploadMedia(file, content.book_id, file.name);
+          const created = await api.createMediaResponse(content.id, {
+            response_type: type,
+            media_url: upload.file_url,
+          });
+          setResponses(prev => [...prev, created]);
+          setMode(null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Could not upload response.');
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      recorder.start();
+      stopTimerRef.current = setTimeout(() => recorder.stop(), maxDuration * 1000);
+    } catch {
+      setError('Microphone/camera permission is needed to record.');
+      setRecordingType(null);
+    }
+  };
+
+  const stopRecording = () => {
+    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop();
+    }
+  };
+
+  const deleteResponse = async (responseId: string) => {
+    if (!confirm('Delete this response so you can re-record?')) return;
+    setBusy(true);
+    try {
+      await api.deleteMediaResponse(responseId);
+      setResponses(prev => prev.filter(response => response.id !== responseId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete response.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const flagResponse = async (responseId: string) => {
+    const reason = window.prompt('Why are you reporting this response?') || '';
+    setBusy(true);
+    try {
+      await api.flagMediaResponse(responseId, reason);
+      setResponses(prev => prev.map(response => response.id === responseId ? { ...response, status: 'flagged' } : response));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not report response.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm">
+          <MessageSquare className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Reader Response</p>
+          <p className="mt-1 font-medium text-theme">{data.prompt || 'Share your response'}</p>
+          <p className="mt-1 text-xs text-muted">
+            {myActiveResponses.length}/{maxResponses} response{maxResponses === 1 ? '' : 's'} used
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {(data.allow_text ?? true) && (
+          <button
+            onClick={() => ensureAuth() && canAdd && setMode(mode === 'text' ? null : 'text')}
+            disabled={!canAdd || busy}
+            className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+          >
+            <MessageSquare className="h-4 w-4" /> Text
+          </button>
+        )}
+        {(data.allow_audio ?? true) && (
+          <button
+            onClick={() => recordingType === 'audio' ? stopRecording() : startRecording('audio')}
+            disabled={!canAdd || busy || recordingType === 'video'}
+            className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-white px-3 py-1.5 text-sm font-medium text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+          >
+            {recordingType === 'audio' ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {recordingType === 'audio' ? 'Stop' : 'Audio'}
+          </button>
+        )}
+        {(data.allow_video ?? true) && (
+          <button
+            onClick={() => recordingType === 'video' ? stopRecording() : startRecording('video')}
+            disabled={!canAdd || busy || recordingType === 'audio'}
+            className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            {recordingType === 'video' ? <Square className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+            {recordingType === 'video' ? 'Stop' : 'Video'}
+          </button>
+        )}
+      </div>
+
+      {!canAdd && (
+        <p className="mt-2 text-xs text-muted">Limit reached. Delete one of your responses below to re-record.</p>
+      )}
+
+      {mode === 'text' && canAdd && (
+        <div className="mt-3">
+          <textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-blue-200 bg-white p-3 text-sm text-theme focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="Write your response..."
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <button onClick={() => setMode(null)} className="rounded px-3 py-1.5 text-sm text-muted hover:bg-surface-hover">Cancel</button>
+            <button onClick={submitText} disabled={busy || !text.trim()} className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Save response</button>
+          </div>
+        </div>
+      )}
+
+      {recordingType && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-red-600" />
+          Recording {recordingType}. Tap Stop when finished. Max {maxDuration}s.
+        </div>
+      )}
+
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+      {responses.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {responses.map(response => {
+            const isMine = response.user_id === userId;
+            return (
+              <div key={response.id} className="rounded-xl border border-theme bg-surface p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted">
+                    {response.user?.display_name || (isMine ? 'You' : 'Reader')} · {response.response_type}
+                    {response.status === 'flagged' && <span className="ml-2 text-red-600">reported</span>}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {isMine && (
+                      <button onClick={() => deleteResponse(response.id)} disabled={busy} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600" title="Delete and re-record">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                    {!isMine && (
+                      <button onClick={() => flagResponse(response.id)} disabled={busy || response.status === 'flagged'} className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600" title="Report response">
+                        <Flag className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {response.response_type === 'text' && <p className="text-sm text-theme whitespace-pre-wrap">{response.body}</p>}
+                {response.response_type === 'audio' && response.media_url && <audio src={response.media_url} controls className="w-full h-9" preload="metadata" />}
+                {response.response_type === 'video' && response.media_url && (
+                  <video src={response.media_url} controls className="max-h-48 w-full rounded-lg bg-black" preload="metadata" playsInline />
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -4224,6 +4485,7 @@ function InlineMediaPlayer({ content }: { content: InlineContent }) {
 // Inline form element - renders interactive forms directly in the text
 function InlineFormElement({ content }: { content: InlineContent }) {
   const type = content.content_type;
+  const { user } = useAuth();
 
   switch (type) {
     case 'question':
@@ -4253,6 +4515,8 @@ function InlineFormElement({ content }: { content: InlineContent }) {
     case 'audio':
     case 'video':
       return <MediaBlock content={content} />;
+    case 'media_response':
+      return <MediaResponseBlock content={content} userId={user?.id} />;
     default:
       return null;
   }

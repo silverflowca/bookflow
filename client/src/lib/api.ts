@@ -22,6 +22,7 @@ import type {
   FeedbackComment,
   AnnotationCommand,
   ShareableUser,
+  MediaResponseRecord,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -232,6 +233,34 @@ class ApiClient {
     return this.request(`/inline-content/${id}/order`, {
       method: 'PATCH',
       body: JSON.stringify({ order_index }),
+    });
+  }
+
+  async getMediaResponses(contentId: string): Promise<MediaResponseRecord[]> {
+    return this.request(`/inline-content/${contentId}/media-responses`);
+  }
+
+  async createMediaResponse(contentId: string, data: {
+    response_type: 'text' | 'audio' | 'video';
+    body?: string;
+    media_url?: string;
+    duration_seconds?: number;
+    parent_id?: string;
+  }): Promise<MediaResponseRecord> {
+    return this.request(`/inline-content/${contentId}/media-responses`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMediaResponse(responseId: string): Promise<void> {
+    return this.request(`/media-responses/${responseId}`, { method: 'DELETE' });
+  }
+
+  async flagMediaResponse(responseId: string, reason?: string): Promise<{ success: boolean }> {
+    return this.request(`/media-responses/${responseId}/flag`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     });
   }
 

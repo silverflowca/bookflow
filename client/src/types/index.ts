@@ -215,7 +215,7 @@ export interface ActivityEvent {
 export type InlineContentType =
   | 'question' | 'poll' | 'highlight' | 'note' | 'link' | 'audio' | 'video'
   | 'select' | 'multiselect' | 'textbox' | 'textarea' | 'radio' | 'checkbox'
-  | 'code_block' | 'scripture_block' | 'image' | 'drawing';
+  | 'code_block' | 'scripture_block' | 'image' | 'drawing' | 'media_response';
 
 // Display mode for interactive content
 export type InlineDisplayMode = 'inline' | 'sidebar' | 'start_of_chapter' | 'end_of_chapter';
@@ -230,7 +230,7 @@ export interface InlineContent {
   anchor_text?: string;
   content_data: QuestionData | PollData | HighlightData | NoteData | LinkData | MediaData
     | SelectData | MultiselectData | TextboxData | TextareaData | RadioData | CheckboxData
-    | CodeBlockData | ScriptureBlockData | ImageData | DrawingData;
+    | CodeBlockData | ScriptureBlockData | ImageData | DrawingData | MediaResponsePromptData;
   created_by: string;
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
@@ -281,6 +281,32 @@ export interface MediaData {
   duration?: number;
   start_time?: number;
   size?: 25 | 50 | 75 | 100;
+}
+
+export interface MediaResponsePromptData {
+  prompt: string;
+  allow_audio?: boolean;
+  allow_video?: boolean;
+  allow_text?: boolean;
+  max_responses_per_user?: number;
+  max_duration_seconds?: number;
+}
+
+export interface MediaResponseRecord {
+  id: string;
+  inline_content_id: string;
+  book_id: string;
+  chapter_id: string;
+  user_id: string;
+  parent_id?: string | null;
+  response_type: 'text' | 'audio' | 'video';
+  body?: string | null;
+  media_url?: string | null;
+  duration_seconds?: number | null;
+  status: 'active' | 'deleted' | 'flagged' | 'hidden';
+  created_at: string;
+  updated_at: string;
+  user?: Pick<Profile, 'id' | 'display_name' | 'avatar_url'> | null;
 }
 
 // Interactive form element types

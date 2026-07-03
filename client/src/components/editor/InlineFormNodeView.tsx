@@ -7,7 +7,7 @@ import type {
 import { useEditorPreviewMode } from '../../contexts/EditorPreviewContext';
 import { getExternalEmbedUrl } from '../../lib/videoEmbeds';
 
-type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block' | 'drawing';
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block' | 'drawing' | 'media_response';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
@@ -291,6 +291,25 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         </figure>
       );
     }
+    case 'media_response': {
+      const d = contentData as any;
+      return (
+        <span className="block w-full mt-1" contentEditable={false}>
+          <span className="block rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-blue-700 mb-1">Reader Response</span>
+            <span className="block text-sm font-medium text-gray-900 mb-2">{d.prompt || 'Share your response'}</span>
+            <span className="inline-flex flex-wrap gap-1.5">
+              {(d.allow_text ?? true) && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-700 border">Text</span>}
+              {(d.allow_audio ?? true) && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-orange-700 border">Audio</span>}
+              {(d.allow_video ?? true) && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-red-700 border">Video</span>}
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                max {d.max_responses_per_user || 1}/reader
+              </span>
+            </span>
+          </span>
+        </span>
+      );
+    }
     default:
       return null;
   }
@@ -311,9 +330,10 @@ const TYPE_LABEL: Record<FormType, string> = {
   poll: 'Poll',
   scripture_block: 'Scripture',
   drawing: 'Drawing',
+  media_response: 'Reader Response',
 };
 
-const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image', 'drawing']);
+const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image', 'drawing', 'media_response']);
 
 // Per-type colour tokens used for the inline pill
 const TYPE_COLOR: Record<FormType, string> = {
@@ -329,6 +349,7 @@ const TYPE_COLOR: Record<FormType, string> = {
   poll:           'bg-green-50  border-green-200  text-green-700',
   scripture_block:'bg-amber-50  border-amber-200  text-amber-700',
   drawing:        'bg-purple-50 border-purple-200 text-purple-700',
+  media_response: 'bg-blue-50   border-blue-200   text-blue-700',
 };
 
 // Location badge styles for non-inline placements

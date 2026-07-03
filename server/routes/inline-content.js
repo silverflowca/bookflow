@@ -304,6 +304,208 @@ router.delete('/inline-content/:id', authenticate, async (req, res) => {
   }
 });
 
+async function getMediaResponseContent(contentId) {
+  const { data, error } = await supabase
+    .from('inline_content')
+    .select('id, content_type, content_data, book_id, chapter_id, book:books!inline_content_book_id_fkey(author_id, visibility)')
+    .eq('id', contentId)
+    .single();
+  if (error) throw error;
+  if (data.content_type !== 'media_response') {
+    const err = new Error('Not a media response prompt');
+    err.status = 400;
+    throw err;
+  }
+  return data;
+}
+
+async function attachMediaResponseProfiles(rows) {
+  const responses = rows || [];
+  const userIds = [...new Set(responses.map(row => row.user_id).filter(Boolean))];
+  if (userIds.length === 0) return responses;
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .in('id', userIds);
+
+  const profileMap = new Map((profiles || []).map(profile => [profile.id, profile]));
+  return responses.map(row => ({ ...row, user: profileMap.get(row.user_id) || null }));
+}
+
+// List audio/video/text responses for an inline media response prompt
+router.get('/inline-content/:id/media-responses', authenticate, async (req, res) => {
+  try {
+    await getMediaResponseContent(req.params.id);
+
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('media_responses')
+      .select('*')
+      .eq('inline_content_id', req.params.id)
+      .neq('status', 'deleted')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    res.json(await attachMediaResponseProfiles(data));
+  } catch (err) {
+    console.error('List media responses error:', err);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Add a reader/author audio, video, or text response
+router.post('/inline-content/:id/media-responses', authenticate, async (req, res) => {
+  const { response_type, body, media_url, duration_seconds, parent_id } = req.body;
+
+  try {
+    const content = await getMediaResponseContent(req.params.id);
+    const data = content.content_data || {};
+    const allowed = {
+      text: data.allow_text !== false,
+      audio: data.allow_audio !== false,
+      video: data.allow_video !== false,
+    };
+
+    if (!['text', 'audio', 'video'].includes(response_type) || !allowed[response_type]) {
+      return res.status(400).json({ error: 'This response type is not allowed' });
+    }
+    if (response_type === 'text' && !String(body || '').trim()) {
+      return res.status(400).json({ error: 'Text response is required' });
+    }
+    if ((response_type === 'audio' || response_type === 'video') && !media_url) {
+      return res.status(400).json({ error: 'Media URL is required' });
+    }
+
+    const maxPerUser = Math.max(1, Number(data.max_responses_per_user || 1));
+    if (!parent_id) {
+      const { count, error: countError } = await supabase
+        .schema('bookflow')
+        .from('media_responses')
+        .select('id', { count: 'exact', head: true })
+        .eq('inline_content_id', req.params.id)
+        .eq('user_id', req.user.id)
+        .is('parent_id', null)
+        .eq('status', 'active');
+
+      if (countError) throw countError;
+      if ((count || 0) >= maxPerUser) {
+        return res.status(409).json({ error: `Maximum of ${maxPerUser} response${maxPerUser === 1 ? '' : 's'} reached` });
+      }
+    }
+
+    const { data: inserted, error } = await supabase
+      .schema('bookflow')
+      .from('media_responses')
+      .insert({
+        inline_content_id: req.params.id,
+        book_id: content.book_id,
+        chapter_id: content.chapter_id,
+        user_id: req.user.id,
+        parent_id: parent_id || null,
+        response_type,
+        body: response_type === 'text' ? String(body || '').trim() : (body || null),
+        media_url: media_url || null,
+        duration_seconds: duration_seconds || null,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    const [withProfile] = await attachMediaResponseProfiles([inserted]);
+    res.status(201).json(withProfile);
+  } catch (err) {
+    console.error('Create media response error:', err);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Soft-delete own response so readers can re-record
+router.delete('/media-responses/:responseId', authenticate, async (req, res) => {
+  try {
+    const { data: existing, error: existingError } = await supabase
+      .schema('bookflow')
+      .from('media_responses')
+      .select('id, user_id, book_id, book:books!media_responses_book_id_fkey(author_id)')
+      .eq('id', req.params.responseId)
+      .single();
+
+    if (existingError) throw existingError;
+    const isOwner = existing.user_id === req.user.id;
+    const isBookAuthor = existing.book?.author_id === req.user.id;
+    if (!isOwner && !isBookAuthor) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const { error } = await supabase
+      .schema('bookflow')
+      .from('media_responses')
+      .update({ status: 'deleted', updated_at: new Date().toISOString() })
+      .eq('id', req.params.responseId);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete media response error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Flag/report a bad response and surface it in admin feedback
+router.post('/media-responses/:responseId/flag', authenticate, async (req, res) => {
+  const { reason } = req.body;
+
+  try {
+    const { data: existing, error: existingError } = await supabase
+      .schema('bookflow')
+      .from('media_responses')
+      .select('*')
+      .eq('id', req.params.responseId)
+      .single();
+
+    if (existingError) throw existingError;
+
+    const { error } = await supabase
+      .schema('bookflow')
+      .from('media_responses')
+      .update({
+        status: 'flagged',
+        flagged_by: req.user.id,
+        flag_reason: reason || null,
+        flagged_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.responseId);
+
+    if (error) throw error;
+
+    try {
+      await supabase.from('feedback').insert({
+        user_id: req.user.id,
+        type: 'bug',
+        title: 'Flagged reader media response',
+        description: [
+          `Reason: ${reason || 'No reason provided'}`,
+          `Response ID: ${existing.id}`,
+          `Inline content ID: ${existing.inline_content_id}`,
+          `Book ID: ${existing.book_id}`,
+          `Chapter ID: ${existing.chapter_id}`,
+          `Response type: ${existing.response_type}`,
+          existing.media_url ? `Media URL: ${existing.media_url}` : null,
+          existing.body ? `Text: ${existing.body}` : null,
+        ].filter(Boolean).join('\n'),
+      });
+    } catch (feedbackError) {
+      console.warn('Unable to create feedback record for flagged media response:', feedbackError.message);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Flag media response error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Vote in poll
 router.post('/polls/:id/vote', authenticate, async (req, res) => {
   const { selected_option, visibility } = req.body;

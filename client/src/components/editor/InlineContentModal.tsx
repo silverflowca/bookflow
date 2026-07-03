@@ -5,7 +5,7 @@ import { getHighlightTheme } from '../../lib/highlightTheme';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, ImageData, DrawingData
+  CodeBlockData, ScriptureBlockData, ImageData, DrawingData, MediaResponsePromptData
 } from '../../types';
 import {
   SelectForm, MultiselectForm, TextboxForm, TextareaForm,
@@ -51,6 +51,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
     code_block: isEditing ? 'Edit Code Block' : 'Add Code Block',
     scripture_block: isEditing ? 'Edit Scripture' : 'Add Scripture Verse',
     drawing: isEditing ? 'Edit Drawing' : 'Add Drawing',
+    media_response: isEditing ? 'Edit Reader Response' : 'Add Reader Response',
   };
 
   const handleSubmit = (data: Partial<InlineContent>) => {
@@ -158,6 +159,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
             {type === 'audio' && <MediaForm type="audio" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
             {type === 'video' && <MediaForm type="video" onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MediaData} isEditing={isEditing} bookId={bookId} />}
             {type === 'image' && <ImageForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ImageData} isEditing={isEditing} bookId={bookId} />}
+            {type === 'media_response' && <MediaResponsePromptForm onSubmit={handleSubmit} initialData={editingItem?.content_data as MediaResponsePromptData} />}
 
             {type === 'select' && <SelectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SelectData} isEditing={isEditing} hideButtons />}
             {type === 'multiselect' && <MultiselectForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as MultiselectData} isEditing={isEditing} hideButtons />}
@@ -171,6 +173,99 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
         </div>
       </div>
     </div>
+  );
+}
+
+function MediaResponsePromptForm({ onSubmit, initialData }: { onSubmit: (data: Partial<InlineContent>) => void; initialData?: MediaResponsePromptData }) {
+  const [prompt, setPrompt] = useState(initialData?.prompt || 'Share your response');
+  const [allowText, setAllowText] = useState(initialData?.allow_text ?? true);
+  const [allowAudio, setAllowAudio] = useState(initialData?.allow_audio ?? true);
+  const [allowVideo, setAllowVideo] = useState(initialData?.allow_video ?? true);
+  const [maxResponses, setMaxResponses] = useState(initialData?.max_responses_per_user || 1);
+  const [maxDuration, setMaxDuration] = useState(initialData?.max_duration_seconds || 180);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const contentData: MediaResponsePromptData = {
+      prompt: prompt.trim() || 'Share your response',
+      allow_text: allowText,
+      allow_audio: allowAudio,
+      allow_video: allowVideo,
+      max_responses_per_user: Math.max(1, maxResponses),
+      max_duration_seconds: Math.max(10, maxDuration),
+    };
+    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+  };
+
+  return (
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+        Readers will see a compact response card with text, audio, and/or video options. Their responses can be deleted and re-recorded.
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Prompt shown to readers</label>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={3}
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          placeholder="What would you like readers to respond to?"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Allowed response types</label>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Text', checked: allowText, set: setAllowText, icon: 'T' },
+            { label: 'Audio', checked: allowAudio, set: setAllowAudio, icon: '🎙' },
+            { label: 'Video', checked: allowVideo, set: setAllowVideo, icon: '▶' },
+          ].map(option => (
+            <button
+              key={option.label}
+              type="button"
+              onClick={() => option.set(!option.checked)}
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                option.checked ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="mr-1">{option.icon}</span>
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {!allowText && !allowAudio && !allowVideo && (
+          <p className="mt-2 text-xs text-red-600">Enable at least one response type.</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-1">Max responses per reader</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={maxResponses}
+            onChange={(e) => setMaxResponses(Number(e.target.value))}
+            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Max recording seconds</label>
+          <input
+            type="number"
+            min={10}
+            max={1800}
+            value={maxDuration}
+            onChange={(e) => setMaxDuration(Number(e.target.value))}
+            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+      </div>
+    </form>
   );
 }
 
