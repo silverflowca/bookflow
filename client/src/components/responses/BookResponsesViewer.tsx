@@ -356,7 +356,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
 
   if (type === 'audio' || type === 'video') {
     const mediaTitle = data.title || data.url || `${type} item`;
-    const showMediaTitle = normalizeDisplayText(mediaTitle) !== headerLabel;
+    const showMediaTitle = normalizeDisplayText(mediaTitle) !== headerLabel && mediaTitle !== data.url;
     return (
       <div className={`mt-4 rounded-xl border px-4 py-3 ${type === 'audio' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}`}>
         {sourceHeader}
@@ -365,6 +365,12 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
         </p>
         {showMediaTitle && (
           <p className={`text-sm font-medium ${type === 'audio' ? 'text-orange-950/85' : 'text-red-950/85'}`}>{mediaTitle}</p>
+        )}
+        {type === 'audio' && data.url && (
+          <audio src={data.url} controls className="mt-2 h-9 w-full" preload="metadata" />
+        )}
+        {type === 'video' && data.url && (
+          <video src={data.url} controls className="mt-2 max-h-64 w-full rounded-lg bg-black" preload="metadata" playsInline />
         )}
         {data.url && (
           <a href={data.url} target="_blank" rel="noreferrer" className={`mt-2 inline-block text-sm hover:underline break-all ${type === 'audio' ? 'text-orange-800' : 'text-red-800'}`}>
