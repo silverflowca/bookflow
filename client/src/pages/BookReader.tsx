@@ -68,9 +68,12 @@ import type {
 function getExternalEmbedUrl(url?: string | null): string | null {
   if (!url) return null;
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  if (yt) return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1`;
+  if (yt) {
+    const origin = typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
+    return `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1&enablejsapi=1${origin}`;
+  }
   const vm = url.match(/vimeo\.com\/(\d+)/);
-  if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1`;
+  if (vm) return `https://player.vimeo.com/video/${vm[1]}?dnt=1&api=1`;
   return null;
 }
 
@@ -121,6 +124,7 @@ export default function BookReader() {
   const [bookChapterStats, setBookChapterStats] = useState<Map<string, { completed: number; total: number }>>(new Map());
   const [showProgressPanel, setShowProgressPanel] = useState(false);
   const [showAccessibleResponses, setShowAccessibleResponses] = useState(false);
+  const [accessibleAnswerCount, setAccessibleAnswerCount] = useState(0);
   // Live episode banner
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string; guest_invite_url?: string; live_shows?: { guest_invite_url?: string } } | null>(null);
   const [liveBannerDismissed, setLiveBannerDismissed] = useState(false);
@@ -410,6 +414,10 @@ export default function BookReader() {
     });
   }, [inlineContent, contentFilter, isAuthor, user?.id]);
 
+  const showSidebarContentFilters = showReaderContentFilters
+    && visibleInlineContent.length > 0
+    && (isAuthor || inlineContent.some(ic => ic.created_by === user?.id));
+
   // Filter inline content based on selected filter
   const filteredInlineContent = useMemo(() => {
     return visibleInlineContent.filter(ic => {
@@ -424,6 +432,31 @@ export default function BookReader() {
       loadBook();
     }
   }, [bookId]);
+
+  const refreshAccessibleAnswerCount = useCallback(() => {
+    if (!bookId) {
+      setAccessibleAnswerCount(0);
+      return;
+    }
+
+    api.getAccessibleBookResponses(bookId)
+      .then(items => {
+        const count = (items || []).reduce((sum: number, item: any) => sum + ((item.responses || []).length), 0);
+        setAccessibleAnswerCount(count);
+      })
+      .catch(() => {
+        setAccessibleAnswerCount(0);
+      });
+  }, [bookId, user?.id]);
+
+  useEffect(() => {
+    refreshAccessibleAnswerCount();
+  }, [refreshAccessibleAnswerCount, chapterId]);
+
+  useEffect(() => {
+    window.addEventListener('bf-responses-changed', refreshAccessibleAnswerCount);
+    return () => window.removeEventListener('bf-responses-changed', refreshAccessibleAnswerCount);
+  }, [refreshAccessibleAnswerCount]);
 
 
   useEffect(() => {
@@ -1018,51 +1051,6 @@ export default function BookReader() {
             {book.subtitle && <p className="text-sm text-muted">{book.subtitle}</p>}
             <p className="text-sm text-muted mt-1">by {book.author?.display_name}</p>
 
-          {/* Answers button */}
-          <button
-            type="button"
-            onClick={() => setShowAccessibleResponses(true)}
-            className="mt-2 w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme text-sm text-muted hover:bg-surface-hover hover:text-theme transition-colors"
-          >
-            <BarChart2 className="h-4 w-4 shrink-0" />
-            <span>Answers</span>
-          </button>
-
-            {/* Progress button — shown when tracking is enabled */}
-            {progressEnabled && (() => {
-              const totalDone = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.completed, 0);
-              const totalItems = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.total, 0);
-              const chapterStat = chapterId ? bookChapterStats.get(chapterId) : undefined;
-              const chapterAllDone = chapterStat && chapterStat.total > 0 && chapterStat.completed >= chapterStat.total;
-              return (
-                <div className="mt-3">
-                  <button
-                    id="bf-progress-btn"
-                    onClick={() => setShowProgressPanel(v => !v)}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                      chapterAllDone
-                        ? 'border-2 border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-semibold hover:bg-green-100 dark:hover:bg-green-900'
-                        : 'border border-theme text-muted hover:bg-surface-hover hover:text-theme'
-                    }`}
-                  >
-                    <CheckCircle className={`h-4 w-4 shrink-0 ${chapterAllDone ? 'text-green-600' : 'text-green-500'}`} />
-                    <span className="flex-1 text-left">Progress</span>
-                    <span className={`text-xs font-semibold ${chapterAllDone ? 'text-green-600' : 'text-blue-500'}`}>
-                      {totalItems > 0 ? `${Math.round((totalDone / totalItems) * 100)}%` : '—'}
-                    </span>
-                  </button>
-                  {totalItems > 0 && (
-                    <div className="mt-1.5 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${chapterAllDone ? 'bg-green-500' : 'bg-blue-500'}`}
-                        style={{ width: `${Math.round((totalDone / totalItems) * 100)}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
             {/* Star rating — shown to readers when author has enabled it */}
             {book.settings?.show_ratings !== false && !isAuthor && (
               <SidebarRating bookId={bookId!} />
@@ -1077,8 +1065,97 @@ export default function BookReader() {
             )}
           </div>
 
+          <div className="px-4 pb-2">
+            {/* Reader responses button */}
+            {accessibleAnswerCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAccessibleResponses(true)}
+                className="group w-full overflow-hidden rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 via-white to-indigo-50 p-0.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md"
+              >
+                <span className="flex items-center gap-2 rounded-lg bg-white/80 px-2.5 py-1 text-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-600 text-white shadow-sm shadow-purple-200 transition-transform group-hover:scale-105">
+                    <BarChart2 className="h-3 w-3" />
+                  </span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block text-[13px] font-semibold leading-none text-theme">Reader Responses</span>
+                  </span>
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-700 tabular-nums">
+                    {accessibleAnswerCount}
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
+
+          {showSidebarContentFilters && (
+            <div className="px-4 pb-2 -mt-1">
+              <div className="px-0 py-0.5">
+                <div className="flex items-center gap-2">
+                  <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.18em] text-muted">Show</p>
+                  <div className="grid flex-1 grid-cols-3 gap-1 rounded-lg bg-surface-hover p-0.5">
+                    {(['all', 'author', 'mine'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setContentFilter(f)}
+                        className={`flex min-w-0 items-center justify-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] font-semibold transition-all ${
+                          contentFilter === f
+                            ? f === 'all' ? 'bg-primary-600 text-white shadow-sm'
+                              : f === 'author' ? 'bg-amber-500 text-white shadow-sm'
+                              : 'bg-blue-500 text-white shadow-sm'
+                            : 'text-muted hover:bg-surface hover:text-theme'
+                        }`}
+                      >
+                        {f === 'author' && <Crown className="h-2.5 w-2.5" />}
+                        {f === 'mine' && <User className="h-2.5 w-2.5" />}
+                        <span>{f === 'all' ? 'All' : f === 'author' ? 'Author' : isAuthor ? 'Mine' : 'My Notes'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="px-4 pt-3 pb-1">
             <span className="text-xs font-semibold uppercase tracking-widest text-muted">Chapters</span>
+          </div>
+
+          <div className="px-4 pb-2">
+            {/* Progress button — shown when tracking is enabled */}
+            {progressEnabled && (() => {
+              const totalDone = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.completed, 0);
+              const totalItems = Array.from(bookChapterStats.values()).reduce((a, s) => a + s.total, 0);
+              const chapterStat = chapterId ? bookChapterStats.get(chapterId) : undefined;
+              const chapterAllDone = chapterStat && chapterStat.total > 0 && chapterStat.completed >= chapterStat.total;
+              const progressPercent = totalItems > 0 ? Math.round((totalDone / totalItems) * 100) : 0;
+              return (
+                <div>
+                  <button
+                    id="bf-progress-btn"
+                    onClick={() => setShowProgressPanel(v => !v)}
+                    className={`relative w-full overflow-hidden flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                      chapterAllDone
+                        ? 'border-2 border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-semibold hover:bg-green-100 dark:hover:bg-green-900'
+                        : 'border border-theme text-muted hover:bg-surface-hover hover:text-theme'
+                    }`}
+                  >
+                    {totalItems > 0 && (
+                      <span
+                        className={`absolute inset-y-0 left-0 transition-all duration-700 ease-out ${chapterAllDone ? 'bg-green-500/15' : 'bg-blue-500/15'}`}
+                        style={{ width: showProgressPanel ? `${progressPercent}%` : '0%' }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <CheckCircle className={`relative h-4 w-4 shrink-0 ${chapterAllDone ? 'text-green-600' : 'text-green-500'}`} />
+                    <span className="relative flex-1 text-left">Show Progress</span>
+                    <span className={`relative text-xs font-semibold ${chapterAllDone ? 'text-green-600' : 'text-blue-500'}`}>
+                      {totalItems > 0 ? `${progressPercent}%` : '—'}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -1255,30 +1332,6 @@ export default function BookReader() {
           {/* Row 2: content filter + component type icons */}
           <div className="border-t border-theme">
             <div className="max-w-3xl mx-auto px-4 py-1.5 flex items-center gap-2 overflow-x-auto">
-              {/* Content filter pills */}
-              {showReaderContentFilters && (isAuthor || inlineContent.some(ic => ic.created_by === user?.id)) && (
-                <div className="flex items-center gap-1 shrink-0 border-r border-theme pr-2 mr-1">
-                  <span className="text-xs text-muted">Show:</span>
-                  {(['all', 'author', 'mine'] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setContentFilter(f)}
-                      className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-colors ${
-                        contentFilter === f
-                          ? f === 'all' ? 'bg-primary-600 text-white'
-                            : f === 'author' ? 'bg-amber-500 text-white'
-                            : 'bg-blue-500 text-white'
-                          : 'text-muted hover:bg-surface-hover'
-                      }`}
-                    >
-                      {f === 'author' && <Crown className="h-3 w-3" />}
-                      {f === 'mine' && <User className="h-3 w-3" />}
-                      {f === 'all' ? 'All' : f === 'author' ? 'Author' : isAuthor ? 'Mine' : 'My Notes'}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {/* Component type filter icons */}
               <HeaderComponentIcons
                 inlineContent={visibleInlineContent}
@@ -2984,6 +3037,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+  const embedRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -2992,6 +3046,8 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const [loaded, setLoaded] = useState(false);
   const [sticky, setSticky] = useState(false);
   const embedUrl = !isAudio ? getExternalEmbedUrl(data.url) : null;
+  const [embedResetKey, setEmbedResetKey] = useState(0);
+  const activeEmbedUrl = embedUrl ? `${embedUrl}&autoplay=${playing ? '1' : '0'}` : null;
 
   // Draggable PiP position — null = use default corner (bottom-right)
   const PIP_W = 280;
@@ -3059,12 +3115,44 @@ function MediaBlock({ content }: { content: InlineContent }) {
     setPipPos(null);
   }, [embedUrl]);
 
+  const pauseEmbed = useCallback(() => {
+    const embedWindow = embedRef.current?.contentWindow;
+    if (embedWindow) {
+      embedWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+      embedWindow.postMessage({ method: 'pause' }, '*');
+    }
+    setPlaying(false);
+    setEmbedResetKey(key => key + 1);
+    closePip();
+    clearPip(mediaId);
+  }, [clearPip, closePip, mediaId]);
+
+  const activateEmbed = useCallback(() => {
+    if (!embedUrl) return;
+    hasPlayedRef.current = true;
+    embedPipDismissedRef.current = false;
+    requestPlay(mediaId, pauseEmbed);
+    setPlaying(true);
+    if (pipId && pipId !== mediaId) {
+      setSticky(true);
+      requestPip(mediaId, closePip);
+    }
+  }, [closePip, embedUrl, mediaId, pauseEmbed, pipId, requestPip, requestPlay]);
+
   const openEmbedPip = useCallback(() => {
+    activateEmbed();
     hasPlayedRef.current = true;
     embedPipDismissedRef.current = false;
     setSticky(true);
     requestPip(mediaId, closePip);
-  }, [closePip, mediaId, requestPip]);
+  }, [activateEmbed, closePip, mediaId, requestPip]);
+
+  useEffect(() => {
+    if (sticky && pipId && pipId !== mediaId) {
+      setSticky(false);
+      setPipPos(null);
+    }
+  }, [mediaId, pipId, sticky]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -3082,7 +3170,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
         }
 
         const shouldShowPip = embedUrl
-          ? embedHasBeenVisibleRef.current && !embedPipDismissedRef.current && (!pipId || pipId === mediaId)
+          ? embedHasBeenVisibleRef.current && hasPlayedRef.current && !embedPipDismissedRef.current && (!pipId || pipId === mediaId)
           : hasPlayedRef.current;
 
         if (shouldShowPip) {
@@ -3109,7 +3197,9 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const pauseSelf = useCallback(() => {
     const el = mediaRef.current;
     if (el && !el.paused) { el.pause(); setPlaying(false); }
-  }, []);
+    closePip();
+    clearPip(mediaId);
+  }, [clearPip, closePip, mediaId]);
 
   const togglePlay = () => {
     const el = mediaRef.current;
@@ -3118,6 +3208,10 @@ function MediaBlock({ content }: { content: InlineContent }) {
       requestPlay(mediaId, pauseSelf);
       el.play();
       setPlaying(true);
+      if (!isAudio && pipId && pipId !== mediaId) {
+        setSticky(true);
+        requestPip(mediaId, closePip);
+      }
     } else {
       el.pause();
       setPlaying(false);
@@ -3149,6 +3243,9 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const canAutoPlayThisItem = isAudio || (!isAudio && !embedUrl);
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const sizePct = (data as any).size ?? 100;
+  const mediaBlockStyle = sizePct < 100
+    ? { width: `${sizePct}%`, minWidth: isAudio ? undefined : 'min(100%, 320px)' }
+    : undefined;
 
   const playSelf = useCallback(() => {
     const el = mediaRef.current;
@@ -3168,7 +3265,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   }, [canAutoPlayThisItem, content.id, playSelf, registerAutoPlay, unregisterAutoPlay]);
 
   return (
-    <div ref={containerRef} className={progressEnabled ? `progress-item media-progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : 'media-progress-item'} style={sizePct < 100 ? { width: `${sizePct}%` } : undefined}>
+    <div ref={containerRef} className={progressEnabled ? `progress-item media-progress-item${completions.has(itemKey) ? ' progress-item--done' : ''}` : 'media-progress-item'} style={mediaBlockStyle}>
       <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-transparent">
 
         {/* Embed (YouTube/Vimeo) */}
@@ -3185,17 +3282,30 @@ function MediaBlock({ content }: { content: InlineContent }) {
                 : undefined}
             >
               <iframe
-                src={embedUrl}
+                key={embedResetKey}
+                ref={embedRef}
+                src={activeEmbedUrl || embedUrl}
                 className="w-full h-full block bg-black"
                 style={sticky ? { height: '158px' } : undefined}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 title={data.title || 'Video'}
               />
+              {!sticky && !playing && (
+                <button
+                  onClick={activateEmbed}
+                  className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 text-white transition-colors hover:bg-black/20"
+                  title="Play video"
+                >
+                  <span className="w-14 h-14 rounded-full bg-black/40 border border-white/30 flex items-center justify-center shadow-md backdrop-blur-sm">
+                    <Play className="h-6 w-6 text-white ml-1" />
+                  </span>
+                </button>
+              )}
               {!sticky && (
                 <button
                   onClick={openEmbedPip}
-                  className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors"
+                  className="absolute bottom-2 right-2 z-20 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors"
                   title="Picture in picture"
                 >
                   <Square className="h-3.5 w-3.5" />

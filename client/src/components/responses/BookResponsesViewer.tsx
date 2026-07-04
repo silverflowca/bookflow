@@ -21,6 +21,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import api from '../../lib/api';
+import { getExternalEmbedUrl } from '../../lib/videoEmbeds';
 import type { BookResponseItem } from '../../types';
 
 interface Props {
@@ -43,6 +44,9 @@ type ResponseRowData = {
   answer_text?: string | null;
   selected_options?: string[] | null;
   response_data?: { value?: unknown } | null;
+  response_type?: 'text' | 'audio' | 'video';
+  body?: string | null;
+  media_url?: string | null;
   is_correct?: boolean | null;
   visibility?: ResponseVisibility;
   club_contexts?: { id: string; name: string; club_type?: string | null }[];
@@ -72,6 +76,7 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; icon
   video: { label: 'Video', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: <BarChart2 className="h-3.5 w-3.5" /> },
   code_block: { label: 'Code', color: 'text-slate-700', bg: 'bg-slate-50 border-slate-200', icon: <List className="h-3.5 w-3.5" /> },
   scripture_block: { label: 'Scripture', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: <MessageSquare className="h-3.5 w-3.5" /> },
+  media_response: { label: 'Reader Response', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', icon: <MessageSquare className="h-3.5 w-3.5" /> },
   radio: { label: 'Radio', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: <List className="h-3.5 w-3.5" /> },
   checkbox: { label: 'Checkbox', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: <CheckCircle className="h-3.5 w-3.5" /> },
   select: { label: 'Select', color: 'text-teal-700', bg: 'bg-teal-50 border-teal-200', icon: <ChevronDown className="h-3.5 w-3.5" /> },
@@ -112,6 +117,13 @@ function typeMeta(type: string) {
 
 function typeAccent(type: string) {
   switch (type) {
+    case 'media_response':
+      return {
+        ring: 'border-blue-300',
+        header: 'bg-gradient-to-r from-blue-50 via-white to-white',
+        circle: 'bg-blue-600 text-white shadow-blue-100',
+        body: 'bg-blue-50/30',
+      };
     case 'question':
       return {
         ring: 'border-blue-300',
@@ -203,6 +215,7 @@ function getItemLabel(item: BookResponseItem) {
   return (
     item.content_data?.question ||
     item.content_data?.label ||
+    item.content_data?.prompt ||
     item.content_data?.title ||
     item.anchor_text ||
     item.content_data?.placeholder ||
@@ -217,6 +230,7 @@ function normalizeDisplayText(value: unknown) {
 function getResponseText(response: ResponseRowData, type: string) {
   if (type === 'poll') return response.selected_option || '—';
   if (type === 'question') return response.answer_text || response.selected_options?.join(', ') || '—';
+  if (type === 'media_response') return response.body || response.media_url || response.response_type || '—';
   const value = response.response_data?.value;
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.join(', ');
@@ -357,6 +371,7 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
   if (type === 'audio' || type === 'video') {
     const mediaTitle = data.title || data.url || `${type} item`;
     const showMediaTitle = normalizeDisplayText(mediaTitle) !== headerLabel && mediaTitle !== data.url;
+    const embedUrl = type === 'video' ? getExternalEmbedUrl(data.url) : null;
     return (
       <div className={`mt-4 rounded-xl border px-4 py-3 ${type === 'audio' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'}`}>
         {sourceHeader}
@@ -369,7 +384,18 @@ function PassiveContentCard({ item }: { item: BookResponseItem }) {
         {type === 'audio' && data.url && (
           <audio src={data.url} controls className="mt-2 h-9 w-full" preload="metadata" />
         )}
-        {type === 'video' && data.url && (
+        {type === 'video' && embedUrl && (
+          <span className="mt-2 block aspect-video overflow-hidden rounded-lg bg-black">
+            <iframe
+              src={embedUrl}
+              className="h-full w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title={data.title || 'Video'}
+            />
+          </span>
+        )}
+        {type === 'video' && data.url && !embedUrl && (
           <video src={data.url} controls className="mt-2 max-h-64 w-full rounded-lg bg-black" preload="metadata" playsInline />
         )}
         {data.url && (
@@ -476,7 +502,13 @@ function ResponseRow({ response, type }: { response: ResponseRowData; type: stri
             </span>
           ))}
         </div>
-        <p className="text-sm text-gray-600 leading-relaxed break-words">{value}</p>
+        {type === 'media_response' && response.response_type === 'audio' && response.media_url ? (
+          <audio src={response.media_url} controls className="mt-1 h-9 w-full" preload="metadata" />
+        ) : type === 'media_response' && response.response_type === 'video' && response.media_url ? (
+          <video src={response.media_url} controls className="mt-1 max-h-52 w-full rounded-lg bg-black" preload="metadata" playsInline />
+        ) : (
+          <p className="text-sm text-gray-600 leading-relaxed break-words">{value}</p>
+        )}
       </div>
     </div>
   );
@@ -519,6 +551,7 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
   const [expanded, setExpanded] = useState(true);
   const isChoice = CHOICE_TYPES.includes(item.content_type);
   const isText = TEXT_TYPES.includes(item.content_type);
+  const isMediaResponse = item.content_type === 'media_response';
   const isPassive = PASSIVE_TYPES.includes(item.content_type as PassiveContentType);
   const hasOptions = !!item.content_data?.options?.length;
   const label = getItemLabel(item);
@@ -577,7 +610,7 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
             </div>
           )}
 
-          {(isText || item.content_type === 'question') && item.total > 0 && (
+          {(isText || item.content_type === 'question' || isMediaResponse) && item.total > 0 && (
             <div className={`${hasOptions ? 'mt-4 pt-4 border-t border-gray-100' : 'mt-3'}`}>
               {hasOptions && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Responses</p>}
               <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
