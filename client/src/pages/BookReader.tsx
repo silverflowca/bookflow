@@ -2979,7 +2979,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const data = content.content_data as MediaData;
   const isAudio = data.type === 'audio';
   const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
-  const { requestPlay, requestPip, clearPlay, clearPip, registerAutoPlay, unregisterAutoPlay, playNext, autoPlayEnabled } = useContext(MediaContext);
+  const { pipId, requestPlay, requestPip, clearPlay, clearPip, registerAutoPlay, unregisterAutoPlay, playNext, autoPlayEnabled } = useContext(MediaContext);
   const mediaId = `media:${content.id}`;
   const itemKey = `ic:${content.id}`;
   const completedRef = useRef(false);
@@ -2991,6 +2991,7 @@ function MediaBlock({ content }: { content: InlineContent }) {
   const [duration, setDuration] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [sticky, setSticky] = useState(false);
+  const embedUrl = !isAudio ? getExternalEmbedUrl(data.url) : null;
 
   // Draggable PiP position — null = use default corner (bottom-right)
   const PIP_W = 280;
@@ -3045,36 +3046,55 @@ function MediaBlock({ content }: { content: InlineContent }) {
     dragRef.current = null;
   };
 
-  // Show PiP when block scrolls out of view (once activated by playing); dismiss only when back in view or closed
+  // Show PiP when block scrolls out of view. Native video requires playback; embeds activate after being seen.
   const hasPlayedRef = useRef(false);
+  const embedHasBeenVisibleRef = useRef(false);
+  const embedPipDismissedRef = useRef(false);
   useEffect(() => { if (playing) hasPlayedRef.current = true; }, [playing]);
 
   const closePip = useCallback(() => {
     setSticky(false);
     hasPlayedRef.current = false;
+    if (embedUrl) embedPipDismissedRef.current = true;
     setPipPos(null);
-  }, []);
+  }, [embedUrl]);
+
+  const openEmbedPip = useCallback(() => {
+    hasPlayedRef.current = true;
+    embedPipDismissedRef.current = false;
+    setSticky(true);
+    requestPip(mediaId, closePip);
+  }, [closePip, mediaId, requestPip]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (hasPlayedRef.current) {
-          if (entry.isIntersecting) {
-            setSticky(false);
-            clearPip(mediaId);
-          } else {
-            setSticky(true);
-            requestPip(mediaId, closePip);
+        if (entry.isIntersecting) {
+          if (embedUrl) {
+            embedHasBeenVisibleRef.current = true;
+            embedPipDismissedRef.current = false;
           }
+          setSticky(false);
+          clearPip(mediaId);
+          return;
+        }
+
+        const shouldShowPip = embedUrl
+          ? embedHasBeenVisibleRef.current && !embedPipDismissedRef.current && (!pipId || pipId === mediaId)
+          : hasPlayedRef.current;
+
+        if (shouldShowPip) {
+          setSticky(true);
+          requestPip(mediaId, closePip);
         }
       },
       { threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [mediaId, requestPip, clearPip, closePip]);
+  }, [embedUrl, mediaId, pipId, requestPip, clearPip, closePip]);
 
   const handleTimeUpdate = useCallback((e: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement>) => {
     const el = e.target as HTMLVideoElement | HTMLAudioElement;
@@ -3126,7 +3146,6 @@ function MediaBlock({ content }: { content: InlineContent }) {
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  const embedUrl = !isAudio ? getExternalEmbedUrl(data.url) : null;
   const canAutoPlayThisItem = isAudio || (!isAudio && !embedUrl);
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const sizePct = (data as any).size ?? 100;
@@ -3155,14 +3174,55 @@ function MediaBlock({ content }: { content: InlineContent }) {
         {/* Embed (YouTube/Vimeo) */}
         {!isAudio && embedUrl && (
           <>
-            <div className="aspect-video w-full bg-black">
+            {sticky && <div className="aspect-video w-full bg-black" />}
+            <div
+              className={sticky ? 'bg-black' : 'relative aspect-video w-full bg-black group'}
+              onPointerDown={sticky ? onPipPointerDown : undefined}
+              onPointerMove={sticky ? onPipPointerMove : undefined}
+              onPointerUp={sticky ? onPipPointerUp : undefined}
+              style={sticky
+                ? (() => { const p = pipPos ?? getDefaultPos(); return { position: 'fixed', top: p.y, left: p.x, width: `${PIP_W}px`, zIndex: 52, borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', pointerEvents: 'all', cursor: 'grab', userSelect: 'none' }; })()
+                : undefined}
+            >
               <iframe
                 src={embedUrl}
                 className="w-full h-full block bg-black"
+                style={sticky ? { height: '158px' } : undefined}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 title={data.title || 'Video'}
               />
+              {!sticky && (
+                <button
+                  onClick={openEmbedPip}
+                  className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/60 transition-colors"
+                  title="Picture in picture"
+                >
+                  <Square className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {sticky && (
+                <>
+                  <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black/80 to-transparent" style={{ pointerEvents: 'none' }} />
+                  <div className="absolute top-0 left-0 h-8" style={{ right: '68px', pointerEvents: 'all' }} />
+                  <button
+                    onClick={() => { closePip(); clearPip(mediaId); }}
+                    style={{ position: 'absolute', top: '6px', right: '6px', pointerEvents: 'all' }}
+                    className="w-6 h-6 rounded-full bg-black/70 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/90 transition-colors"
+                    title="Close picture in picture"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                    style={{ position: 'absolute', top: '6px', right: '36px', pointerEvents: 'all' }}
+                    className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-colors"
+                    title="Scroll back to video"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
             </div>
             {/* Manual completion for embeds — iframes can't report playback position */}
             {progressEnabled && (
