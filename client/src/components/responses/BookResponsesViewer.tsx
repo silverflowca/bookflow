@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BarChart2,
   CheckCircle,
@@ -685,25 +685,32 @@ export default function BookResponsesViewer({
     setActiveChapterId(initialChapterId || null);
   }, [initialChapterId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = mode === 'accessible'
-          ? await api.getAccessibleBookResponses(bookId, initialChapterId)
-          : await api.getBookResponses(bookId, initialChapterId);
-        if (!cancelled) setResponseItems(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message || 'Failed to load responses');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const loadResponses = useCallback(async (signal?: { cancelled: boolean }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = mode === 'accessible'
+        ? await api.getAccessibleBookResponses(bookId, initialChapterId)
+        : await api.getBookResponses(bookId, initialChapterId);
+      if (!signal?.cancelled) setResponseItems(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      if (!signal?.cancelled) setError(err?.message || 'Failed to load responses');
+    } finally {
+      if (!signal?.cancelled) setLoading(false);
     }
-    load();
-    return () => { cancelled = true; };
   }, [bookId, initialChapterId, mode]);
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    loadResponses(signal);
+    return () => { signal.cancelled = true; };
+  }, [loadResponses]);
+
+  useEffect(() => {
+    const refresh = () => loadResponses();
+    window.addEventListener('bf-responses-changed', refresh);
+    return () => window.removeEventListener('bf-responses-changed', refresh);
+  }, [loadResponses]);
 
   const chapters = useMemo(() => {
     const byChapter = new Map<string, { id: string; title: string; order: number; count: number }>();
