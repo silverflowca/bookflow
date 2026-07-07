@@ -4507,9 +4507,10 @@ function SignatureBlock({ content, isAuthor = false, userId, defaultVisibility =
               (mode === 'typed' && !typedName.trim()) ||
               (mode === 'checkbox' && !agreed)
             }
-            className="w-full py-2 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
+            className="w-full py-2.5 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
           >
-            {saveStatus === 'saving' ? 'Signing…' : 'Sign'}
+            {saveStatus === 'saving' ? 'Signing…' : '✍ Sign Document'}
           </button>
         </div>
       )}
