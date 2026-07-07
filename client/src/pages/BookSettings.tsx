@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2, Download, Edit, ExternalLink } from 'lucide-react';
+import { useParams, Link, useLocation } from 'react-router-dom';
+import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2, Download, Edit, ExternalLink, PenLine } from 'lucide-react';
 import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
@@ -8,6 +8,7 @@ import SignatureStatusTab from '../components/signatures/SignatureStatusTab';
 
 export default function BookSettings() {
   const { bookId } = useParams<{ bookId: string }>();
+  const location = useLocation();
   const [book, setBook] = useState<Book | null>(null);
   const [settings, setSettings] = useState<BookSettingsType | null>(null);
   const [title, setTitle] = useState('');
@@ -238,44 +239,40 @@ export default function BookSettings() {
         </div>
       </div>
 
-      {/* Quick links */}
-      <div id="bf-settings-quicklinks" className="flex gap-3 mb-8">
-        <Link
-          to={`/edit/book/${bookId}/collaborators`}
-          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
-        >
-          <Users className="h-4 w-4" />
-          Collaborators
-        </Link>
-        <Link
-          to={`/edit/book/${bookId}/versions`}
-          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
-        >
-          <History className="h-4 w-4" />
-          Versions
-        </Link>
-        <Link
-          to={`/edit/book/${bookId}/activity`}
-          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
-        >
-          <Activity className="h-4 w-4" />
-          Activity
-        </Link>
-        <Link
-          to={`/edit/book/${bookId}/dashboard`}
-          className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
-        >
-          <BarChart2 className="h-4 w-4" />
-          Dashboard
-        </Link>
+      {/* Sub-nav tabs */}
+      <div id="bf-settings-quicklinks" className="flex gap-1 mb-8 border-b border-theme overflow-x-auto">
+        {[
+          { to: `/edit/book/${bookId}/settings`, label: 'Settings', icon: null, exact: true },
+          { to: `/edit/book/${bookId}/collaborators`, label: 'Collaborators', icon: <Users className="h-3.5 w-3.5" /> },
+          { to: `/edit/book/${bookId}/versions`, label: 'Versions', icon: <History className="h-3.5 w-3.5" /> },
+          { to: `/edit/book/${bookId}/activity`, label: 'Activity', icon: <Activity className="h-3.5 w-3.5" /> },
+          { to: `/edit/book/${bookId}/dashboard`, label: 'Dashboard', icon: <BarChart2 className="h-3.5 w-3.5" /> },
+          { to: `/edit/book/${bookId}/signatures`, label: 'E-Signatures', icon: <PenLine className="h-3.5 w-3.5" /> },
+        ].map(({ to, label, icon, exact }) => {
+          const active = exact ? location.pathname === to : location.pathname.startsWith(to);
+          return (
+            <Link
+              key={to}
+              to={to}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+                active
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-muted hover:text-theme'
+              }`}
+            >
+              {icon}
+              {label}
+            </Link>
+          );
+        })}
         {book.slug && (
           <a
             href={`/read/${book.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 theme-section rounded-lg text-sm font-medium text-muted hover:text-theme transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-muted hover:text-theme transition-colors -mb-px"
           >
-            <Share2 className="h-4 w-4" />
+            <Share2 className="h-3.5 w-3.5" />
             Public URL
           </a>
         )}
@@ -845,15 +842,6 @@ export default function BookSettings() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* E-Signatures */}
-      <div className="p-6">
-        <h2 className="text-lg font-semibold mb-1 text-theme">E-Signatures</h2>
-        <p className="text-sm text-muted mb-4">
-          Track signature requests and responses from readers. Add a <strong>Signature</strong> component in the chapter editor to start collecting signatures.
-        </p>
-        {bookId && <SignatureStatusTab bookId={bookId} />}
       </div>
 
       {/* Save Button */}

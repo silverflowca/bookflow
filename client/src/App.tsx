@@ -36,6 +36,7 @@ import BookLandingPage from './pages/BookLandingPage';
 import DocsPage from './pages/DocsPage';
 import MyFeedbackPage from './pages/MyFeedbackPage';
 import BookChatPage from './pages/BookChatPage';
+import BookSignaturesPage from './pages/BookSignaturesPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -106,6 +107,12 @@ function AppRoutes() {
         <Route path="edit/book/:bookId/settings" element={
           <ProtectedRoute>
             <BookSettings />
+          </ProtectedRoute>
+        } />
+
+        <Route path="edit/book/:bookId/signatures" element={
+          <ProtectedRoute>
+            <BookSignaturesPage />
           </ProtectedRoute>
         } />
 
