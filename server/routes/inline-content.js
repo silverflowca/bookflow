@@ -738,7 +738,7 @@ router.get('/books/:bookId/my-answers', authenticate, async (req, res) => {
 // ─── E-Signature Routes ────────────────────────────────────────────────────────
 
 // POST /inline-content/:id/signatures — submit a signature
-router.post('/:id/signatures', authenticate, async (req, res) => {
+router.post('/inline-content/:id/signatures', authenticate, async (req, res) => {
   try {
     const { signer_name, signature_type, signature_data, visibility } = req.body;
     if (!['drawn', 'typed', 'checkbox'].includes(signature_type)) {
@@ -780,7 +780,7 @@ router.post('/:id/signatures', authenticate, async (req, res) => {
 });
 
 // GET /inline-content/:id/signatures/mine — get current user's signature
-router.get('/:id/signatures/mine', authenticate, async (req, res) => {
+router.get('/inline-content/:id/signatures/mine', authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
       .schema('bookflow')
@@ -799,7 +799,7 @@ router.get('/:id/signatures/mine', authenticate, async (req, res) => {
 });
 
 // GET /inline-content/:id/signatures/all — get all signatures (author only)
-router.get('/:id/signatures/all', authenticate, async (req, res) => {
+router.get('/inline-content/:id/signatures/all', authenticate, async (req, res) => {
   try {
     // Verify author
     const { data: ic } = await supabase
@@ -829,7 +829,7 @@ router.get('/:id/signatures/all', authenticate, async (req, res) => {
 });
 
 // DELETE /inline-content/:id/signatures/mine — retract signature
-router.delete('/:id/signatures/mine', authenticate, async (req, res) => {
+router.delete('/inline-content/:id/signatures/mine', authenticate, async (req, res) => {
   try {
     const { error } = await supabase
       .schema('bookflow')
