@@ -60,6 +60,11 @@ export const InlineFormNode = Node.create({
           return { 'data-content-data': JSON.stringify(attrs.contentData) };
         },
       },
+      _v: {
+        default: 0,
+        parseHTML: () => 0,
+        renderHTML: () => ({}),
+      },
     };
   },
 

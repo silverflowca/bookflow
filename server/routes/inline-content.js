@@ -735,4 +735,115 @@ router.get('/books/:bookId/my-answers', authenticate, async (req, res) => {
   }
 });
 
+// ─── E-Signature Routes ────────────────────────────────────────────────────────
+
+// POST /inline-content/:id/signatures — submit a signature
+router.post('/:id/signatures', authenticate, async (req, res) => {
+  try {
+    const { signer_name, signature_type, signature_data, visibility } = req.body;
+    if (!['drawn', 'typed', 'checkbox'].includes(signature_type)) {
+      return res.status(400).json({ error: 'Invalid signature_type' });
+    }
+
+    // Verify the inline_content exists and is a signature type
+    const { data: ic, error: icErr } = await supabase
+      .schema('bookflow')
+      .from('inline_content')
+      .select('id, book_id, content_type')
+      .eq('id', req.params.id)
+      .single();
+    if (icErr || !ic) return res.status(404).json({ error: 'Content not found' });
+    if (ic.content_type !== 'signature') return res.status(400).json({ error: 'Not a signature block' });
+
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('signature_responses')
+      .upsert({
+        inline_content_id: req.params.id,
+        user_id: req.user.id,
+        book_id: ic.book_id,
+        signer_name: signer_name || null,
+        signature_type,
+        signature_data: signature_data || null,
+        visibility: visibility || 'private',
+        agreed_at: new Date().toISOString(),
+      }, { onConflict: 'inline_content_id,user_id' })
+      .select(`*, user:user_id(id, display_name, avatar_url)`)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Submit signature error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /inline-content/:id/signatures/mine — get current user's signature
+router.get('/:id/signatures/mine', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('signature_responses')
+      .select(`*, user:user_id(id, display_name, avatar_url)`)
+      .eq('inline_content_id', req.params.id)
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Get my signature error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /inline-content/:id/signatures/all — get all signatures (author only)
+router.get('/:id/signatures/all', authenticate, async (req, res) => {
+  try {
+    // Verify author
+    const { data: ic } = await supabase
+      .schema('bookflow')
+      .from('inline_content')
+      .select('book_id, book:books(author_id)')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!ic || ic.book.author_id !== req.user.id) {
+      return res.status(403).json({ error: 'Author access required' });
+    }
+
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('signature_responses')
+      .select(`*, user:user_id(id, display_name, avatar_url)`)
+      .eq('inline_content_id', req.params.id)
+      .order('agreed_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ responses: data, total: data.length });
+  } catch (err) {
+    console.error('Get all signatures error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /inline-content/:id/signatures/mine — retract signature
+router.delete('/:id/signatures/mine', authenticate, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .schema('bookflow')
+      .from('signature_responses')
+      .delete()
+      .eq('inline_content_id', req.params.id)
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete signature error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

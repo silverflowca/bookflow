@@ -5,11 +5,11 @@ import { getHighlightTheme } from '../../lib/highlightTheme';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, ImageData, DrawingData, MediaResponsePromptData
+  CodeBlockData, ScriptureBlockData, ImageData, DrawingData, MediaResponsePromptData, SignatureData
 } from '../../types';
 import {
   SelectForm, MultiselectForm, TextboxForm, TextareaForm,
-  RadioForm, CheckboxForm, CodeBlockForm, ScriptureBlockForm
+  RadioForm, CheckboxForm, CodeBlockForm, ScriptureBlockForm, SignatureForm
 } from './InteractiveForms';
 import DrawingCanvas from './DrawingCanvas';
 
@@ -24,7 +24,7 @@ interface Props {
   onUpdate?: (id: string, data: Partial<InlineContent>) => void; // For edit mode
 }
 
-const FORM_TYPES = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox'];
+const FORM_TYPES = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'signature'];
 
 export default function InlineContentModal({ type, selectedText, hasCursor, bookId, onClose, onCreate, editingItem, onUpdate }: Props) {
   const isEditing = !!editingItem;
@@ -52,6 +52,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
     scripture_block: isEditing ? 'Edit Scripture' : 'Add Scripture Verse',
     drawing: isEditing ? 'Edit Drawing' : 'Add Drawing',
     media_response: isEditing ? 'Edit Reader Response' : 'Add Reader Response',
+    signature: isEditing ? 'Edit Signature Request' : 'Add Signature Request',
   };
 
   const handleSubmit = (data: Partial<InlineContent>) => {
@@ -169,6 +170,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
             {type === 'checkbox' && <CheckboxForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CheckboxData} isEditing={isEditing} hideButtons />}
             {type === 'code_block' && <CodeBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CodeBlockData} isEditing={isEditing} hideButtons />}
             {type === 'scripture_block' && <ScriptureBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ScriptureBlockData} isEditing={isEditing} hideButtons />}
+            {type === 'signature' && <SignatureForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SignatureData} isEditing={isEditing} hideButtons />}
           </div>
         </div>
       </div>

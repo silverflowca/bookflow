@@ -130,6 +130,10 @@ body {
 .ProseMirror {
   min-height: 300px;
   outline: none;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.125rem;
+  line-height: 1.8;
+  color: var(--color-text);
 }
 
 /* Restore heading + list styles inside the editor.
@@ -485,15 +489,9 @@ body {
 }
 
 .inline-textbox {
-  background-color: rgba(59, 130, 246, 0.18);
-  border-bottom: 2px dashed #3b82f6;
-  outline: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .inline-textarea {
-  background-color: rgba(59, 130, 246, 0.15);
-  border-bottom: 2px dashed #3b82f6;
-  outline: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .inline-radio {

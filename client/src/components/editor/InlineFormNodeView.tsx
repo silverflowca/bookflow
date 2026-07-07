@@ -1,13 +1,13 @@
-import { BookOpen } from 'lucide-react';
+import { BookOpen, PenLine } from 'lucide-react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import type {
-  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData, ScriptureBlockData,
+  TextboxData, TextareaData, SelectData, MultiselectData, RadioData, CheckboxData, PollData, ScriptureBlockData, SignatureData,
 } from '../../types/index';
 import { useEditorPreviewMode } from '../../contexts/EditorPreviewContext';
 import { getExternalEmbedUrl } from '../../lib/videoEmbeds';
 
-type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block' | 'drawing' | 'media_response';
+type FormType = 'textbox' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'audio' | 'video' | 'image' | 'poll' | 'scripture_block' | 'drawing' | 'media_response' | 'signature';
 type Position = 'inline' | 'start_of_chapter' | 'end_of_chapter';
 
 // ─── Inline widget previews (read-only) ─────────────────────────────────────
@@ -42,18 +42,23 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
     }
     case 'textarea': {
       const d = contentData as TextareaData;
-      const isFull = (d.width ?? 'full') === 'full';
+      const isFull = !d.width || d.width === 'full';
+      const widthStyle: React.CSSProperties = isFull ? { width: '100%' } : (WIDTH_STYLE[d.width!] ?? { width: '100%' });
       return (
-        <span className={`${isFull ? 'flex flex-1 min-w-0' : 'inline-flex'} items-start gap-1 ml-1 align-middle`} data-testid="inline-form-preview-textarea">
-          <textarea
-            placeholder={d.placeholder || d.label || 'Type here…'}
-            defaultValue={d.default_value || ''}
-            readOnly
-            tabIndex={-1}
-            rows={Math.min(d.rows || 2, 2)}
-            className="px-2 py-0.5 text-sm border border-gray-300 rounded pointer-events-none resize-none"
-            style={{ background: 'rgba(255,255,255,0.45)', ...(isFull ? { width: '100%' } : WIDTH_STYLE[d.width ?? 'full']) }}
-          />
+        <span className="block" style={widthStyle} data-testid="inline-form-preview-textarea">
+          <span className="block bg-surface-hover border border-theme rounded-lg p-3">
+            {(d.show_label ?? true) && d.label && (
+              <span className="block mb-2 text-sm font-medium leading-snug text-theme">{d.label}</span>
+            )}
+            <textarea
+              placeholder={d.placeholder || 'Enter your response...'}
+              defaultValue={d.default_value || ''}
+              readOnly
+              tabIndex={-1}
+              rows={d.rows || 4}
+              className="w-full p-2 theme-input rounded-lg resize-none pointer-events-none"
+            />
+          </span>
         </span>
       );
     }
@@ -310,6 +315,31 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         </span>
       );
     }
+    case 'signature': {
+      const d = contentData as SignatureData;
+      return (
+        <span className="block w-full" data-testid="inline-form-preview-signature">
+          <span className="block bg-surface-hover border-2 border-dashed border-theme rounded-lg p-3">
+            <span className="flex items-center gap-2 mb-2">
+              <PenLine className="h-4 w-4 text-muted" />
+              <span className="text-sm font-medium text-theme">{d.label || 'Signature'}</span>
+              {d.required && <span className="text-red-500 text-xs">*</span>}
+            </span>
+            {d.description && (
+              <span className="block text-xs text-muted mb-2">{d.description}</span>
+            )}
+            <span className="block h-14 rounded border border-dashed border-theme bg-white/50 flex items-center justify-center">
+              <span className="text-xs text-muted opacity-60">Signature area</span>
+            </span>
+            <span className="flex gap-2 mt-2">
+              {(d.allow_drawn ?? true) && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Draw</span>}
+              {(d.allow_typed ?? true) && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Type</span>}
+              {(d.allow_checkbox ?? true) && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Agree</span>}
+            </span>
+          </span>
+        </span>
+      );
+    }
     default:
       return null;
   }
@@ -331,9 +361,10 @@ const TYPE_LABEL: Record<FormType, string> = {
   scripture_block: 'Scripture',
   drawing: 'Drawing',
   media_response: 'Reader Response',
+  signature: 'Signature',
 };
 
-const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image', 'drawing', 'media_response']);
+const BLOCK_MEDIA_TYPES = new Set<FormType>(['audio', 'video', 'image', 'drawing', 'media_response', 'signature']);
 
 // Per-type colour tokens used for the inline pill
 const TYPE_COLOR: Record<FormType, string> = {
@@ -350,6 +381,7 @@ const TYPE_COLOR: Record<FormType, string> = {
   scripture_block:'bg-amber-50  border-amber-200  text-amber-700',
   drawing:        'bg-purple-50 border-purple-200 text-purple-700',
   media_response: 'bg-blue-50   border-blue-200   text-blue-700',
+  signature:      'bg-purple-50 border-purple-200 text-purple-700',
 };
 
 // Location badge styles for non-inline placements
@@ -441,6 +473,43 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
           )}
           <span className="text-xs opacity-60 font-normal">[{label}]</span>
         </span>
+      </NodeViewWrapper>
+    );
+  }
+
+  // ── Textarea: render as full block matching the reader ───────────────────
+  if (contentType === 'textarea') {
+    const taData = contentData as TextareaData | null;
+    const taFull = !taData?.width || taData.width === 'full';
+    const taWidthStyle: React.CSSProperties = taFull ? {} : (WIDTH_STYLE[taData!.width!] ?? {});
+    return (
+      <NodeViewWrapper as="div" className="my-1" style={taWidthStyle} data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
+        <div
+          className={`rounded${ringClass} cursor-pointer`}
+          onDoubleClick={handleDoubleClick}
+          title="Double-click to edit"
+        >
+          {!!contentData && (
+            <FormPreview contentType={contentType} contentData={contentData as any} />
+          )}
+        </div>
+      </NodeViewWrapper>
+    );
+  }
+
+  // ── Signature: render as full block matching the reader ──────────────────
+  if (contentType === 'signature') {
+    return (
+      <NodeViewWrapper as="div" className="my-1" data-content-id={contentId} data-content-type={contentType} data-testid="inline-form-node">
+        <div
+          className={`rounded${ringClass} cursor-pointer`}
+          onDoubleClick={handleDoubleClick}
+          title="Double-click to edit"
+        >
+          {!!contentData && (
+            <FormPreview contentType={contentType} contentData={contentData as any} />
+          )}
+        </div>
       </NodeViewWrapper>
     );
   }

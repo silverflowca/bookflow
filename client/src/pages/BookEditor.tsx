@@ -1328,7 +1328,7 @@ export default function BookEditor() {
                           to={`/edit/book/${bookId}/chapter/${chapter.id}`}
                           className="block font-medium hover:text-accent break-words"
                         >
-                          Chapter {index + 1}: {chapter.title}
+                          {index + 1}. {chapter.title}
                         </Link>
                         <div className="mt-1 flex gap-3 text-xs text-muted flex-wrap">
                           <span>{chapter.word_count || 0} words</span>

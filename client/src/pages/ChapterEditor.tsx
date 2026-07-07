@@ -5,7 +5,7 @@ import {
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
   LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3,
-  Indent, Outdent, MessageSquare
+  Indent, Outdent, MessageSquare, Undo2, Redo2
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -524,7 +524,9 @@ export default function ChapterEditor() {
   // Apply content that was loaded before the editor was ready
   useEffect(() => {
     if (editor && pendingContentRef.current) {
-      editor.commands.setContent(pendingContentRef.current as any);
+      editor.commands.setContent(pendingContentRef.current as any, false);
+      // Reset undo history so the initial load can't be undone
+      editor.view.updateState(editor.state.reconfigure({ plugins: editor.state.plugins }));
       pendingContentRef.current = null;
     }
   }, [editor]);
@@ -582,7 +584,9 @@ export default function ChapterEditor() {
           }
         }
         if (editor) {
-          editor.commands.setContent(contentToSet);
+          editor.commands.setContent(contentToSet, false);
+          // Reset undo history so the initial load can't be undone
+          editor.view.updateState(editor.state.reconfigure({ plugins: editor.state.plugins }));
         } else {
           // Editor not ready yet — stash for the editor-ready effect
           pendingContentRef.current = contentToSet;
@@ -830,9 +834,9 @@ export default function ChapterEditor() {
     }
   }
 
-  const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll'];
+  const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'signature'];
   // Types that can be inserted as an atom node at the cursor (no text selection needed)
-  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block', 'media_response'];
+  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block', 'media_response', 'signature'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
@@ -1068,7 +1072,7 @@ export default function ChapterEditor() {
         state.doc.descendants((node, pos) => {
           if (found) return false;
           if (node.type.name === 'inlineFormWidget' && node.attrs.contentId === id) {
-            tr.setNodeMarkup(pos, undefined, { ...node.attrs, contentData: data.content_data });
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, contentData: data.content_data, _v: Date.now() });
             found = true;
           }
         });
@@ -1329,6 +1333,21 @@ export default function ChapterEditor() {
           {/* Toolbar */}
           <div id="bf-editor-toolbar" className="bg-surface rounded-t-lg border border-b-0 border-theme p-2 flex gap-1 flex-wrap sticky top-12 z-20 shadow-sm">
             <ToolbarButton
+              onClick={() => editor?.chain().focus().undo().run()}
+              active={false}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().redo().run()}
+              active={false}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </ToolbarButton>
+            <div className="w-px bg-surface-hover mx-1 self-stretch" />
+            <ToolbarButton
               onClick={() => editor?.chain().focus().toggleBold().run()}
               active={editor?.isActive('bold')}
               title="Bold"
@@ -1524,6 +1543,13 @@ export default function ChapterEditor() {
               className="text-purple-600"
             >
               <Pencil className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => handleAddInlineContent('signature')}
+              title="Add Signature Request"
+              className="text-purple-700"
+            >
+              <MessageSquare className="h-4 w-4" />
             </ToolbarButton>
             <div className="w-px bg-surface-hover mx-1" />
             <ToolbarButton
@@ -1912,6 +1938,7 @@ function InlineContentItem({
     video: <Video className="h-4 w-4 text-red-600" />,
     image: <Image className="h-4 w-4 text-sky-600" />,
     media_response: <MessageSquare className="h-4 w-4 text-blue-600" />,
+    signature: <MessageSquare className="h-4 w-4 text-purple-700" />,
   };
 
   const bgColors: Record<string, string> = {

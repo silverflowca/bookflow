@@ -666,10 +666,19 @@ export default function ClubDetailPage() {
   const { user } = useAuth();
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<PanelTab>(() => {
-    const requestedTab = searchParams.get('tab');
-    return isPanelTab(requestedTab) ? requestedTab : 'overview';
-  });
+  const rawTab = searchParams.get('tab');
+  const tab: PanelTab = isPanelTab(rawTab) ? rawTab : 'overview';
+
+  function setTab(t: PanelTab) {
+    const next = new URLSearchParams(searchParams);
+    if (t === 'overview') {
+      next.delete('tab');
+    } else {
+      next.set('tab', t);
+    }
+    setSearchParams(next, { replace: true });
+  }
+
   const { counts: chatUnread, clearClub: clearChatUnread } = useChatUnread();
   const [showInvite, setShowInvite] = useState(false);
   const [showAddBook, setShowAddBook] = useState(false);
@@ -689,33 +698,6 @@ export default function ClubDetailPage() {
   useEffect(() => {
     if (clubId) loadClub();
   }, [clubId]);
-
-  useEffect(() => {
-    const requestedTab = searchParams.get('tab');
-    if (isPanelTab(requestedTab) && requestedTab !== tab) {
-      setTab(requestedTab);
-      return;
-    }
-
-    if (!requestedTab && tab !== 'overview') {
-      setTab('overview');
-    }
-  }, [searchParams, tab]);
-
-  useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (tab === 'overview') {
-      nextParams.delete('tab');
-    } else {
-      nextParams.set('tab', tab);
-    }
-
-    const currentParams = searchParams.toString();
-    const targetParams = nextParams.toString();
-    if (currentParams !== targetParams) {
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [tab, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (tab === 'progress' && clubId && !progressData) loadProgress();

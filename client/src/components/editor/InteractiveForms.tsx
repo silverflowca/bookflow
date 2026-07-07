@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type {
   InlineContent, InlineDisplayMode, SelectData, MultiselectData, TextboxData, TextareaData,
-  RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, LabelPosition
+  RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, LabelPosition, SignatureData
 } from '../../types';
 
 interface FormProps {
@@ -1087,6 +1087,86 @@ export function ScriptureBlockForm({ onSubmit, onClose, initialData, isEditing, 
       </label>
 
       <DisplayModeSelector value={displayMode} onChange={setDisplayMode} />
+
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
+    </form>
+  );
+}
+
+// ─── Signature Form ───────────────────────────────────────────────────────────
+
+export function SignatureForm({ onSubmit, onClose, initialData, isEditing, hideButtons }: FormProps & { initialData?: SignatureData }) {
+  const [label, setLabel] = useState(initialData?.label || 'Please sign below');
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [required, setRequired] = useState(initialData?.required ?? true);
+  const [allowDrawn, setAllowDrawn] = useState(initialData?.allow_drawn ?? true);
+  const [allowTyped, setAllowTyped] = useState(initialData?.allow_typed ?? true);
+  const [allowCheckbox, setAllowCheckbox] = useState(initialData?.allow_checkbox ?? true);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const contentData: SignatureData = {
+      label,
+      description: description || undefined,
+      required,
+      allow_drawn: allowDrawn,
+      allow_typed: allowTyped,
+      allow_checkbox: allowCheckbox,
+      width: 'full',
+    };
+    onSubmit({ content_data: contentData, visibility: 'all_readers' });
+  };
+
+  return (
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">Label <span className="text-red-500">*</span></label>
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          placeholder="Please sign below"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Description (optional)</label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          rows={2}
+          placeholder="By signing, I confirm that I have read and understood the content above."
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Allowed signature methods</label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={allowDrawn} onChange={(e) => setAllowDrawn(e.target.checked)} />
+            <span className="text-sm">Draw (canvas)</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={allowTyped} onChange={(e) => setAllowTyped(e.target.checked)} />
+            <span className="text-sm">Type name</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={allowCheckbox} onChange={(e) => setAllowCheckbox(e.target.checked)} />
+            <span className="text-sm">Checkbox agreement</span>
+          </label>
+        </div>
+        {!allowDrawn && !allowTyped && !allowCheckbox && (
+          <p className="text-xs text-red-500 mt-1">At least one method must be selected.</p>
+        )}
+      </div>
+
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+        <span className="text-sm">Required</span>
+      </label>
 
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
