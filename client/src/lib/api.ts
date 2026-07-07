@@ -1311,6 +1311,10 @@ class ApiClient {
     return this.request(`/feedback/${id}`);
   }
 
+  async updateFeedback(id: string, data: { title: string; description?: string }): Promise<Feedback> {
+    return this.request(`/feedback/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
   async updateFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback> {
     return this.request(`/feedback/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
   }

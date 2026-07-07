@@ -359,6 +359,38 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
+// ── PATCH /:id — update title/description (owner or admin) ───────────────────
+router.patch('/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { title, description } = req.body;
+  if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
+
+  try {
+    const { data: feedback, error: fbErr } = await supabase
+      .from('feedback')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    if (fbErr || !feedback) return res.status(404).json({ error: 'Feedback not found' });
+
+    const isOwner = feedback.user_id === req.user.id;
+    const isAdmin = req.user.system_role === 'super_admin';
+    if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Access denied' });
+
+    const { data, error } = await supabase
+      .from('feedback')
+      .update({ title: title.trim().slice(0, 500), description: description?.trim() || null, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('[feedback] PATCH /:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── PATCH /:id/status — update status (admin only) ───────────────────────────
 router.patch('/:id/status', authenticate, requireSuperAdmin, async (req, res) => {
   const { id } = req.params;
