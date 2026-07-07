@@ -755,7 +755,7 @@ router.post('/inline-content/:id/signatures', authenticate, async (req, res) => 
     if (icErr || !ic) return res.status(404).json({ error: 'Content not found' });
     if (ic.content_type !== 'signature') return res.status(400).json({ error: 'Not a signature block' });
 
-    const { data, error } = await supabase
+    const { error: upsertError } = await supabase
       .schema('bookflow')
       .from('signature_responses')
       .upsert({
@@ -767,8 +767,17 @@ router.post('/inline-content/:id/signatures', authenticate, async (req, res) => 
         signature_data: signature_data || null,
         visibility: visibility || 'private',
         agreed_at: new Date().toISOString(),
-      }, { onConflict: 'inline_content_id,user_id' })
-      .select(`*, user:user_id(id, display_name, avatar_url)`)
+      }, { onConflict: 'inline_content_id,user_id' });
+
+    if (upsertError) throw upsertError;
+
+    // Re-fetch with profile join (user_id → bookflow.profiles via auth.users)
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('signature_responses')
+      .select(`*, user:profiles!user_id(id, display_name, avatar_url)`)
+      .eq('inline_content_id', req.params.id)
+      .eq('user_id', req.user.id)
       .single();
 
     if (error) throw error;
@@ -785,7 +794,7 @@ router.get('/inline-content/:id/signatures/mine', authenticate, async (req, res)
     const { data, error } = await supabase
       .schema('bookflow')
       .from('signature_responses')
-      .select(`*, user:user_id(id, display_name, avatar_url)`)
+      .select(`*, user:profiles!user_id(id, display_name, avatar_url)`)
       .eq('inline_content_id', req.params.id)
       .eq('user_id', req.user.id)
       .maybeSingle();
@@ -816,7 +825,7 @@ router.get('/inline-content/:id/signatures/all', authenticate, async (req, res) 
     const { data, error } = await supabase
       .schema('bookflow')
       .from('signature_responses')
-      .select(`*, user:user_id(id, display_name, avatar_url)`)
+      .select(`*, user:profiles!user_id(id, display_name, avatar_url)`)
       .eq('inline_content_id', req.params.id)
       .order('agreed_at', { ascending: false });
 
