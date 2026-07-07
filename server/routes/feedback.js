@@ -237,6 +237,44 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
+// ── GET /mine — list current user's own feedback submissions ─────────────────
+router.get('/mine', authenticate, async (req, res) => {
+  const { status, type, page = '1', limit = '20' } = req.query;
+  const pageNum = Math.max(1, parseInt(page, 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10)));
+  const offset = (pageNum - 1) * pageSize;
+
+  try {
+    let query = supabase
+      .from('feedback')
+      .select(`
+        id, type, title, description, status, page_url, created_at, updated_at,
+        screenshots:feedback_screenshots(id, storage_path, order_index, note),
+        audio:feedback_audio(id, storage_path, duration_seconds),
+        comments:feedback_comments(id, body, created_at, author:profiles!feedback_comments_author_id_fkey(id, display_name, avatar_url))
+      `, { count: 'exact' })
+      .eq('user_id', req.user.id)
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (status) query = query.eq('status', status);
+    if (type) query = query.eq('type', type);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    const normalized = (data ?? []).map(item => ({
+      ...item,
+      audio: Array.isArray(item.audio) ? (item.audio[0] ?? null) : item.audio,
+    }));
+
+    res.json({ data: normalized, count, page: pageNum, limit: pageSize });
+  } catch (err) {
+    console.error('[feedback] GET /mine error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET / — list all feedback (admin only) ────────────────────────────────────
 router.get('/', authenticate, requireSuperAdmin, async (req, res) => {
   const { status, type, page = '1', limit = '20' } = req.query;
@@ -344,20 +382,27 @@ router.patch('/:id/status', authenticate, requireSuperAdmin, async (req, res) =>
   }
 });
 
-// ── POST /:id/comments — add discussion reply (admin only) ────────────────────
-router.post('/:id/comments', authenticate, requireSuperAdmin, async (req, res) => {
+// ── POST /:id/comments — add discussion reply (owner or admin) ────────────────
+router.post('/:id/comments', authenticate, async (req, res) => {
   const { id } = req.params;
   const { body } = req.body;
   if (!body?.trim()) return res.status(400).json({ error: 'body is required' });
 
   try {
-    // Fetch feedback to get owner + title for notification
+    // Fetch feedback to get owner + title for authorization + notification
     const { data: feedback, error: fbErr } = await supabase
       .from('feedback')
       .select('id, user_id, title')
       .eq('id', id)
       .single();
     if (fbErr || !feedback) return res.status(404).json({ error: 'Feedback not found' });
+
+    // Authorization: must be owner or super_admin
+    const isOwner = feedback.user_id === req.user.id;
+    const isAdmin = req.user.system_role === 'super_admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
 
     // Insert comment
     const { data: comment, error: cmtErr } = await supabase
@@ -376,8 +421,25 @@ router.post('/:id/comments', authenticate, requireSuperAdmin, async (req, res) =
       .update({ updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    // Notify the submitter (but not if admin is replying to themselves)
-    if (feedback.user_id !== req.user.id) {
+    // Notify: if owner replied → notify admins; if admin replied → notify owner
+    if (isOwner) {
+      // Notify all super_admins
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('system_role', 'super_admin');
+      const adminIds = (admins || []).map(a => a.id).filter(aid => aid !== req.user.id);
+      if (adminIds.length > 0) {
+        await supabase.from('user_notifications').insert(
+          adminIds.map(adminId => ({
+            user_id: adminId,
+            type: 'feedback_reply',
+            title: `User replied to feedback: "${feedback.title}"`,
+            body: body.trim().slice(0, 300),
+          }))
+        );
+      }
+    } else if (isAdmin && feedback.user_id !== req.user.id) {
       await notifyFeedbackReply(feedback.user_id, feedback.title, body.trim());
     }
 

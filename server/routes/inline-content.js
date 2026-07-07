@@ -197,17 +197,29 @@ router.put('/inline-content/:id', authenticate, async (req, res) => {
     // Check ownership
     const { data: existing, error: existingError } = await supabase
       .from('inline_content')
-      .select('created_by, book:books!inline_content_book_id_fkey(author_id)')
+      .select('created_by, book_id, book:books!inline_content_book_id_fkey(author_id)')
       .eq('id', req.params.id)
       .single();
 
     if (existingError) throw existingError;
 
-    // Allow update if user is creator or book author
-    const isAuthor = existing.book?.author_id === req.user.id;
+    // Allow update if user is creator, book owner, or accepted collaborator
+    const isOwner = existing.book?.author_id === req.user.id;
     const isCreator = existing.created_by === req.user.id;
+    let isCollaborator = false;
+    if (!isOwner && !isCreator) {
+      const { data: collab } = await supabase
+        .schema('bookflow')
+        .from('book_collaborators')
+        .select('id')
+        .eq('book_id', existing.book_id)
+        .eq('user_id', req.user.id)
+        .not('invite_accepted_at', 'is', null)
+        .maybeSingle();
+      isCollaborator = !!collab;
+    }
 
-    if (!isCreator && !isAuthor) {
+    if (!isCreator && !isOwner && !isCollaborator) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
@@ -251,13 +263,25 @@ router.patch('/inline-content/:id/order', authenticate, async (req, res) => {
   try {
     const { data: existing, error: existingError } = await supabase
       .from('inline_content')
-      .select('created_by, book:books!inline_content_book_id_fkey(author_id)')
+      .select('created_by, book_id, book:books!inline_content_book_id_fkey(author_id)')
       .eq('id', req.params.id)
       .single();
     if (existingError) throw existingError;
-    const isAuthor = existing.book?.author_id === req.user.id;
+    const isOwner = existing.book?.author_id === req.user.id;
     const isCreator = existing.created_by === req.user.id;
-    if (!isCreator && !isAuthor) return res.status(403).json({ error: 'Not authorized' });
+    let isCollaborator = false;
+    if (!isOwner && !isCreator) {
+      const { data: collab } = await supabase
+        .schema('bookflow')
+        .from('book_collaborators')
+        .select('id')
+        .eq('book_id', existing.book_id)
+        .eq('user_id', req.user.id)
+        .not('invite_accepted_at', 'is', null)
+        .maybeSingle();
+      isCollaborator = !!collab;
+    }
+    if (!isCreator && !isOwner && !isCollaborator) return res.status(403).json({ error: 'Not authorized' });
 
     const { error } = await supabase
       .from('inline_content')
@@ -274,19 +298,31 @@ router.patch('/inline-content/:id/order', authenticate, async (req, res) => {
 // Delete inline content
 router.delete('/inline-content/:id', authenticate, async (req, res) => {
   try {
-    // Check ownership or book author
+    // Check ownership or book author/collaborator
     const { data: existing, error: existingError } = await supabase
       .from('inline_content')
-      .select('created_by, book:books!inline_content_book_id_fkey(author_id)')
+      .select('created_by, book_id, book:books!inline_content_book_id_fkey(author_id)')
       .eq('id', req.params.id)
       .single();
 
     if (existingError) throw existingError;
 
-    const isAuthor = existing.book?.author_id === req.user.id;
+    const isOwner = existing.book?.author_id === req.user.id;
     const isCreator = existing.created_by === req.user.id;
+    let isCollaborator = false;
+    if (!isOwner && !isCreator) {
+      const { data: collab } = await supabase
+        .schema('bookflow')
+        .from('book_collaborators')
+        .select('id')
+        .eq('book_id', existing.book_id)
+        .eq('user_id', req.user.id)
+        .not('invite_accepted_at', 'is', null)
+        .maybeSingle();
+      isCollaborator = !!collab;
+    }
 
-    if (!isCreator && !isAuthor) {
+    if (!isCreator && !isOwner && !isCollaborator) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 

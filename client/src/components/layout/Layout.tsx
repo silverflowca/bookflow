@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles, HelpCircle } from 'lucide-react';
+import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles, HelpCircle, Inbox } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 import FeedbackButton from '../feedback/FeedbackButton';
@@ -304,10 +304,18 @@ export default function Layout() {
       <Link
         to={profile?.system_role === 'super_admin' ? '/admin' : '/settings'}
         onClick={() => { setShowThemeDropdown(false); setShowMobileMenu(false); }}
-        className="flex items-center gap-3 px-4 py-3 border-b-2 border-theme text-sm font-semibold text-theme hover:bg-surface-hover transition-colors"
+        className="flex items-center gap-3 px-4 py-3 border-b border-theme text-sm font-semibold text-theme hover:bg-surface-hover transition-colors"
       >
         <Settings className="h-4 w-4 text-accent" />
         <span>{profile?.system_role === 'super_admin' ? 'Admin & Settings' : 'More Settings'}</span>
+      </Link>
+      <Link
+        to="/my-feedback"
+        onClick={() => { setShowThemeDropdown(false); setShowMobileMenu(false); }}
+        className="flex items-center gap-3 px-4 py-3 border-b-2 border-theme text-sm font-semibold text-theme hover:bg-surface-hover transition-colors"
+      >
+        <Inbox className="h-4 w-4 text-accent" />
+        <span>My Feedback</span>
       </Link>
 
       {/* Colour Themes — collapsible sub-section */}
@@ -523,8 +531,11 @@ export default function Layout() {
                     onClick={() => { openFeedback(); setShowMobileMenu(false); }}
                     className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full"
                   >
-                    <MessageSquarePlus className="h-5 w-5 text-accent flex-shrink-0" /> Feedback
+                    <MessageSquarePlus className="h-5 w-5 text-accent flex-shrink-0" /> Submit Feedback
                   </button>
+                  <Link to="/my-feedback" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
+                    <Inbox className="h-5 w-5 text-accent flex-shrink-0" /> My Feedback
+                  </Link>
                   <Link to="/docs" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors">
                     <HelpCircle className="h-5 w-5 text-accent flex-shrink-0" /> Help & Documentation
                   </Link>

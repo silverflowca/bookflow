@@ -1283,6 +1283,18 @@ class ApiClient {
     return this.request('/feedback', { method: 'POST', body: JSON.stringify(data) });
   }
 
+  async getMyFeedback(params?: {
+    status?: FeedbackStatus;
+    type?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: Feedback[]; count: number; page: number; limit: number }> {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))).toString()
+      : '';
+    return this.request(`/feedback/mine${qs}`);
+  }
+
   async adminGetFeedback(params?: {
     status?: FeedbackStatus;
     type?: string;

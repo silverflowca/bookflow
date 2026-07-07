@@ -34,6 +34,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import BookLandingPage from './pages/BookLandingPage';
 import DocsPage from './pages/DocsPage';
+import MyFeedbackPage from './pages/MyFeedbackPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -216,6 +217,13 @@ function AppRoutes() {
         <Route path="admin" element={
           <ProtectedRoute>
             <AdminPage />
+          </ProtectedRoute>
+        } />
+
+        {/* My Feedback */}
+        <Route path="my-feedback" element={
+          <ProtectedRoute>
+            <MyFeedbackPage />
           </ProtectedRoute>
         } />
 
