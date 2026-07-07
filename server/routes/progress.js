@@ -1,6 +1,7 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
 import { authenticate } from '../middleware/auth.js';
+import { postBookChatComponentUpdate } from '../services/chat-status.js';
 
 const router = express.Router();
 
@@ -133,6 +134,10 @@ router.post('/complete', authenticate, async (req, res) => {
     if (error) throw error;
 
     res.json({ ok: true });
+
+    // Fire book-chat component update (non-blocking, after response sent)
+    postBookChatComponentUpdate(req.user.id, chapter.book_id, chapter_id, item_type)
+      .catch(err => console.error('[book-chat] component update error:', err.message));
   } catch (err) {
     console.error('Mark complete error:', err);
     res.status(500).json({ error: err.message });

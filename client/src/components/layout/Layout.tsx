@@ -587,7 +587,7 @@ export default function Layout() {
       </header>
 
       {/* Main Content — flex-1 so it fills remaining height; overflow-auto for normal pages */}
-      <main className={`flex-1 overflow-auto${user ? ' pb-20 md:pb-0' : ''}`}>
+      <main id="bf-main" className={`flex-1 overflow-auto${user ? ' pb-20 md:pb-0' : ''}`}>
         <Outlet />
       </main>
 

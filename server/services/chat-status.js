@@ -374,6 +374,132 @@ export function rescheduleClubCron(clubId, cronExpression) {
   console.log(`[chat-status] Scheduled custom cron for club ${clubId}: ${cronExpression}`)
 }
 
+// ─── Book Chat System Messages ────────────────────────────────────────────────
+
+async function insertBookChatSystemMessage(bookId, body, statusPayload) {
+  const { data, error } = await supabase
+    .schema('bookflow').from('book_chat_messages')
+    .insert({
+      book_id: bookId,
+      sender_id: null,
+      message_type: 'system_status',
+      body,
+      status_payload: statusPayload,
+    })
+    .select('id').single()
+
+  if (error) console.error('[chat-status] insertBookChatSystemMessage error:', error.message)
+  return data?.id
+}
+
+/**
+ * Called from books.js PUT /books/:id/progress when chapter changes or book completes.
+ * Posts a status message to the book-level chat.
+ */
+export async function postBookChatProgressUpdate(userId, bookId, newChapterId, percentComplete, justCompleted) {
+  try {
+    const { data: settings } = await supabase
+      .schema('bookflow').from('book_settings')
+      .select('enable_book_chat, chat_share_reader_progress, chat_share_book_progress')
+      .eq('book_id', bookId)
+      .maybeSingle()
+
+    if (!settings?.enable_book_chat) return
+
+    const { data: profile } = await supabase
+      .schema('bookflow').from('profiles')
+      .select('display_name, share_my_progress')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!profile?.share_my_progress && profile?.share_my_progress !== undefined) return
+    const name = profile?.display_name || 'A reader'
+
+    if (justCompleted && settings.chat_share_book_progress) {
+      const body = `✅ ${name} just finished reading the book!`
+      await insertBookChatSystemMessage(bookId, body, {
+        event: 'book_completed',
+        member_id: userId,
+        member_name: name,
+        book_id: bookId,
+      })
+    } else if (newChapterId && settings.chat_share_reader_progress) {
+      const { data: ch } = await supabase
+        .schema('bookflow').from('chapters')
+        .select('title, order_index')
+        .eq('id', newChapterId)
+        .maybeSingle()
+
+      const chapterLabel = ch
+        ? `${ch.order_index + 1}. "${ch.title}"`
+        : `Chapter ${newChapterId}`
+
+      const body = `📖 ${name} started ${chapterLabel} (${Math.round(percentComplete)}% complete)`
+      await insertBookChatSystemMessage(bookId, body, {
+        event: 'chapter_started',
+        member_id: userId,
+        member_name: name,
+        book_id: bookId,
+        chapter_id: newChapterId,
+        chapter_title: ch?.title || null,
+        percent: percentComplete,
+      })
+    }
+  } catch (err) {
+    console.error('[chat-status] postBookChatProgressUpdate error:', err.message)
+  }
+}
+
+/**
+ * Called from progress.js POST /progress/complete when an interactive component is completed.
+ * Posts a status message to the book-level chat.
+ */
+export async function postBookChatComponentUpdate(userId, bookId, chapterId, itemType) {
+  try {
+    const { data: settings } = await supabase
+      .schema('bookflow').from('book_settings')
+      .select('enable_book_chat, chat_share_reader_progress')
+      .eq('book_id', bookId)
+      .maybeSingle()
+
+    if (!settings?.enable_book_chat || !settings?.chat_share_reader_progress) return
+
+    const { data: profile } = await supabase
+      .schema('bookflow').from('profiles')
+      .select('display_name, share_my_progress')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!profile?.share_my_progress && profile?.share_my_progress !== undefined) return
+    const name = profile?.display_name || 'A reader'
+
+    const { data: ch } = await supabase
+      .schema('bookflow').from('chapters')
+      .select('title, order_index')
+      .eq('id', chapterId)
+      .maybeSingle()
+
+    const chapterTitle = ch?.title || 'a chapter'
+    const typeLabel = itemType === 'poll' ? 'poll' :
+                      itemType === 'question' ? 'question' :
+                      itemType === 'textbox' || itemType === 'textarea' ? 'form' :
+                      itemType || 'component'
+
+    const body = `${name} completed a ${typeLabel} in "${chapterTitle}"`
+    await insertBookChatSystemMessage(bookId, body, {
+      event: 'component_completed',
+      member_id: userId,
+      member_name: name,
+      book_id: bookId,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      item_type: itemType,
+    })
+  } catch (err) {
+    console.error('[chat-status] postBookChatComponentUpdate error:', err.message)
+  }
+}
+
 export async function startStatusCron() {
   // Global default: every Monday at 9am
   cron.schedule('0 9 * * 1', runGlobalWeeklySummary)

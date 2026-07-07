@@ -1,7 +1,7 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
 import { authenticate, optionalAuth, requireAuthor } from '../middleware/auth.js';
-import { postCompletionUpdate } from '../services/chat-status.js';
+import { postCompletionUpdate, postBookChatProgressUpdate } from '../services/chat-status.js';
 
 const router = express.Router();
 
@@ -721,6 +721,10 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
     show_component_panel,
     show_reader_content_filters,
     auto_play_media,
+    enable_listen,
+    enable_book_chat,
+    chat_share_reader_progress,
+    chat_share_book_progress,
   } = req.body;
 
   try {
@@ -740,6 +744,10 @@ router.put('/:id/settings', authenticate, requireAuthor, async (req, res) => {
         show_component_panel,
         show_reader_content_filters,
         auto_play_media,
+        enable_listen,
+        enable_book_chat,
+        chat_share_reader_progress,
+        chat_share_book_progress,
       })
       .eq('book_id', req.params.id)
       .select()
@@ -836,6 +844,15 @@ router.put('/:id/progress', authenticate, async (req, res) => {
         percent_complete,
         justCompleted
       ).catch(err => console.error('chat-status trigger error:', err.message));
+
+      // Also post to book-level chat
+      postBookChatProgressUpdate(
+        req.user.id,
+        req.params.id,
+        current_chapter_id,
+        percent_complete,
+        justCompleted
+      ).catch(err => console.error('[book-chat] progress update error:', err.message));
     }
 
     res.json(data);
@@ -1057,6 +1074,48 @@ router.get('/:id/accessible-responses', optionalAuth, async (req, res) => {
     res.json(result.items);
   } catch (err) {
     console.error('Accessible book responses error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /books/:id/signatures — all signature blocks + per-block responses (author only)
+router.get('/:id/signatures', authenticate, requireAuthor, async (req, res) => {
+  try {
+    // Get all signature inline_content for this book
+    const { data: sigBlocks, error: blocksErr } = await supabase
+      .schema('bookflow')
+      .from('inline_content')
+      .select(`
+        id, content_data, anchor_text, chapter_id,
+        chapter:chapters(title)
+      `)
+      .eq('book_id', req.params.id)
+      .eq('content_type', 'signature');
+
+    if (blocksErr) throw blocksErr;
+
+    // For each block, fetch responses
+    const results = await Promise.all((sigBlocks || []).map(async (block) => {
+      const { data: responses } = await supabase
+        .schema('bookflow')
+        .from('signature_responses')
+        .select(`*, user:user_id(id, display_name, avatar_url)`)
+        .eq('inline_content_id', block.id)
+        .order('agreed_at', { ascending: false });
+
+      return {
+        content_id: block.id,
+        label: block.content_data?.label || 'Signature',
+        chapter_title: block.chapter?.title || 'Unknown Chapter',
+        anchor_text: block.anchor_text,
+        total: (responses || []).length,
+        responses: responses || [],
+      };
+    }));
+
+    res.json(results);
+  } catch (err) {
+    console.error('Get book signatures error:', err);
     res.status(500).json({ error: err.message });
   }
 });

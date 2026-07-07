@@ -335,6 +335,30 @@ class ApiClient {
     return this.request(`/form-responses/${contentId}/all`);
   }
 
+  // E-Signatures
+  async submitSignature(contentId: string, data: { signer_name?: string; signature_type: 'drawn' | 'typed' | 'checkbox'; signature_data?: string; visibility?: string }): Promise<import('../types').SignatureResponse> {
+    return this.request(`/inline-content/${contentId}/signatures`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMySignature(contentId: string): Promise<import('../types').SignatureResponse | null> {
+    return this.request(`/inline-content/${contentId}/signatures/mine`);
+  }
+
+  async getAllSignatures(contentId: string): Promise<{ responses: import('../types').SignatureResponse[]; total: number }> {
+    return this.request(`/inline-content/${contentId}/signatures/all`);
+  }
+
+  async deleteMySignature(contentId: string): Promise<void> {
+    return this.request(`/inline-content/${contentId}/signatures/mine`, { method: 'DELETE' });
+  }
+
+  async getBookSignatures(bookId: string): Promise<{ content_id: string; label: string; chapter_title: string; total: number; responses: import('../types').SignatureResponse[] }[]> {
+    return this.request(`/books/${bookId}/signatures`);
+  }
+
   async getBookResponses(bookId: string, chapterId?: string): Promise<import('../types').BookResponseItem[]> {
     const qs = chapterId ? `?chapter_id=${chapterId}` : '';
     return this.request(`/books/${bookId}/responses${qs}`);
@@ -1050,6 +1074,42 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/chat/ensure-folder`, { method: 'POST', body: '{}' });
   }
 
+  // ── Book Chat ───────────────────────────────────────────────────────────────
+
+  async getBookChatMessages(bookId: string, params?: { before?: string; limit?: number }): Promise<{ messages: any[]; hasMore: boolean }> {
+    const qs = new URLSearchParams();
+    if (params?.before) qs.set('before', params.before);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString() ? `?${qs}` : '';
+    return this.request(`/book-chat/${bookId}/messages${query}`);
+  }
+
+  async sendBookChatMessage(bookId: string, body: string, replyToId?: string): Promise<any> {
+    return this.request(`/book-chat/${bookId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body, reply_to_id: replyToId }),
+    });
+  }
+
+  async markBookChatRead(bookId: string, lastMessageId: string): Promise<void> {
+    return this.request(`/book-chat/${bookId}/read`, {
+      method: 'POST',
+      body: JSON.stringify({ last_message_id: lastMessageId }),
+    });
+  }
+
+  async getBookChatUnreadCount(bookId: string): Promise<{ count: number }> {
+    return this.request(`/book-chat/${bookId}/unread-count`);
+  }
+
+  async getBookChatReaders(bookId: string): Promise<any[]> {
+    return this.request(`/book-chat/${bookId}/readers`);
+  }
+
+  async getBookChatStats(bookId: string): Promise<{ total_words: number; total_read_minutes: number; total_readers: number; avg_progress: number }> {
+    return this.request(`/book-chat/${bookId}/stats`);
+  }
+
   // ── LiveFlow ────────────────────────────────────────────────────────────────
 
   async getLiveShows(): Promise<{ shows: any[] }> {
@@ -1143,6 +1203,7 @@ class ApiClient {
     website_url?: string; location?: string;
     profile_public?: boolean; show_reading_progress?: boolean;
     show_clubs?: boolean; show_books_authored?: boolean;
+    share_my_progress?: boolean;
   }): Promise<any> {
     return this.request('/profile/me', { method: 'PUT', body: JSON.stringify(data) });
   }

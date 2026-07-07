@@ -4,6 +4,7 @@ import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check,
 import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
+import SignatureStatusTab from '../components/signatures/SignatureStatusTab';
 
 export default function BookSettings() {
   const { bookId } = useParams<{ bookId: string }>();
@@ -618,6 +619,46 @@ export default function BookSettings() {
           </div>
         </div>
 
+        {/* Listen & Chat */}
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Listen & Chat</h2>
+          <p className="text-sm text-muted mb-4">
+            Control the Listen button and the book-level chat feature.
+          </p>
+          <div className="space-y-4">
+            <ToggleSetting
+              label="Enable Listen button"
+              description="Show the Listen (text-to-speech) button to all authenticated readers. When off, the button is hidden for everyone."
+              checked={settings.enable_listen ?? true}
+              onChange={(v) => updateSetting('enable_listen', v)}
+            />
+
+            <ToggleSetting
+              label="Enable Book Chat"
+              description="Allow readers to chat together. A Chat button will appear in the reader toolbar."
+              checked={settings.enable_book_chat ?? false}
+              onChange={(v) => updateSetting('enable_book_chat', v)}
+            />
+
+            {(settings.enable_book_chat ?? false) && (
+              <div className="ml-6 pl-4 border-l-2 border-[var(--color-border)] space-y-3">
+                <ToggleSetting
+                  label="Share reader progress with other readers"
+                  description="When a reader starts a new chapter, a status update is posted in the book chat."
+                  checked={settings.chat_share_reader_progress ?? true}
+                  onChange={(v) => updateSetting('chat_share_reader_progress', v)}
+                />
+                <ToggleSetting
+                  label="Share book completion"
+                  description="When a reader finishes the book, a completion message is posted in the book chat."
+                  checked={settings.chat_share_book_progress ?? true}
+                  onChange={(v) => updateSetting('chat_share_book_progress', v)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Progress Tracking */}
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-4 text-theme">Progress Tracking</h2>
@@ -804,6 +845,15 @@ export default function BookSettings() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* E-Signatures */}
+      <div className="p-6">
+        <h2 className="text-lg font-semibold mb-1 text-theme">E-Signatures</h2>
+        <p className="text-sm text-muted mb-4">
+          Track signature requests and responses from readers. Add a <strong>Signature</strong> component in the chapter editor to start collecting signatures.
+        </p>
+        {bookId && <SignatureStatusTab bookId={bookId} />}
       </div>
 
       {/* Save Button */}

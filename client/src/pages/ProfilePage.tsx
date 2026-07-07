@@ -23,6 +23,7 @@ interface ProfileData {
     show_reading_progress: boolean;
     show_clubs: boolean;
     show_books_authored: boolean;
+    share_my_progress: boolean;
   };
   authored_books: any[];
   currently_reading: any[];
@@ -69,6 +70,7 @@ export default function ProfilePage() {
     show_reading_progress: true,
     show_clubs: true,
     show_books_authored: true,
+    share_my_progress: true,
   });
 
   const isOwnProfile = !userId || userId === user?.id;
@@ -99,6 +101,7 @@ export default function ProfilePage() {
           show_reading_progress: result.profile.show_reading_progress ?? true,
           show_clubs: result.profile.show_clubs ?? true,
           show_books_authored: result.profile.show_books_authored ?? true,
+          share_my_progress: result.profile.share_my_progress ?? true,
         });
       }
     } catch (err: any) {
@@ -483,6 +486,12 @@ export default function ProfilePage() {
                   onChange={v => setForm(f => ({ ...f, show_books_authored: v }))}
                 />
                 <PrivacyToggle
+                  label="Share my reading progress in book chats"
+                  description="Your chapter and component completions are posted as status updates in book chats"
+                  value={form.share_my_progress}
+                  onChange={v => setForm(f => ({ ...f, share_my_progress: v }))}
+                />
+                <PrivacyToggle
                   label="Author account"
                   description="Mark yourself as an author"
                   value={form.is_author}
@@ -516,6 +525,10 @@ export default function ProfilePage() {
                 <li className="flex items-center gap-2">
                   {p.show_books_authored ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
                   Authored books {p.show_books_authored ? 'visible' : 'hidden'}
+                </li>
+                <li className="flex items-center gap-2">
+                  {p.share_my_progress ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
+                  Progress sharing {p.share_my_progress ? 'on' : 'off'}
                 </li>
               </ul>
               <button
@@ -555,18 +568,24 @@ function PrivacyToggle({
   label: string; description: string; value: boolean; onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <button
-        type="button"
-        onClick={() => onChange(!value)}
-        className={`relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition-colors ${value ? 'bg-accent' : 'bg-white/20 border border-white/30'}`}
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className="flex items-start gap-3 w-full text-left hover:bg-surface-hover rounded-lg p-1.5 -mx-1.5 transition-colors"
+    >
+      <div
+        className="relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition-colors"
+        style={{ backgroundColor: value ? 'var(--color-accent)' : '#d1d5db', border: value ? 'none' : '1px solid #9ca3af' }}
       >
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full shadow transition-transform ${value ? 'bg-white translate-x-4' : 'bg-white/70 translate-x-0.5'}`} />
-      </button>
+        <span
+          className="absolute top-0.5 h-4 w-4 rounded-full shadow transition-transform bg-white"
+          style={{ transform: value ? 'translateX(1rem)' : 'translateX(0.125rem)' }}
+        />
+      </div>
       <div>
         <p className="text-sm font-medium text-theme leading-tight">{label}</p>
         <p className="text-xs text-muted">{description}</p>
       </div>
-    </div>
+    </button>
   );
 }

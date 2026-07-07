@@ -17,6 +17,7 @@ export interface Profile {
   bio?: string;
   is_author: boolean;
   system_role?: SystemRole;
+  share_my_progress?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +74,10 @@ export interface BookSettings {
   enable_chapter_qr_codes?: boolean;
   /** 'live' = render inline components identical to the reader; 'minimal' = compact pill/badge view */
   editor_preview_mode?: 'live' | 'minimal';
+  enable_listen?: boolean;
+  enable_book_chat?: boolean;
+  chat_share_reader_progress?: boolean;
+  chat_share_book_progress?: boolean;
 }
 
 export interface BookLanding {
@@ -88,6 +93,29 @@ export interface BookLanding {
   author?: { id: string; display_name: string; avatar_url?: string };
   settings?: Partial<BookSettings>;
   chapters: Pick<Chapter, 'id' | 'title' | 'slug' | 'order_index' | 'word_count' | 'estimated_read_time_minutes'>[];
+}
+
+// Book Chat types
+export interface BookChatMessage {
+  id: string;
+  book_id: string;
+  sender_id?: string | null;
+  sender?: { id: string; display_name: string; avatar_url?: string | null } | null;
+  message_type: 'text' | 'system_status';
+  body?: string | null;
+  status_payload?: any;
+  reply_to_id?: string | null;
+  deleted_at?: string | null;
+  created_at: string;
+}
+
+export interface BookChatReader {
+  user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  current_chapter_title?: string | null;
+  percent_complete: number;
+  completed_at?: string | null;
 }
 
 // Chapter types
@@ -215,7 +243,8 @@ export interface ActivityEvent {
 export type InlineContentType =
   | 'question' | 'poll' | 'highlight' | 'note' | 'link' | 'audio' | 'video'
   | 'select' | 'multiselect' | 'textbox' | 'textarea' | 'radio' | 'checkbox'
-  | 'code_block' | 'scripture_block' | 'image' | 'drawing' | 'media_response';
+  | 'code_block' | 'scripture_block' | 'image' | 'drawing' | 'media_response'
+  | 'signature';
 
 // Display mode for interactive content
 export type InlineDisplayMode = 'inline' | 'sidebar' | 'start_of_chapter' | 'end_of_chapter';
@@ -230,7 +259,8 @@ export interface InlineContent {
   anchor_text?: string;
   content_data: QuestionData | PollData | HighlightData | NoteData | LinkData | MediaData
     | SelectData | MultiselectData | TextboxData | TextareaData | RadioData | CheckboxData
-    | CodeBlockData | ScriptureBlockData | ImageData | DrawingData | MediaResponsePromptData;
+    | CodeBlockData | ScriptureBlockData | ImageData | DrawingData | MediaResponsePromptData
+    | SignatureData;
   created_by: string;
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
@@ -412,6 +442,30 @@ export interface DrawingData {
   /** Original canvas dimensions, stored for display ratio */
   canvasWidth?: number;
   canvasHeight?: number;
+}
+
+export interface SignatureData {
+  label: string;
+  description?: string;
+  required?: boolean;
+  allow_drawn?: boolean;
+  allow_typed?: boolean;
+  allow_checkbox?: boolean;
+  width?: 'full' | 'sm' | 'md' | 'lg';
+}
+
+export interface SignatureResponse {
+  id: string;
+  inline_content_id: string;
+  user_id: string;
+  book_id: string;
+  signer_name?: string;
+  signature_type: 'drawn' | 'typed' | 'checkbox';
+  signature_data?: string;
+  agreed_at: string;
+  visibility: 'private' | 'shared' | 'public';
+  created_at: string;
+  user?: Profile;
 }
 
 // Form response for interactive elements

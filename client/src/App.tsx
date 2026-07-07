@@ -35,6 +35,7 @@ import AdminPage from './pages/AdminPage';
 import BookLandingPage from './pages/BookLandingPage';
 import DocsPage from './pages/DocsPage';
 import MyFeedbackPage from './pages/MyFeedbackPage';
+import BookChatPage from './pages/BookChatPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -71,6 +72,11 @@ function AppRoutes() {
         {/* Reading */}
         <Route path="book/:bookId" element={<BookReader />} />
         <Route path="book/:bookId/chapter/:chapterId" element={<BookReader />} />
+        <Route path="book/:bookId/chat" element={
+          <ProtectedRoute>
+            <BookChatPage />
+          </ProtectedRoute>
+        } />
 
         {/* Public reader — no auth required */}
         <Route path="read/:slug" element={<PublicBookPage />} />
@@ -231,6 +237,7 @@ function AppRoutes() {
         <Route path="docs" element={<DocsPage />} />
         <Route path="help" element={<DocsPage />} />
       </Route>
+
     </Routes>
   );
 }

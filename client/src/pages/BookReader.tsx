@@ -5,7 +5,7 @@ import {
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2
+  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, PenLine
 } from 'lucide-react';
 import { getTextAlignStyle, getTextStyleAttributes } from '../components/editor/PasteFormattingExtensions';
 
@@ -87,10 +87,11 @@ import BookResponsesViewer from '../components/responses/BookResponsesViewer';
 import TutorialOverlay from '../components/reader/TutorialOverlay';
 import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
 import { DEMO_BOOK_ID } from '../config/demoBook';
+import SignatureCanvas from '../components/editor/SignatureCanvas';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
-  AllFormResponsesResult, MediaResponsePromptData, MediaResponseRecord,
+  AllFormResponsesResult, MediaResponsePromptData, MediaResponseRecord, SignatureData, SignatureResponse,
 } from '../types';
 
 function getExternalEmbedUrl(url?: string | null): string | null {
@@ -1314,13 +1315,25 @@ export default function BookReader() {
             </button>
             <div className="flex-1 text-center">
               <p className="text-sm text-muted">
-                Chapter {currentChapterIndex + 1} of {book.chapters?.length}
+                {currentChapterIndex + 1} of {book.chapters?.length}
               </p>
             </div>
+            <div className="flex items-center gap-2">
+            {/* Chat Button — shown when book chat is enabled */}
+            {settings?.enable_book_chat && (
+              <Link
+                to={`/book/${bookId}/chat`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-surface-hover text-theme hover:bg-primary-100 hover:text-primary-700 transition-colors"
+                title="Book Chat"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Chat</span>
+              </Link>
+            )}
             {/* TTS Button — shown to logged-in users always, or to public readers only if author enabled it */}
             <button
               id="bf-tts-btn"
-              style={{ display: (user || settings?.allow_public_tts) ? undefined : 'none' }}
+              style={{ display: (settings?.enable_listen !== false) && (user || settings?.allow_public_tts) ? undefined : 'none' }}
               onClick={handlePlayTTS}
               disabled={ttsLoading || !chapter}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -1351,7 +1364,7 @@ export default function BookReader() {
             {isAuthor && chapterId && (
               <Link
                 to={`/edit/book/${bookId}/chapter/${chapterId}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-surface-hover text-theme hover:bg-primary-100 hover:text-primary-700 transition-colors ml-2"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-surface-hover text-theme hover:bg-primary-100 hover:text-primary-700 transition-colors"
                 title="Back to editor"
               >
                 <Pencil className="h-4 w-4" />
@@ -1362,10 +1375,11 @@ export default function BookReader() {
             <button
               onClick={toggleFocusMode}
               title="Focus mode — hide panels"
-              className="ml-2 p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+              className="p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
             >
               <Maximize2 className="h-4 w-4" />
             </button>
+            </div>
           </div>
 
           {/* Row 2: content filter + component type icons */}
@@ -1527,12 +1541,13 @@ export default function BookReader() {
               {prevChapter ? (
                 <Link
                   to={`/book/${bookId}/chapter/${prevChapter.id}`}
-                  className="flex items-center gap-2 text-accent hover:text-accent"
+                  className="flex items-center gap-2 text-accent hover:text-accent no-underline"
                 >
                   <ChevronLeft className="h-5 w-5" />
                   <div>
                     <p className="text-xs text-muted">Previous</p>
                     <p className="font-medium">{prevChapter.title}</p>
+                    {book?.title && <p className="text-xs text-muted/70 mt-0.5">{book.title}</p>}
                   </div>
                 </Link>
               ) : (
@@ -1542,11 +1557,12 @@ export default function BookReader() {
               {nextChapter ? (
                 <Link
                   to={`/book/${bookId}/chapter/${nextChapter.id}`}
-                  className="flex items-center gap-2 text-accent hover:text-accent text-right"
+                  className="flex items-center gap-2 text-accent hover:text-accent text-right no-underline"
                 >
                   <div>
                     <p className="text-xs text-muted">Next</p>
                     <p className="font-medium">{nextChapter.title}</p>
+                    {book?.title && <p className="text-xs text-muted/70 mt-0.5">{book.title}</p>}
                   </div>
                   <ChevronRight className="h-5 w-5" />
                 </Link>
@@ -2024,7 +2040,7 @@ function ChapterContent({
     }
     collectTextNodes(parsedContent.content, 'n');
 
-    const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox'];
+    const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'signature'];
     const blockMediaTypes = ['image', 'drawing'];
     const unmatched = inlineContent.filter(
       ic => (formTypes.includes(ic.content_type) || blockMediaTypes.includes(ic.content_type)) &&
@@ -2189,6 +2205,7 @@ function getInlineContentClass(type: string): string {
     checkbox: 'inline-form inline-checkbox',
     code_block: 'inline-code',
     scripture_block: 'inline-scripture',
+    signature: 'inline-form inline-signature',
   };
   return classes[type] || '';
 }
@@ -2233,6 +2250,8 @@ function getInlineContentIcon(type: string): React.ReactNode {
       return <BookOpen className={`${iconClass} text-amber-700`} />;
     case 'media_response':
       return <MessageSquare className={`${iconClass} text-blue-600`} />;
+    case 'signature':
+      return <PenLine className={`${iconClass} text-purple-600`} />;
     default:
       return null;
   }
@@ -2389,7 +2408,7 @@ function TipTapNode({
 
     case 'text': {
       const nodeText = node.text || '';
-      const FORM_TYPES_SET = new Set(['question', 'poll', 'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block']);
+      const FORM_TYPES_SET = new Set(['question', 'poll', 'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block', 'signature']);
       const MEDIA_TYPES_SET = new Set(['audio', 'video', 'image', 'drawing']);
 
       // Look up pre-assigned matches for this exact node key (computed before render, no mutation)
@@ -2735,6 +2754,9 @@ function InlineContentBlock({ content, isAuthor = false, userId, defaultVisibili
   }
   if (content.content_type === 'drawing') {
     return <DrawingBlock content={content} />;
+  }
+  if (content.content_type === 'signature') {
+    return <SignatureBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
   }
   return null;
 }
@@ -4294,6 +4316,216 @@ function TextareaBlock({ content, isAuthor = false, userId, defaultVisibility = 
         <p className="text-xs text-muted mt-1">{value.length}/{data.max_length} characters</p>
       )}
       {isAuthor && allResponses && <ResponseSummary result={allResponses} type="text" />}
+    </div>
+    </div>
+  );
+}
+
+// E-Signature block
+function SignatureBlock({ content, isAuthor = false, userId, defaultVisibility = 'shared' }: { content: InlineContent; isAuthor?: boolean; userId?: string; defaultVisibility?: 'private' | 'shared' | 'public' }) {
+  const data = content.content_data as SignatureData;
+  const [existing, setExisting] = useState<SignatureResponse | null>(null);
+  const [mode, setMode] = useState<'drawn' | 'typed' | 'checkbox'>('drawn');
+  const [typedName, setTypedName] = useState('');
+  const [agreed, setAgreed] = useState(false);
+  const [drawnData, setDrawnData] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [allResponses, setAllResponses] = useState<{ responses: SignatureResponse[]; total: number } | null>(null);
+  const requestAuth = useContext(AuthGateContext);
+  const { completions, markComplete, markIncomplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const itemKey = `ic:${content.id}`;
+
+  // Default mode to first allowed method
+  useEffect(() => {
+    if (data.allow_drawn ?? true) setMode('drawn');
+    else if (data.allow_typed ?? true) setMode('typed');
+    else if (data.allow_checkbox ?? true) setMode('checkbox');
+  }, [data.allow_drawn, data.allow_typed, data.allow_checkbox]);
+
+  useEffect(() => {
+    if (!userId) return;
+    api.getMySignature(content.id).then(r => {
+      if (r) {
+        setExisting(r);
+        markComplete(itemKey, 'form');
+      }
+    }).catch(() => {});
+    if (isAuthor) api.getAllSignatures(content.id).then(setAllResponses).catch(() => {});
+  }, [content.id, userId, isAuthor, itemKey, markComplete]);
+
+  const handleSign = async () => {
+    if (!userId) { requestAuth(); return; }
+    let signatureData = '';
+    let signerName = '';
+    if (mode === 'drawn') {
+      if (!drawnData) return;
+      signatureData = drawnData;
+    } else if (mode === 'typed') {
+      if (!typedName.trim()) return;
+      signerName = typedName.trim();
+      signatureData = typedName.trim();
+    } else {
+      if (!agreed) return;
+      signatureData = 'agreed';
+    }
+    setSaveStatus('saving');
+    try {
+      const res = await api.submitSignature(content.id, {
+        signer_name: signerName || typedName || undefined,
+        signature_type: mode,
+        signature_data: signatureData,
+        visibility: defaultVisibility,
+      });
+      setExisting(res);
+      markComplete(itemKey, 'form');
+      setSaveStatus('saved');
+      if (isAuthor) api.getAllSignatures(content.id).then(setAllResponses).catch(() => {});
+    } catch {
+      setSaveStatus('error');
+    }
+  };
+
+  const handleRetract = async () => {
+    try {
+      await api.deleteMySignature(content.id);
+      setExisting(null);
+      markIncomplete(itemKey);
+      setSaveStatus('idle');
+    } catch {
+      setSaveStatus('error');
+    }
+  };
+
+  const isDone = progressEnabled && completions.has(itemKey);
+
+  return (
+    <div className={progressEnabled ? `progress-item${isDone ? ' progress-item--done' : ''}` : undefined}>
+    <div className="bg-surface-hover border border-theme rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <PenLine className="h-5 w-5 text-muted" />
+          <span className="font-medium text-theme">{data.label || 'Signature'}</span>
+          {data.required && <span className="text-red-500 text-sm">*</span>}
+        </div>
+        {saveStatus === 'saving' && <span className="text-xs text-muted">Saving…</span>}
+        {saveStatus === 'saved' && <span className="text-xs text-green-600">Signed ✓</span>}
+        {saveStatus === 'error' && <span className="text-xs text-red-500">Error</span>}
+      </div>
+      {data.description && (
+        <p className="text-sm text-muted mb-3">{data.description}</p>
+      )}
+
+      {existing ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 p-2 rounded bg-green-50 border border-green-200">
+            <Check className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-800 font-medium">Signed</span>
+            <span className="text-xs text-green-600 ml-auto">
+              {new Date(existing.agreed_at).toLocaleDateString()}
+            </span>
+          </div>
+          {existing.signature_type === 'drawn' && existing.signature_data && (
+            <SignatureCanvas readOnly defaultValue={existing.signature_data} height={80} />
+          )}
+          {existing.signature_type === 'typed' && (
+            <p className="text-lg italic" style={{ fontFamily: 'cursive' }}>{existing.signature_data}</p>
+          )}
+          {existing.signature_type === 'checkbox' && (
+            <p className="text-sm text-muted">Agreed by checkbox</p>
+          )}
+          <button
+            onClick={handleRetract}
+            className="text-xs text-muted hover:text-red-500 underline transition-colors"
+          >
+            Retract signature
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Mode tabs */}
+          {[(data.allow_drawn ?? true) && 'drawn', (data.allow_typed ?? true) && 'typed', (data.allow_checkbox ?? true) && 'checkbox'].filter(Boolean).length > 1 && (
+            <div className="flex gap-1 border-b border-theme pb-2">
+              {(data.allow_drawn ?? true) && (
+                <button type="button" onClick={() => setMode('drawn')}
+                  className={`px-3 py-1 rounded-t text-sm transition-colors ${mode === 'drawn' ? 'bg-surface text-theme font-medium border-b-2 border-accent' : 'text-muted hover:text-theme'}`}>
+                  Draw
+                </button>
+              )}
+              {(data.allow_typed ?? true) && (
+                <button type="button" onClick={() => setMode('typed')}
+                  className={`px-3 py-1 rounded-t text-sm transition-colors ${mode === 'typed' ? 'bg-surface text-theme font-medium border-b-2 border-accent' : 'text-muted hover:text-theme'}`}>
+                  Type
+                </button>
+              )}
+              {(data.allow_checkbox ?? true) && (
+                <button type="button" onClick={() => setMode('checkbox')}
+                  className={`px-3 py-1 rounded-t text-sm transition-colors ${mode === 'checkbox' ? 'bg-surface text-theme font-medium border-b-2 border-accent' : 'text-muted hover:text-theme'}`}>
+                  Agree
+                </button>
+              )}
+            </div>
+          )}
+
+          {mode === 'drawn' && (
+            <SignatureCanvas onSave={setDrawnData} height={120} />
+          )}
+          {mode === 'typed' && (
+            <div>
+              <input
+                type="text"
+                value={typedName}
+                onChange={e => setTypedName(e.target.value)}
+                placeholder="Type your full name"
+                className="w-full p-2 theme-input rounded-lg text-lg italic"
+                style={{ fontFamily: 'cursive' }}
+                onFocus={() => { if (!api.getToken()) requestAuth(); }}
+              />
+            </div>
+          )}
+          {mode === 'checkbox' && (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={e => {
+                  if (!api.getToken()) { requestAuth(); return; }
+                  setAgreed(e.target.checked);
+                }}
+                className="mt-0.5 accent-accent"
+              />
+              <span className="text-sm text-theme">
+                I confirm that I have read and understood the content, and I agree to sign this document electronically.
+              </span>
+            </label>
+          )}
+
+          <button
+            onClick={handleSign}
+            disabled={
+              saveStatus === 'saving' ||
+              (mode === 'drawn' && !drawnData) ||
+              (mode === 'typed' && !typedName.trim()) ||
+              (mode === 'checkbox' && !agreed)
+            }
+            className="w-full py-2 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
+          >
+            {saveStatus === 'saving' ? 'Signing…' : 'Sign'}
+          </button>
+        </div>
+      )}
+
+      {isAuthor && allResponses && (
+        <div className="mt-3 pt-3 border-t border-theme">
+          <p className="text-xs text-muted font-medium mb-1">{allResponses.total} signature{allResponses.total !== 1 ? 's' : ''} received</p>
+          {allResponses.responses.slice(0, 3).map(r => (
+            <div key={r.id} className="flex items-center gap-2 text-xs text-muted">
+              <span className="font-medium">{r.user?.display_name || 'Reader'}</span>
+              <span className="opacity-60">{r.signature_type}</span>
+              <span className="ml-auto opacity-60">{new Date(r.agreed_at).toLocaleDateString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
     </div>
   );
