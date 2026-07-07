@@ -51,6 +51,34 @@ const MediaContext = createContext<MediaCtx>({
 // Context that any interactive component can call to request a login/register modal
 const AuthGateContext = createContext<() => void>(() => {});
 
+interface PollResponseState {
+  selected: string | null;
+  results: Record<string, number>;
+  totalVotes: number;
+  voted: boolean;
+  loading: boolean;
+  loaded: boolean;
+}
+
+const EMPTY_POLL_RESPONSE: PollResponseState = {
+  selected: null,
+  results: {},
+  totalVotes: 0,
+  voted: false,
+  loading: false,
+  loaded: false,
+};
+
+interface PollResponsesCtx {
+  responses: Record<string, PollResponseState>;
+  updateResponse: (pollId: string, updater: (current: PollResponseState) => PollResponseState) => void;
+}
+
+const PollResponsesContext = createContext<PollResponsesCtx>({
+  responses: {},
+  updateResponse: () => {},
+});
+
 import api from '../lib/api';
 import { getHighlightCssVars, getHighlightTheme } from '../lib/highlightTheme';
 import { useAuth } from '../contexts/AuthContext';
@@ -99,6 +127,17 @@ export default function BookReader() {
   const [showToc, setShowToc] = useState(false);
   const [activeContent, setActiveContent] = useState<InlineContent | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
+  const [pollResponses, setPollResponses] = useState<Record<string, PollResponseState>>({});
+  const updatePollResponse = useCallback((pollId: string, updater: (current: PollResponseState) => PollResponseState) => {
+    setPollResponses(prev => {
+      const current = prev[pollId] ?? EMPTY_POLL_RESPONSE;
+      return { ...prev, [pollId]: updater(current) };
+    });
+  }, []);
+  const pollResponsesCtx = useMemo(() => ({
+    responses: pollResponses,
+    updateResponse: updatePollResponse,
+  }), [pollResponses, updatePollResponse]);
 
   // Reader inline content state
   const [selectedText, setSelectedText] = useState<{ text: string; range: Range | null } | null>(null);
@@ -1391,6 +1430,7 @@ export default function BookReader() {
           <HighlightsContext.Provider value={showHighlights}>
           <MediaContext.Provider value={mediaCtx}>
           <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
+          <PollResponsesContext.Provider value={pollResponsesCtx}>
           <TaskChecksContext.Provider value={{ checked: taskChecks, toggle: toggleTaskCheck, setChecked: setTaskCheckValue }}>
           <article className="max-w-3xl mx-auto px-4 py-8">
             <div className="flex items-start gap-3 mb-6">
@@ -1516,6 +1556,7 @@ export default function BookReader() {
             </nav>
           </article>
           </TaskChecksContext.Provider>
+          </PollResponsesContext.Provider>
           </ProgressContext.Provider>
           </MediaContext.Provider>
           </HighlightsContext.Provider>
@@ -1532,6 +1573,7 @@ export default function BookReader() {
       {/* Inline Content Panel — hidden in focus mode */}
       {activeContent && (
         <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
+        <PollResponsesContext.Provider value={pollResponsesCtx}>
           <MediaContext.Provider value={mediaCtx}>
             <InlineContentPanel
               content={activeContent}
@@ -1541,6 +1583,7 @@ export default function BookReader() {
               defaultVisibility={book?.user_in_shared_club ? 'shared' : 'private'}
             />
           </MediaContext.Provider>
+        </PollResponsesContext.Provider>
         </ProgressContext.Provider>
       )}
 
@@ -2428,7 +2471,11 @@ function TipTapNode({
           segments.push(
             isFullW2 ? (
               <span key={`form-${ic.id}`} id={`reader-inline-${ic.id}`} className="block my-2">
-                {segText && showHighlights && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`}><TextWithMarks text={segText} marks={node.marks} /></mark>}
+                {segText && showHighlights && !isBlockFormType && (
+                  <span className="block mb-2 text-base font-medium leading-snug text-theme">
+                    <TextWithMarks text={segText} marks={node.marks} />
+                  </span>
+                )}
                 {segText && !showHighlights && <TextWithMarks text={segText} marks={node.marks} />}
                 {match.last && <InlineFormElement content={ic} />}
               </span>
@@ -2508,7 +2555,11 @@ function TipTapNode({
         : undefined;
       return isFullW ? (
         <span id={`reader-inline-${effectiveIc.id}`} className="block my-3">
-          {anchorText && !isBlock && <mark className={`${markerClass} px-0.5 rounded text-sm mb-1 inline-block`} style={hlStyle}>{anchorText}</mark>}
+          {anchorText && !isBlock && (
+            <span className="block mb-2 text-base font-medium leading-snug text-theme" style={hlStyle}>
+              {anchorText}
+            </span>
+          )}
           <InlineFormElement content={effectiveIc} />
         </span>
       ) : (
@@ -3757,60 +3808,83 @@ function SidebarRating({ bookId }: { bookId: string }) {
 
 function PollBlock({ content, defaultVisibility = 'shared' }: { content: InlineContent; defaultVisibility?: 'private' | 'shared' | 'public' }) {
   const data = content.content_data as PollData;
-  const [selected, setSelected] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, number>>({});
-  const [totalVotes, setTotalVotes] = useState(0);
-  const [voted, setVoted] = useState(false);
   const { completions, markComplete, enabled: progressEnabled } = useContext(ProgressContext);
+  const { responses, updateResponse } = useContext(PollResponsesContext);
   const requestAuth = useContext(AuthGateContext);
   const itemKey = `ic:${content.id}`;
+  const pollState = responses[content.id] ?? EMPTY_POLL_RESPONSE;
+  const { selected, results, totalVotes, voted, loading, loaded } = pollState;
 
   useEffect(() => {
-    loadResults();
-  }, []);
+    if (loading || loaded) return;
 
-  async function loadResults() {
-    try {
-      const res = await api.getPollResults(content.id);
-      setResults(res.results);
-      setTotalVotes(res.total_votes);
-      if (res.user_vote) {
-        setSelected(res.user_vote);
-        setVoted(true);
-      }
-    } catch (err) {
-      console.error('Failed to load poll results:', err);
-    }
+    let active = true;
+    updateResponse(content.id, current => ({ ...current, loading: true }));
+
+    api.getPollResults(content.id)
+      .then(res => {
+        if (!active) return;
+        updateResponse(content.id, current => ({
+          ...current,
+          selected: res.user_vote ?? current.selected,
+          results: res.results,
+          totalVotes: res.total_votes,
+          voted: !!res.user_vote,
+          loading: false,
+          loaded: true,
+        }));
+      })
+      .catch(err => {
+        console.error('Failed to load poll results:', err);
+        if (active) updateResponse(content.id, current => ({ ...current, loading: false, loaded: true }));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [content.id, loading, loaded, updateResponse]);
+
+  function selectOption(optionId: string) {
+    if (voted) return;
+    if (!api.getToken()) { requestAuth(); return; }
+    updateResponse(content.id, current => ({ ...current, selected: optionId }));
   }
 
   async function handleVote() {
-    if (!selected) return;
+    if (!selected || loading) return;
     if (!api.getToken()) { requestAuth(); return; }
+    updateResponse(content.id, current => ({ ...current, loading: true }));
     try {
       const res = await api.votePoll(content.id, selected, defaultVisibility);
-      setResults(res.results);
-      setTotalVotes(res.total_votes);
-      setVoted(true);
+      updateResponse(content.id, current => ({
+        ...current,
+        results: res.results,
+        totalVotes: res.total_votes,
+        voted: true,
+        loading: false,
+        loaded: true,
+      }));
       markComplete(itemKey, 'poll');
     } catch (err) {
       console.error('Failed to vote:', err);
+      updateResponse(content.id, current => ({ ...current, loading: false }));
     }
   }
 
   const isDone = progressEnabled && (completions.has(itemKey) || voted);
 
   return (
-    <div className={`bg-green-50 border rounded-lg p-4 ${isDone ? 'border-green-400' : 'border-green-200'}${progressEnabled ? ` progress-item${isDone ? ' progress-item--done' : ''}` : ''}`}>
-      <div className="flex items-center justify-between mb-3">
+    <div className={`bg-green-50 border rounded-lg p-3 ${isDone ? 'border-green-400' : 'border-green-200'}${progressEnabled ? ` progress-item${isDone ? ' progress-item--done' : ''}` : ''}`}>
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <BarChart2 className="h-5 w-5 text-green-600" />
           <span className="font-medium text-green-800">Poll</span>
         </div>
         {isDone && <Check className="h-4 w-4 text-green-500 shrink-0" />}
       </div>
-      <p className="text-theme mb-4">{data.question}</p>
+      <p className="text-theme mb-3">{data.question}</p>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {data.options.map((opt) => {
           const count = results[opt.id] || results[opt.text] || 0;
           const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
@@ -3818,8 +3892,8 @@ function PollBlock({ content, defaultVisibility = 'shared' }: { content: InlineC
           return (
             <div
               key={opt.id}
-              onClick={() => { if (!voted) { if (!api.getToken()) { requestAuth(); return; } setSelected(opt.id); } }}
-              className={`relative p-3 border rounded-lg cursor-pointer transition-colors ${
+              onClick={() => selectOption(opt.id)}
+              className={`relative px-3 py-2 border rounded-lg cursor-pointer transition-colors ${
                 selected === opt.id
                   ? 'border-green-500 bg-green-100'
                   : 'border-theme hover:border-green-300'
@@ -3845,10 +3919,10 @@ function PollBlock({ content, defaultVisibility = 'shared' }: { content: InlineC
       {!voted && (
         <button
           onClick={handleVote}
-          disabled={!selected}
-          className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          disabled={!selected || loading}
+          className="mt-3 px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
         >
-          Vote
+          {loading ? 'Voting...' : 'Vote'}
         </button>
       )}
 
@@ -4128,7 +4202,7 @@ function TextboxBlock({ content, isAuthor = false, userId, defaultVisibility = '
           <SaveStatusDot status={saveStatus} />
         </div>
       </div>
-      {(data.show_label ?? true) && <label className="block text-theme mb-2">{data.label}</label>}
+      {(data.show_label ?? true) && <label className="block mb-2 text-base font-medium leading-snug text-theme">{data.label}</label>}
       <input
         type="text"
         value={value}
@@ -4205,7 +4279,7 @@ function TextareaBlock({ content, isAuthor = false, userId, defaultVisibility = 
           <SaveStatusDot status={saveStatus} />
         </div>
       </div>
-      {(data.show_label ?? true) && <label className="block text-theme mb-2">{data.label}</label>}
+      {(data.show_label ?? true) && <label className="block mb-2 text-base font-medium leading-snug text-theme">{data.label}</label>}
       <textarea
         ref={textareaRef}
         value={value}

@@ -151,8 +151,9 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
   const formIds = items.filter(i => ['select', 'multiselect', 'radio', 'checkbox', 'textbox', 'textarea'].includes(i.content_type)).map(i => i.id);
   const pollIds = items.filter(i => i.content_type === 'poll').map(i => i.id);
   const questionIds = items.filter(i => i.content_type === 'question').map(i => i.id);
+  const mediaResponseIds = items.filter(i => i.content_type === 'media_response').map(i => i.id);
 
-  const [frsRes, prsRes, qasRes] = await Promise.all([
+  const [frsRes, prsRes, qasRes, mrsRes] = await Promise.all([
     formIds.length
       ? supabase
           .schema('bookflow')
@@ -174,6 +175,15 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
           .from('question_answers')
           .select('inline_content_id, id, user_id, answer_text, selected_options, is_correct, created_at, visibility, user:profiles!question_answers_user_id_fkey(id, display_name, avatar_url)')
           .in('inline_content_id', questionIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    mediaResponseIds.length
+      ? supabase
+          .schema('bookflow')
+          .from('media_responses')
+          .select('inline_content_id, id, user_id, response_type, body, media_url, duration_seconds, status, created_at, updated_at, user:profiles!media_responses_user_id_fkey(id, display_name, avatar_url)')
+          .in('inline_content_id', mediaResponseIds)
+          .eq('status', 'active')
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
   ]);
@@ -200,6 +210,14 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
     const enriched = withResponseMeta(row, context);
     if (!questionAnswersByItem[row.inline_content_id]) questionAnswersByItem[row.inline_content_id] = [];
     questionAnswersByItem[row.inline_content_id].push(enriched);
+  }
+
+  const mediaResponsesByItem = {};
+  for (const row of (mrsRes.data || [])) {
+    if (!authorMode && viewerId && row.user_id !== viewerId && !context.canAccess) continue;
+    const enriched = withResponseMeta({ ...row, visibility: 'public', response_data: { value: row.body || row.media_url || row.response_type } }, context);
+    if (!mediaResponsesByItem[row.inline_content_id]) mediaResponsesByItem[row.inline_content_id] = [];
+    mediaResponsesByItem[row.inline_content_id].push(enriched);
   }
 
   const choiceTypes = ['select', 'multiselect', 'radio', 'checkbox'];
@@ -231,6 +249,9 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
       };
     } else if (item.content_type === 'question') {
       responses = questionAnswersByItem[item.id] || [];
+      total = responses.length;
+    } else if (item.content_type === 'media_response') {
+      responses = mediaResponsesByItem[item.id] || [];
       total = responses.length;
     } else if (choiceTypes.includes(item.content_type)) {
       const frs = formResponsesByItem[item.id] || [];

@@ -407,7 +407,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
         title="Double-click to edit"
       >
         {/* Anchor text */}
-        <span className="font-medium underline decoration-dotted underline-offset-2" data-testid="inline-form-anchor">
+        <span className="font-medium" data-testid="inline-form-anchor">
           {anchorText}
         </span>
         {/* Location indicator */}
@@ -435,7 +435,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
           className={`inline-flex items-baseline gap-1 mx-0.5 px-1.5 py-0.5 rounded border align-baseline cursor-pointer ${colorClass}${ringClass}`}
         >
           {anchorText && (
-            <span className="font-medium underline decoration-dotted underline-offset-2">
+            <span className="font-medium">
               {anchorText}
             </span>
           )}
@@ -496,7 +496,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
         >
           <span className="flex items-center gap-1.5 mb-1 text-xs font-medium opacity-70" contentEditable={false}>
             <span>{label}</span>
-            {anchorText && <span className="underline decoration-dotted underline-offset-2">{anchorText}</span>}
+            {anchorText && <span>{anchorText}</span>}
           </span>
           {!!contentData && (
             <FormPreview contentType={contentType} contentData={contentData as any} />
@@ -517,7 +517,7 @@ export function InlineFormNodeView({ node, selected }: NodeViewProps) {
       title="Double-click to edit"
     >
       {/* Anchor text */}
-      <span className="font-medium underline decoration-dotted underline-offset-2" data-testid="inline-form-anchor">
+      <span className="font-medium" data-testid="inline-form-anchor">
         {anchorText}
       </span>
 

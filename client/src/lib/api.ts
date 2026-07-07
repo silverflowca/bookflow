@@ -30,6 +30,12 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 class ApiClient {
   private token: string | null = null;
 
+  private notifyResponsesChanged() {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bf-responses-changed'));
+    }
+  }
+
   setToken(token: string | null) {
     this.token = token;
     if (token) {
@@ -247,14 +253,17 @@ class ApiClient {
     duration_seconds?: number;
     parent_id?: string;
   }): Promise<MediaResponseRecord> {
-    return this.request(`/inline-content/${contentId}/media-responses`, {
+    const response = await this.request(`/inline-content/${contentId}/media-responses`, {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }) as MediaResponseRecord;
+    this.notifyResponsesChanged();
+    return response;
   }
 
   async deleteMediaResponse(responseId: string): Promise<void> {
-    return this.request(`/media-responses/${responseId}`, { method: 'DELETE' });
+    await this.request(`/media-responses/${responseId}`, { method: 'DELETE' });
+    this.notifyResponsesChanged();
   }
 
   async flagMediaResponse(responseId: string, reason?: string): Promise<{ success: boolean }> {
@@ -266,10 +275,12 @@ class ApiClient {
 
   // Polls
   async votePoll(pollId: string, selectedOption: string, visibility?: 'private' | 'shared' | 'public'): Promise<{ vote: any; results: Record<string, number>; total_votes: number }> {
-    return this.request(`/polls/${pollId}/vote`, {
+    const response = await this.request(`/polls/${pollId}/vote`, {
       method: 'POST',
       body: JSON.stringify({ selected_option: selectedOption, ...(visibility ? { visibility } : {}) }),
-    });
+    }) as { vote: any; results: Record<string, number>; total_votes: number };
+    this.notifyResponsesChanged();
+    return response;
   }
 
   async getPollResults(pollId: string): Promise<{ results: Record<string, number>; total_votes: number; user_vote?: string }> {
@@ -278,10 +289,12 @@ class ApiClient {
 
   // Questions
   async answerQuestion(questionId: string, data: { answer_text?: string; selected_options?: string[]; visibility?: 'private' | 'shared' | 'public' }): Promise<any> {
-    return this.request(`/questions/${questionId}/answer`, {
+    const response = await this.request(`/questions/${questionId}/answer`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    this.notifyResponsesChanged();
+    return response;
   }
 
   async getMyQuestionAnswer(questionId: string): Promise<{ answer_text?: string; selected_options?: string[]; is_correct?: boolean | null } | null> {
@@ -306,10 +319,12 @@ class ApiClient {
 
   // Form Responses
   async submitFormResponse(contentId: string, responseData: any, visibility?: 'private' | 'shared' | 'public'): Promise<FormResponse> {
-    return this.request(`/form-responses/${contentId}`, {
+    const response = await this.request(`/form-responses/${contentId}`, {
       method: 'POST',
       body: JSON.stringify({ response_data: responseData, ...(visibility ? { visibility } : {}) }),
-    });
+    }) as FormResponse;
+    this.notifyResponsesChanged();
+    return response;
   }
 
   async getMyFormResponse(contentId: string): Promise<FormResponse | null> {

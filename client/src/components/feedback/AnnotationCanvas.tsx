@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Pen, Circle, Highlighter, Undo2 } from 'lucide-react';
+import { Pen, Circle, Highlighter, Undo2, Redo2 } from 'lucide-react';
 import type { AnnotationCommand } from '../../types';
 
 type Tool = 'freehand' | 'circle' | 'highlight';
@@ -65,6 +65,7 @@ export default function AnnotationCanvas({ imageUrl, annotations, onChange }: Pr
   const [color, setColor] = useState('#ef4444');
   const [naturalW, setNaturalW] = useState(0);
   const [naturalH, setNaturalH] = useState(0);
+  const [redoStack, setRedoStack] = useState<AnnotationCommand[]>([]);
   const drawing = useRef(false);
   const currentCmd = useRef<AnnotationCommand | null>(null);
 
@@ -81,6 +82,17 @@ export default function AnnotationCanvas({ imageUrl, annotations, onChange }: Pr
   }, [annotations, naturalW, naturalH]);
 
   useEffect(() => { redraw(); }, [redraw]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); handleUndo(); }
+      if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); handleRedo(); }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotations, redoStack]);
 
   function getPos(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): { x: number; y: number } {
     const canvas = canvasRef.current!;
@@ -127,8 +139,23 @@ export default function AnnotationCanvas({ imageUrl, annotations, onChange }: Pr
     drawing.current = false;
     if (currentCmd.current.points.length >= 2) {
       onChange([...annotations, currentCmd.current]);
+      setRedoStack([]); // new stroke clears redo history
     }
     currentCmd.current = null;
+  }
+
+  function handleUndo() {
+    if (annotations.length === 0) return;
+    const last = annotations[annotations.length - 1];
+    setRedoStack(prev => [last, ...prev]);
+    onChange(annotations.slice(0, -1));
+  }
+
+  function handleRedo() {
+    if (redoStack.length === 0) return;
+    const [next, ...rest] = redoStack;
+    setRedoStack(rest);
+    onChange([...annotations, next]);
   }
 
   function onImageLoad() {
@@ -172,15 +199,28 @@ export default function AnnotationCanvas({ imageUrl, annotations, onChange }: Pr
           ))}
         </div>
 
-        {/* Undo */}
-        <button
-          onClick={() => onChange(annotations.slice(0, -1))}
-          disabled={annotations.length === 0}
-          title="Undo"
-          className="ml-auto p-1.5 rounded-md text-muted hover:text-theme disabled:opacity-30 transition-colors"
-        >
-          <Undo2 className="h-4 w-4" />
-        </button>
+        {/* Undo / Redo */}
+        <div className="ml-auto flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <button
+            onClick={handleUndo}
+            disabled={annotations.length === 0}
+            title="Undo (Ctrl+Z)"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium text-muted hover:text-theme hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            <span className="text-xs">Undo</span>
+          </button>
+          <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-0.5" />
+          <button
+            onClick={handleRedo}
+            disabled={redoStack.length === 0}
+            title="Redo (Ctrl+Y)"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium text-muted hover:text-theme hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <span className="text-xs">Redo</span>
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Canvas over image */}
