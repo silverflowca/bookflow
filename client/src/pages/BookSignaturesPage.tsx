@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, PenLine } from 'lucide-react';
+import { ChevronLeft, FileSignature } from 'lucide-react';
 import SignatureStatusTab from '../components/signatures/SignatureStatusTab';
 
 export default function BookSignaturesPage() {
@@ -12,7 +12,7 @@ export default function BookSignaturesPage() {
           <ChevronLeft className="h-6 w-6" />
         </Link>
         <div className="flex items-center gap-2">
-          <PenLine className="h-6 w-6 text-accent" />
+          <FileSignature className="h-6 w-6 text-accent" />
           <div>
             <h1 className="text-2xl font-bold text-theme">E-Signatures</h1>
             <p className="text-sm text-muted">Track signature requests and responses from readers.</p>

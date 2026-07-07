@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2, Download, Edit, ExternalLink, PenLine } from 'lucide-react';
+import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check, Users, History, Share2, Activity, BarChart2, Download, Edit, ExternalLink, FileSignature } from 'lucide-react';
 import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
@@ -247,7 +247,7 @@ export default function BookSettings() {
           { to: `/edit/book/${bookId}/versions`, label: 'Versions', icon: <History className="h-3.5 w-3.5" /> },
           { to: `/edit/book/${bookId}/activity`, label: 'Activity', icon: <Activity className="h-3.5 w-3.5" /> },
           { to: `/edit/book/${bookId}/dashboard`, label: 'Dashboard', icon: <BarChart2 className="h-3.5 w-3.5" /> },
-          { to: `/edit/book/${bookId}/signatures`, label: 'E-Signatures', icon: <PenLine className="h-3.5 w-3.5" /> },
+          { to: `/edit/book/${bookId}/signatures`, label: 'E-Signatures', icon: <FileSignature className="h-3.5 w-3.5" /> },
         ].map(({ to, label, icon, exact }) => {
           const active = exact ? location.pathname === to : location.pathname.startsWith(to);
           return (
