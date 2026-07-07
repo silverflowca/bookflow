@@ -5,7 +5,7 @@ import {
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, PenLine
+  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, FileSignature
 } from 'lucide-react';
 import { getTextAlignStyle, getTextStyleAttributes } from '../components/editor/PasteFormattingExtensions';
 
@@ -2251,7 +2251,7 @@ function getInlineContentIcon(type: string): React.ReactNode {
     case 'media_response':
       return <MessageSquare className={`${iconClass} text-blue-600`} />;
     case 'signature':
-      return <PenLine className={`${iconClass} text-purple-600`} />;
+      return <FileSignature className={`${iconClass} text-purple-600`} />;
     default:
       return null;
   }
@@ -2352,7 +2352,7 @@ function TipTapNode({
       if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]" style={style}>&nbsp;</p>;
       // If paragraph contains only block-level widget nodes (image, drawing, etc.), render as div
       // to avoid invalid HTML (<div> inside <p>) which breaks browser DOM parsing
-      const BLOCK_WIDGET_TYPES = new Set(['question', 'poll', 'image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block']);
+      const BLOCK_WIDGET_TYPES = new Set(['question', 'poll', 'image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block', 'media_response', 'signature']);
       const isBlockWidget = node.content.length === 1 &&
         node.content[0].type === 'inlineFormWidget' &&
         BLOCK_WIDGET_TYPES.has(node.content[0].attrs?.contentType);
@@ -2565,7 +2565,7 @@ function TipTapNode({
         return <span>{anchorText}</span>;
       }
       // Block-level types must render as block, not inline-flex
-      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block', 'media_response']);
+      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block', 'media_response', 'signature']);
       const isBlock = BLOCK_TYPES.has(effectiveIc.content_type);
       const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
       const markerClass = getInlineContentClass(effectiveIc.content_type);
@@ -4403,7 +4403,7 @@ function SignatureBlock({ content, isAuthor = false, userId, defaultVisibility =
     <div className="bg-surface-hover border border-theme rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <PenLine className="h-5 w-5 text-muted" />
+          <FileSignature className="h-5 w-5 text-muted" />
           <span className="font-medium text-theme">{data.label || 'Signature'}</span>
           {data.required && <span className="text-red-500 text-sm">*</span>}
         </div>
@@ -4993,6 +4993,8 @@ function InlineFormElement({ content }: { content: InlineContent }) {
       return <MediaBlock content={content} />;
     case 'media_response':
       return <MediaResponseBlock content={content} userId={user?.id} />;
+    case 'signature':
+      return <SignatureBlock content={content} userId={user?.id} />;
     default:
       return null;
   }

@@ -4,7 +4,6 @@ import { ChevronLeft, Save, Upload, Image, X, Loader2, Globe, Lock, Copy, Check,
 import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, BookSettings as BookSettingsType } from '../types';
-import SignatureStatusTab from '../components/signatures/SignatureStatusTab';
 
 export default function BookSettings() {
   const { bookId } = useParams<{ bookId: string }>();

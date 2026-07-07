@@ -5,7 +5,7 @@ import {
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
   LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3,
-  Indent, Outdent, MessageSquare, Undo2, Redo2
+  Indent, Outdent, MessageSquare, FileSignature, Undo2, Redo2
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -1549,7 +1549,7 @@ export default function ChapterEditor() {
               title="Add Signature Request"
               className="text-purple-700"
             >
-              <MessageSquare className="h-4 w-4" />
+              <FileSignature className="h-4 w-4" />
             </ToolbarButton>
             <div className="w-px bg-surface-hover mx-1" />
             <ToolbarButton
@@ -1938,7 +1938,7 @@ function InlineContentItem({
     video: <Video className="h-4 w-4 text-red-600" />,
     image: <Image className="h-4 w-4 text-sky-600" />,
     media_response: <MessageSquare className="h-4 w-4 text-blue-600" />,
-    signature: <MessageSquare className="h-4 w-4 text-purple-700" />,
+    signature: <FileSignature className="h-4 w-4 text-purple-700" />,
   };
 
   const bgColors: Record<string, string> = {

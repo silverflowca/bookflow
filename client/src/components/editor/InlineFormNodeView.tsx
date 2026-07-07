@@ -1,4 +1,4 @@
-import { BookOpen, PenLine } from 'lucide-react';
+import { BookOpen, FileSignature } from 'lucide-react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import type {
@@ -321,7 +321,7 @@ function FormPreview({ contentType, contentData }: { contentType: FormType; cont
         <span className="block w-full" data-testid="inline-form-preview-signature">
           <span className="block bg-surface-hover border-2 border-dashed border-theme rounded-lg p-3">
             <span className="flex items-center gap-2 mb-2">
-              <PenLine className="h-4 w-4 text-muted" />
+              <FileSignature className="h-4 w-4 text-muted" />
               <span className="text-sm font-medium text-theme">{d.label || 'Signature'}</span>
               {d.required && <span className="text-red-500 text-xs">*</span>}
             </span>
