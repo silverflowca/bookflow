@@ -771,17 +771,26 @@ router.post('/inline-content/:id/signatures', authenticate, async (req, res) => 
 
     if (upsertError) throw upsertError;
 
-    // Re-fetch with profile join (user_id → bookflow.profiles via auth.users)
+    // Re-fetch the row (plain — no FK join to auth.users)
     const { data, error } = await supabase
       .schema('bookflow')
       .from('signature_responses')
-      .select(`*, user:profiles!user_id(id, display_name, avatar_url)`)
+      .select('*')
       .eq('inline_content_id', req.params.id)
       .eq('user_id', req.user.id)
       .single();
 
     if (error) throw error;
-    res.json(data);
+
+    // Attach profile manually
+    const { data: profile } = await supabase
+      .schema('bookflow')
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .eq('id', req.user.id)
+      .maybeSingle();
+
+    res.json({ ...data, user: profile || null });
   } catch (err) {
     console.error('Submit signature error:', err);
     res.status(500).json({ error: err.message });
@@ -794,13 +803,22 @@ router.get('/inline-content/:id/signatures/mine', authenticate, async (req, res)
     const { data, error } = await supabase
       .schema('bookflow')
       .from('signature_responses')
-      .select(`*, user:profiles!user_id(id, display_name, avatar_url)`)
+      .select('*')
       .eq('inline_content_id', req.params.id)
       .eq('user_id', req.user.id)
       .maybeSingle();
 
     if (error) throw error;
-    res.json(data);
+    if (!data) return res.json(null);
+
+    const { data: profile } = await supabase
+      .schema('bookflow')
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .eq('id', req.user.id)
+      .maybeSingle();
+
+    res.json({ ...data, user: profile || null });
   } catch (err) {
     console.error('Get my signature error:', err);
     res.status(500).json({ error: err.message });
@@ -825,12 +843,25 @@ router.get('/inline-content/:id/signatures/all', authenticate, async (req, res) 
     const { data, error } = await supabase
       .schema('bookflow')
       .from('signature_responses')
-      .select(`*, user:profiles!user_id(id, display_name, avatar_url)`)
+      .select('*')
       .eq('inline_content_id', req.params.id)
       .order('agreed_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ responses: data, total: data.length });
+
+    // Attach profiles
+    const userIds = [...new Set(data.map(r => r.user_id).filter(Boolean))];
+    let profileMap = {};
+    if (userIds.length) {
+      const { data: profiles } = await supabase
+        .schema('bookflow')
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', userIds);
+      if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
+    }
+    const responses = data.map(r => ({ ...r, user: profileMap[r.user_id] || null }));
+    res.json({ responses, total: responses.length });
   } catch (err) {
     console.error('Get all signatures error:', err);
     res.status(500).json({ error: err.message });
