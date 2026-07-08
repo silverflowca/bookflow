@@ -10,6 +10,7 @@ interface CommentThreadProps {
   bookId?: string;
   canResolve: boolean;
   onResolved?: (commentId: string) => void;
+  onUnresolved?: (commentId: string) => void;
   onDeleted?: (commentId: string) => void;
   onReplyAdded?: (reply: BookComment, parentId: string) => void;
   currentUserId?: string;
@@ -31,6 +32,7 @@ export default function CommentThread({
   bookId,
   canResolve,
   onResolved,
+  onUnresolved,
   onDeleted,
   onReplyAdded,
   currentUserId,
@@ -52,6 +54,18 @@ export default function CommentThread({
       onResolved?.(comment.id);
     } catch (err) {
       console.error('Failed to resolve:', err);
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  async function handleUnresolve() {
+    setResolving(true);
+    try {
+      await api.resolveComment(comment.id, 'open');
+      onUnresolved?.(comment.id);
+    } catch (err) {
+      console.error('Failed to unresolve:', err);
     } finally {
       setResolving(false);
     }
@@ -119,6 +133,15 @@ export default function CommentThread({
                 >
                   <Check className="h-3.5 w-3.5 text-green-500" />
                   Resolve
+                </button>
+              )}
+              {canResolve && isResolved && (
+                <button
+                  onClick={() => { handleUnresolve(); setShowMenu(false); }}
+                  className="w-full text-left px-3 py-2 flex items-center gap-2 text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+                >
+                  <Check className="h-3.5 w-3.5 text-orange-400" />
+                  Unresolve
                 </button>
               )}
               {isOwn && (

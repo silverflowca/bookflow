@@ -6,7 +6,7 @@ import {
   Settings, Shield, HelpCircle,
   Eye, Radio, Layers, Bell,
   Zap,
-  UserPlus, Lightbulb,
+  UserPlus, Lightbulb, MessageSquare, PenLine,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -138,6 +138,18 @@ const SECTIONS: Section[] = [
         a: 'Open the Book Editor and click the Activity tab (clock/list icon). The timeline shows every version save, comment, inline content change, and collaborator action — who did it and when.',
         tags: ['activity', 'history', 'changelog'],
       },
+      {
+        q: 'How do I undo or redo changes in the chapter editor?',
+        a: (
+          <ul className="space-y-1.5 text-sm">
+            <li>Click the <strong>↩ Undo</strong> or <strong>↪ Redo</strong> buttons at the far left of the editor toolbar.</li>
+            <li>Or use keyboard shortcuts: <strong>Ctrl+Z</strong> (Undo) and <strong>Ctrl+Shift+Z</strong> (Redo) on Windows; <strong>⌘Z</strong> / <strong>⌘⇧Z</strong> on Mac.</li>
+            <li>Undo history is cleared when you first load a chapter — you cannot undo back past the initial load.</li>
+            <li>The auto-save (2 seconds after you stop typing) only fires for changes you make, not for undo/redo actions that restore prior content.</li>
+          </ul>
+        ),
+        tags: ['undo', 'redo', 'editor', 'history', 'keyboard'],
+      },
     ],
   },
   {
@@ -176,6 +188,7 @@ const SECTIONS: Section[] = [
               <li><strong>Drawing</strong> — freehand canvas sketch</li>
               <li><strong>Scripture</strong> — Bible verse reference block</li>
               <li><strong>Code Block</strong> — syntax-highlighted code snippet</li>
+              <li><strong>Signature</strong> — e-signature block (draw, type, or checkbox agreement)</li>
             </ul>
           </div>
         ),
@@ -217,6 +230,23 @@ const SECTIONS: Section[] = [
         q: 'What is the difference between Live and Minimal editor preview?',
         a: 'In Book Settings → Editor Preview Mode you can choose: "Live" renders components exactly as readers see them (useful for final review); "Minimal" shows them as a compact badge/pill so they don\'t disrupt your writing flow. Change this any time without affecting how readers see the content.',
         tags: ['editor', 'preview', 'settings'],
+      },
+      {
+        q: 'How do E-Signatures work?',
+        a: (
+          <div className="space-y-2 text-sm">
+            <p>The <strong>Signature</strong> component lets you collect signed agreements from readers directly inside a chapter. To set one up:</p>
+            <ol className="list-decimal ml-4 space-y-1">
+              <li>In the Chapter Editor, click the <strong>Signature</strong> button in the toolbar (pen icon).</li>
+              <li>Give the block a label (e.g. "I agree to the terms") and optionally a description.</li>
+              <li>Choose which capture modes to allow: <strong>Draw</strong> (freehand canvas), <strong>Type</strong> (typed name rendered in cursive), or <strong>Agree</strong> (checkbox acknowledgement).</li>
+              <li>Save — the block appears inline in the chapter.</li>
+            </ol>
+            <p>Readers see a tabbed interface and can sign using any allowed method. Their signature is stored with a timestamp.</p>
+            <p>As an author, view all signatures in <strong>Book Settings → E-Signatures</strong>. Each block shows a count and an expandable list of signers with their name, method, and date.</p>
+          </div>
+        ),
+        tags: ['signature', 'e-signature', 'sign', 'agreement'],
       },
     ],
   },
@@ -361,6 +391,104 @@ const SECTIONS: Section[] = [
         q: 'How does Club Chat work?',
         a: 'Each club has a built-in chat channel. Open the Club detail → Chat tab. Send text messages, scroll history, and receive notifications when new messages arrive. You can set your notification mode (all messages, mentions only, or none) per club.',
         tags: ['chat', 'club', 'messages'],
+      },
+    ],
+  },
+  {
+    id: 'book-chat',
+    icon: <MessageSquare className="h-5 w-5" />,
+    title: 'Book Chat',
+    color: 'text-sky-700',
+    bg: 'bg-sky-50 border-sky-200',
+    intro: 'A dedicated chat room attached to every book — all readers in one conversation.',
+    faqs: [
+      {
+        q: 'What is Book Chat?',
+        a: 'Book Chat is a real-time chat room shared by all readers of a book. Unlike Club Chat (which is per-club), Book Chat is per-book — every reader who has opened the book can join the same conversation. Access it from the chat bubble icon next to the book title in the reader, or navigate to /book/:id/chat.',
+        tags: ['book chat', 'chat', 'realtime'],
+      },
+      {
+        q: 'Who can see Book Chat messages?',
+        a: 'All readers who have started reading the book can see and send messages. The author and any collaborators can also see all messages. Public books allow any logged-in user who has opened the book to participate.',
+        tags: ['book chat', 'visibility', 'readers'],
+      },
+      {
+        q: 'How are readers identified in Book Chat?',
+        a: 'Each participant gets a unique colour assigned to their name, avatar initial, and message bubble — making it easy to tell who said what at a glance. Your own messages appear on the right side in the accent colour.',
+        tags: ['book chat', 'colour', 'avatar'],
+      },
+      {
+        q: 'What are system status messages in Book Chat?',
+        a: 'When a reader completes a chapter or finishes the book, a small status update appears in the chat (e.g. "Alex completed Chapter 3"). This is controlled by the "Share my progress" setting. You can turn it off in your Profile → Privacy Settings or via the toggle at the top of any Book Chat.',
+        tags: ['book chat', 'progress', 'system message', 'status'],
+      },
+      {
+        q: 'How do I turn off progress sharing in Book Chat?',
+        a: (
+          <ul className="space-y-1.5 text-sm">
+            <li>Toggle <strong>"Share my progress in this chat"</strong> at the top of the Book Chat page — this controls sharing for that specific chat session.</li>
+            <li>Or go to <strong>Profile → Edit Profile → Privacy Settings</strong> and toggle off <strong>"Share my reading progress in book chats"</strong> to disable it globally across all books.</li>
+          </ul>
+        ),
+        tags: ['book chat', 'progress', 'privacy', 'share'],
+      },
+      {
+        q: 'Can the author disable Book Chat for their book?',
+        a: 'Yes. Go to Book Settings and toggle off "Enable Book Chat". This hides the chat icon from readers and prevents new messages.',
+        tags: ['book chat', 'disable', 'settings', 'author'],
+      },
+      {
+        q: 'Does Book Chat show who is currently reading?',
+        a: 'Yes. The readers panel on the left side of Book Chat shows all readers who have opened the book, their current chapter, and their overall completion percentage.',
+        tags: ['book chat', 'readers', 'progress', 'sidebar'],
+      },
+    ],
+  },
+  {
+    id: 'esignatures',
+    icon: <PenLine className="h-5 w-5" />,
+    title: 'E-Signatures',
+    color: 'text-purple-700',
+    bg: 'bg-purple-50 border-purple-200',
+    intro: 'Collect signed agreements, acknowledgements, and sign-offs directly inside your chapters.',
+    faqs: [
+      {
+        q: 'How do I add an e-signature block to a chapter?',
+        a: (
+          <ol className="list-decimal ml-4 space-y-1 text-sm">
+            <li>Open the Chapter Editor and click the <strong>Signature</strong> (pen) button in the toolbar.</li>
+            <li>Enter a label (e.g. "I have read and agree to the above") and an optional description.</li>
+            <li>Choose which signing methods to allow: Draw, Type, or Agree (checkbox).</li>
+            <li>Click Save — the block appears inline in the chapter at your cursor position.</li>
+          </ol>
+        ),
+        tags: ['signature', 'add', 'editor'],
+      },
+      {
+        q: 'What signing methods are available?',
+        a: (
+          <ul className="space-y-1.5 text-sm">
+            <li><strong>Draw</strong> — reader draws their signature on a freehand canvas with mouse or touch.</li>
+            <li><strong>Type</strong> — reader types their name, displayed in a cursive script font.</li>
+            <li><strong>Agree</strong> — reader checks a checkbox to acknowledge agreement (no handwriting needed).</li>
+          </ul>
+        ),
+        tags: ['signature', 'draw', 'type', 'checkbox', 'methods'],
+      },
+      {
+        q: 'Where do I see who has signed?',
+        a: 'Go to Book Settings → E-Signatures. Each signature block in the book is listed with a signed count badge. Click any block to expand it and see each signer\'s name, the method they used (drawn/typed/agreed), and the date and time they signed.',
+        tags: ['signature', 'status', 'settings', 'who signed'],
+      },
+      {
+        q: 'Can a reader withdraw their signature?',
+        a: 'Yes. A reader who has already signed will see a "Retract signature" button on the block. Clicking it removes their record. They can sign again at any time.',
+        tags: ['signature', 'retract', 'withdraw', 'delete'],
+      },
+      {
+        q: 'Is the signature legally binding?',
+        a: 'BookFlow e-signatures record the signer\'s user identity, timestamp, IP address, and chosen acknowledgement method — which may satisfy requirements for many informal agreements. For legally binding contracts requiring compliance with specific e-signature laws (e.g. eIDAS, ESIGN Act), consult a legal professional.',
+        tags: ['signature', 'legal', 'binding'],
       },
     ],
   },
@@ -550,14 +678,20 @@ const SECTIONS: Section[] = [
       {
         q: 'How do I control what others can see on my profile?',
         a: (
-          <ul className="space-y-1.5 text-sm">
-            <li><strong>Public Profile</strong> — toggle on/off whether your profile is visible at all.</li>
-            <li><strong>Show Reading Progress</strong> — hide your reading stats from public view.</li>
-            <li><strong>Show Clubs</strong> — hide your club memberships.</li>
-            <li><strong>Show Books Authored</strong> — hide your authored books list.</li>
-          </ul>
+          <div className="space-y-2 text-sm">
+            <p>Go to <strong>Profile → Edit Profile → Privacy Settings</strong>. Click any toggle row (anywhere on the row, including the label) to switch it on or off:</p>
+            <ul className="space-y-1.5 ml-2">
+              <li><strong>Public Profile</strong> — toggle on/off whether your profile is visible at all.</li>
+              <li><strong>Show Reading Progress</strong> — hide your reading stats from public view.</li>
+              <li><strong>Show Clubs</strong> — hide your club memberships.</li>
+              <li><strong>Show Books Authored</strong> — hide your authored books list.</li>
+              <li><strong>Share my reading progress in book chats</strong> — when on, chapter completions and book finishes are posted as status updates in Book Chat. Turn this off to read silently.</li>
+              <li><strong>Author account</strong> — mark yourself as an author to unlock book creation tools.</li>
+            </ul>
+            <p>Click <strong>Save</strong> after making changes.</p>
+          </div>
         ),
-        tags: ['privacy', 'profile', 'settings'],
+        tags: ['privacy', 'profile', 'settings', 'share', 'progress', 'book chat'],
       },
       {
         q: 'How do I become an Author?',
@@ -628,6 +762,7 @@ const SECTIONS: Section[] = [
 
 const NAVIGATION_RESULTS: NavigationResult[] = [
   { id: 'books', title: 'Books', description: 'Open your dashboard and manage your books.', to: '/dashboard', icon: <BookOpen className="h-4 w-4" />, tags: ['books', 'dashboard', 'my books', 'read books'] },
+  { id: 'book-chat', title: 'Book Chat', description: 'Open the real-time chat for a book.', to: '/dashboard', icon: <MessageSquare className="h-4 w-4" />, tags: ['book chat', 'chat', 'readers', 'realtime', 'messages'] },
   { id: 'clubs', title: 'Clubs', description: 'Browse or manage your book clubs.', to: '/clubs', icon: <Users className="h-4 w-4" />, tags: ['clubs', 'book clubs', 'groups'] },
   { id: 'study-groups', title: 'Study Groups', description: 'Jump to the study groups view inside clubs.', to: '/clubs?tab=bookstudy', icon: <Users className="h-4 w-4" />, tags: ['study groups', 'study', 'book study'] },
   { id: 'live', title: 'Live', description: 'Open the live broadcasting and scheduling area.', to: '/live', icon: <Radio className="h-4 w-4" />, tags: ['live', 'streaming', 'broadcast'] },

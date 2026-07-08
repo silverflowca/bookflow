@@ -246,12 +246,13 @@ router.post('/:commentId/resolve', authenticate, async (req, res) => {
 
     if (!canResolve) return res.status(403).json({ error: 'Not authorized to resolve comments' });
 
+    const isUnresolving = status === 'open';
     const { data, error } = await supabase
       .from('book_comments')
       .update({
         status,
-        resolved_by: req.user.id,
-        resolved_at: new Date().toISOString(),
+        resolved_by: isUnresolving ? null : req.user.id,
+        resolved_at: isUnresolving ? null : new Date().toISOString(),
       })
       .eq('id', req.params.commentId)
       .select()

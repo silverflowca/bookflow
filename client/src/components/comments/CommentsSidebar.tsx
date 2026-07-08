@@ -92,6 +92,12 @@ export default function CommentsSidebar({
     ));
   }
 
+  function handleUnresolved(commentId: string) {
+    setComments(prev => prev.map(c =>
+      c.id === commentId ? { ...c, status: 'open' as const } : c
+    ));
+  }
+
   function handleDeleted(commentId: string) {
     setComments(prev => prev.filter(c => c.id !== commentId));
   }
@@ -225,6 +231,7 @@ export default function CommentsSidebar({
               canResolve={canResolve}
               currentUserId={currentUserId}
               onResolved={handleResolved}
+              onUnresolved={handleUnresolved}
               onDeleted={handleDeleted}
               onReplyAdded={handleReplyAdded}
             />

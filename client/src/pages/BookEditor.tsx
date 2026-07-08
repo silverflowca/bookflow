@@ -114,7 +114,8 @@ function BookShareDropdown({ book, bookId, onClose }: {
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-1 z-50 w-80 max-w-[min(320px,calc(100vw-2rem))] bg-surface border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden"
+      className="absolute right-0 top-full mt-1 z-50 w-80 max-w-[min(320px,calc(100vw-2rem))] border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden"
+      style={{ backgroundColor: 'var(--color-surface)', backgroundImage: 'none' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-surface-hover">
@@ -347,7 +348,8 @@ function ChapterShareDropdown({ chapter, chapterIndex, book, bookId, onClose }: 
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-1 z-50 w-80 max-w-[min(320px,calc(100vw-2rem))] bg-surface border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden"
+      className="absolute right-0 top-full mt-1 z-50 w-80 max-w-[min(320px,calc(100vw-2rem))] border border-[var(--color-border)] rounded-2xl shadow-2xl overflow-hidden"
+      style={{ backgroundColor: 'var(--color-surface)', backgroundImage: 'none' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-surface-hover">

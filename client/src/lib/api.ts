@@ -729,7 +729,7 @@ class ApiClient {
     return this.request(`/comments/${commentId}`, { method: 'DELETE' });
   }
 
-  async resolveComment(commentId: string, status: 'resolved' | 'rejected' = 'resolved'): Promise<BookComment> {
+  async resolveComment(commentId: string, status: 'resolved' | 'rejected' | 'open' = 'resolved'): Promise<BookComment> {
     return this.request(`/comments/${commentId}/resolve`, {
       method: 'POST',
       body: JSON.stringify({ status }),
