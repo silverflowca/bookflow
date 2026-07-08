@@ -555,15 +555,19 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
       .eq('id', req.params.id)
       .single();
 
-    if (contentError) throw contentError;
+    if (contentError) {
+      console.error('[vote] inline_content lookup failed:', contentError.message, contentError.code);
+      throw contentError;
+    }
 
     if (content.content_type !== 'poll') {
       return res.status(400).json({ error: 'Not a poll' });
     }
 
     // Check if option is valid
-    const options = content.content_data.options || [];
-    if (!options.find(o => o.id === selected_option || o.text === selected_option)) {
+    const pollOptions = content.content_data.options || [];
+    if (!pollOptions.find(o => o.id === selected_option || o.text === selected_option)) {
+      console.error('[vote] invalid option:', selected_option, 'available:', pollOptions.map(o => o.id));
       return res.status(400).json({ error: 'Invalid option' });
     }
 
@@ -579,7 +583,10 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[vote] upsert failed:', error.message, error.code, error.details);
+      throw error;
+    }
 
     // Get poll results
     const { data: results } = await supabase
