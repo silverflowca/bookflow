@@ -1537,37 +1537,35 @@ export default function BookReader() {
             <EndOfChapterContent items={inlineContent} isAuthor={isAuthor} userId={user?.id} defaultVisibility={book?.user_in_shared_club ? 'shared' : book?.visibility === 'public' ? 'private' : 'private'} />
 
             {/* Navigation */}
-            <nav className="flex justify-between items-center mt-12 pt-8 border-t">
+            <nav className="mt-12 pt-8 border-t grid grid-cols-2 gap-px bg-theme">
               {prevChapter ? (
                 <Link
                   to={`/book/${bookId}/chapter/${prevChapter.id}`}
-                  className="flex items-center gap-2 text-accent hover:text-accent no-underline"
+                  className="flex items-start gap-2 text-accent hover:text-accent no-underline bg-page hover:bg-surface-hover transition-colors p-4 rounded-l-xl min-w-0"
                 >
-                  <ChevronLeft className="h-5 w-5" />
-                  <div>
-                    <p className="text-xs text-muted">Previous</p>
-                    <p className="font-medium">{prevChapter.title}</p>
-                    {book?.title && <p className="text-xs text-muted/70 mt-0.5">{book.title}</p>}
+                  <ChevronLeft className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted mb-0.5">Previous</p>
+                    <p className="font-medium text-sm leading-snug line-clamp-3">{prevChapter.title}</p>
                   </div>
                 </Link>
               ) : (
-                <div />
+                <div className="bg-page rounded-l-xl" />
               )}
 
               {nextChapter ? (
                 <Link
                   to={`/book/${bookId}/chapter/${nextChapter.id}`}
-                  className="flex items-center gap-2 text-accent hover:text-accent text-right no-underline"
+                  className="flex items-start gap-2 text-accent hover:text-accent text-right no-underline bg-page hover:bg-surface-hover transition-colors p-4 rounded-r-xl min-w-0 justify-end"
                 >
-                  <div>
-                    <p className="text-xs text-muted">Next</p>
-                    <p className="font-medium">{nextChapter.title}</p>
-                    {book?.title && <p className="text-xs text-muted/70 mt-0.5">{book.title}</p>}
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted mb-0.5">Next</p>
+                    <p className="font-medium text-sm leading-snug line-clamp-3">{nextChapter.title}</p>
                   </div>
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-5 w-5 shrink-0 mt-0.5" />
                 </Link>
               ) : (
-                <div />
+                <div className="bg-page rounded-r-xl" />
               )}
             </nav>
           </article>
