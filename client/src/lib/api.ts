@@ -875,8 +875,11 @@ class ApiClient {
     URL.revokeObjectURL(url);
   }
 
-  async exportPdf(bookId: string): Promise<{ download_url?: string }> {
-    return this.request(`/books/${bookId}/export/pdf`, { method: 'POST' });
+  async exportPdf(bookId: string, options?: Record<string, boolean>): Promise<{ download_url?: string }> {
+    return this.request(`/books/${bookId}/export/pdf`, {
+      method: 'POST',
+      body: options ? JSON.stringify({ options }) : undefined,
+    });
   }
 
   async exportEpub(bookId: string): Promise<{ download_url?: string }> {

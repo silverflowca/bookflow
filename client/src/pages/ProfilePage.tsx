@@ -185,8 +185,12 @@ export default function ProfilePage() {
                   : <User className="h-9 w-9 text-muted" />}
             </div>
             {isOwnProfile && !avatarUploading && (
-              <label className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-accent flex items-center justify-center cursor-pointer shadow-md hover:opacity-90 transition-opacity" title="Change photo">
-                <Camera className="h-3.5 w-3.5 text-white" />
+              <label
+                className="absolute bottom-0 right-0 h-7 w-7 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: '#7c3aed', border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,0.25)' }}
+                title="Change photo"
+              >
+                <Camera className="h-3.5 w-3.5" style={{ color: '#fff' }} />
                 <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
               </label>
             )}

@@ -5,7 +5,7 @@ import path from 'path';
 import { supabase } from '../config/supabase.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { buildSnapshot } from './versions.js';
-import { buildBookHtml, tiptapToHtml } from '../utils/tiptapToHtml.js';
+import { buildBookHtml, buildBookHtmlWithInline, tiptapToHtml } from '../utils/tiptapToHtml.js';
 import { FileFlowClient, getFileFlowToken, ensureBookFolders } from '../services/fileflow.js';
 
 const router = express.Router({ mergeParams: true });
@@ -17,6 +17,7 @@ function extractJwt(req) {
 
 async function fetchBookFull(bookId) {
   const { data: book, error } = await supabase
+    .schema('bookflow')
     .from('books')
     .select(`
       id, title, subtitle, description, cover_image_url, status, visibility,
@@ -28,6 +29,7 @@ async function fetchBookFull(bookId) {
   if (error) throw error;
 
   const { data: chapters } = await supabase
+    .schema('bookflow')
     .from('chapters')
     .select('id, title, content, content_text, order_index, word_count, status')
     .eq('book_id', bookId)
@@ -111,7 +113,27 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
   let browser;
   try {
     const book = await fetchBookFull(req.params.bookId);
-    const html = buildBookHtml(book, book.chapters);
+    const options = req.body.options || {};
+
+    // Fetch all inline content for all chapters
+    const chapterIds = book.chapters.map(ch => ch.id);
+    let inlineByChapter = {};
+    if (chapterIds.length > 0) {
+      const { data: allInline } = await supabase
+        .schema('bookflow')
+        .from('inline_content')
+        .select('*')
+        .in('chapter_id', chapterIds)
+        .eq('is_author_content', true);
+      if (allInline) {
+        for (const block of allInline) {
+          if (!inlineByChapter[block.chapter_id]) inlineByChapter[block.chapter_id] = [];
+          inlineByChapter[block.chapter_id].push(block);
+        }
+      }
+    }
+
+    const html = buildBookHtmlWithInline(book, book.chapters, inlineByChapter, options);
 
     browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     const page = await browser.newPage();

@@ -479,6 +479,86 @@ function ChapterShareDropdown({ chapter, chapterIndex, book, bookId, onClose }: 
   );
 }
 
+// ── PDF Export Modal ───────────────────────────────────────────────────────────
+const PDF_EXPORT_OPTIONS: { key: string; label: string }[] = [
+  { key: 'includePolls',     label: 'Polls' },
+  { key: 'includeQuestions', label: 'Questions & Quizzes' },
+  { key: 'includeImages',    label: 'Images' },
+  { key: 'includeCodeBlocks', label: 'Code Blocks' },
+  { key: 'includeScripture', label: 'Scripture Blocks' },
+  { key: 'includeForms',     label: 'Form Fields (select, textbox, radio…)' },
+  { key: 'includeSignatures', label: 'Signature Blocks' },
+  { key: 'includeAudio',     label: 'Audio & Video Blocks' },
+  { key: 'includeNotes',     label: 'Notes & Annotations' },
+  { key: 'includeLinks',     label: 'Link Cards' },
+];
+
+function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: (opts: Record<string, boolean>) => void }) {
+  const [options, setOptions] = useState<Record<string, boolean>>(
+    Object.fromEntries(PDF_EXPORT_OPTIONS.map(o => [o.key, true]))
+  );
+
+  function toggle(key: string) {
+    setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function selectAll(val: boolean) {
+    setOptions(Object.fromEntries(PDF_EXPORT_OPTIONS.map(o => [o.key, val])));
+  }
+
+  const allChecked = PDF_EXPORT_OPTIONS.every(o => options[o.key]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-4 border-b border-theme">
+          <h2 className="font-semibold text-theme">PDF Export Options</h2>
+          <button onClick={onClose} className="text-muted hover:text-theme">✕</button>
+        </div>
+        <div className="p-4">
+          <p className="text-sm text-muted mb-3">Choose what to include in the exported PDF:</p>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-muted uppercase tracking-wide">Inline Content</span>
+            <button
+              onClick={() => selectAll(!allChecked)}
+              className="text-xs text-accent hover:underline"
+            >
+              {allChecked ? 'Deselect all' : 'Select all'}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {PDF_EXPORT_OPTIONS.map(opt => (
+              <label key={opt.key} className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={!!options[opt.key]}
+                  onChange={() => toggle(opt.key)}
+                  className="h-4 w-4 rounded border-theme accent-accent"
+                />
+                <span className="text-sm text-theme group-hover:text-accent transition-colors">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2 p-4 border-t border-theme">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 rounded-lg text-sm border border-theme text-theme hover:bg-surface-hover"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onExport(options)}
+            className="flex-1 px-4 py-2 rounded-lg text-sm bg-accent text-white hover:opacity-90 font-medium"
+          >
+            Download PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Publish Modal ─────────────────────────────────────────────────────────────
 function PublishModal({ book, bookId, onClose, onPublished, onUnpublished }: {
   book: Book;
@@ -721,6 +801,7 @@ export default function BookEditor() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showPdfExportModal, setShowPdfExportModal] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   // Inline review state
   const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
@@ -931,18 +1012,36 @@ export default function BookEditor() {
 
   async function handleExport(format: 'json' | 'pdf' | 'epub' | 'docx') {
     if (!bookId) return;
-    setExporting(format);
     setShowExportMenu(false);
+    if (format === 'pdf') {
+      setShowPdfExportModal(true);
+      return;
+    }
+    setExporting(format);
     try {
       if (format === 'json') {
         await api.exportJson(bookId);
       } else {
-        const methodMap = { pdf: 'exportPdf', epub: 'exportEpub', docx: 'exportDocx' } as const;
-        const result = await api[methodMap[format]](bookId);
+        const methodMap = { epub: 'exportEpub', docx: 'exportDocx' } as const;
+        const result = await api[methodMap[format as 'epub' | 'docx']](bookId);
         if (result?.download_url) window.open(result.download_url, '_blank');
       }
     } catch (err) {
       alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handlePdfExport(options: Record<string, boolean>) {
+    if (!bookId) return;
+    setShowPdfExportModal(false);
+    setExporting('pdf');
+    try {
+      const result = await api.exportPdf(bookId, options);
+      if (result?.download_url) window.open(result.download_url, '_blank');
+    } catch (err) {
+      alert(`PDF export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setExporting(null);
     }
@@ -1265,6 +1364,14 @@ export default function BookEditor() {
           )}
         </div>
       </div>
+
+      {/* PDF Export modal */}
+      {showPdfExportModal && (
+        <PdfExportModal
+          onClose={() => setShowPdfExportModal(false)}
+          onExport={handlePdfExport}
+        />
+      )}
 
       {/* Publish modal */}
       {showPublishModal && book && (
