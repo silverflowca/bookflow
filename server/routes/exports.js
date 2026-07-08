@@ -106,11 +106,9 @@ router.get('/:bookId/publisher-metadata', authenticate, requireRole(['owner', 'a
 
 // POST /api/books/:bookId/export/pdf
 router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']), async (req, res) => {
-  let puppeteer;
-  try { puppeteer = (await import('puppeteer')).default; }
-  catch { return res.status(501).json({ error: 'PDF export requires puppeteer. Run: npm install puppeteer' }); }
+  const pdfServiceUrl = process.env.PDF_SERVICE_URL;
+  if (!pdfServiceUrl) return res.status(501).json({ error: 'PDF export is not configured. Set PDF_SERVICE_URL.' });
 
-  let browser;
   try {
     const book = await fetchBookFull(req.params.bookId);
     const options = req.body.options || {};
@@ -135,30 +133,28 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
 
     const html = buildBookHtmlWithInline(book, book.chapters, inlineByChapter, options);
 
-    browser = await puppeteer.launch({
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    // Delegate PDF generation to the dedicated pdf-service
+    const pdfRes = await fetch(`${pdfServiceUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html }),
     });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: { top: '2cm', bottom: '2cm', left: '2.5cm', right: '2.5cm' },
-      printBackground: true,
-    });
-    await browser.close();
-    browser = null;
+    if (!pdfRes.ok) {
+      const err = await pdfRes.json().catch(() => ({}));
+      return res.status(502).json({ error: err.error || 'PDF service error' });
+    }
+    const { pdf: pdfBase64 } = await pdfRes.json();
+    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
     const fileName = `${(book.title || 'book').replace(/[^a-z0-9]/gi, '_')}.pdf`;
-    const result = await uploadToBackups(req.params.bookId, book.title, Buffer.from(pdfBuffer), fileName, 'application/pdf', req.user.id, extractJwt(req));
+    const result = await uploadToBackups(req.params.bookId, book.title, pdfBuffer, fileName, 'application/pdf', req.user.id, extractJwt(req));
 
     if (result) return res.json(result);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(Buffer.from(pdfBuffer));
+    res.send(pdfBuffer);
   } catch (err) {
-    if (browser) await browser.close().catch(() => {});
     res.status(500).json({ error: err.message });
   }
 });
@@ -314,17 +310,19 @@ router.post('/:bookId/export/submission-package', authenticate, requireRole(['ow
     } catch { /* epub-gen not installed, skip */ }
 
     try {
-      const puppeteer = (await import('puppeteer')).default;
-      const browser = await puppeteer.launch({
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-      });
-      const page = await browser.newPage();
-      await page.setContent(buildBookHtml(book, book.chapters), { waitUntil: 'networkidle0' });
-      const pdfBuffer = await page.pdf({ format: 'A4', margin: { top: '2cm', bottom: '2cm', left: '2.5cm', right: '2.5cm' } });
-      await browser.close();
-      fs.writeFileSync(path.join(tmpDir, `${safeName}.pdf`), Buffer.from(pdfBuffer));
-    } catch { /* puppeteer not installed, skip */ }
+      const pdfServiceUrl = process.env.PDF_SERVICE_URL;
+      if (pdfServiceUrl) {
+        const pdfRes = await fetch(`${pdfServiceUrl}/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: buildBookHtml(book, book.chapters) }),
+        });
+        if (pdfRes.ok) {
+          const { pdf: pdfBase64 } = await pdfRes.json();
+          fs.writeFileSync(path.join(tmpDir, `${safeName}.pdf`), Buffer.from(pdfBase64, 'base64'));
+        }
+      }
+    } catch { /* pdf-service unavailable, skip PDF in package */ }
 
     const zipPath = path.join(os.tmpdir(), `${safeName}_submission.zip`);
     await new Promise((resolve, reject) => {
