@@ -812,11 +812,13 @@ export default function BookEditor() {
 
   async function loadBook() {
     try {
-      const bookData = await api.getBook(bookId!);
+      const [bookData, roleResult] = await Promise.all([
+        api.getBook(bookId!),
+        api.getMyRole(bookId!).catch(() => ({ role: 'owner' as CollaboratorRole })),
+      ]);
       setBook(bookData);
       setChapters(bookData.chapters || []);
-      // Load current user's role (works for all collaborators)
-      api.getMyRole(bookId!).then(r => setUserRole(r.role)).catch(() => {});
+      setUserRole(roleResult.role);
       // Load collaborators list (owner only — silently fail for non-owners)
       api.getCollaborators(bookId!).then(setCollaborators).catch(() => {});
       // Load latest review request
