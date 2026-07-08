@@ -90,7 +90,7 @@ function MessageItem({ msg, currentUserId }: { msg: BookChatMessage; currentUser
     return (
       <div className="flex justify-end gap-2 mb-3">
         <div className="max-w-xs lg:max-w-md">
-          <div className="rounded-2xl rounded-tr-sm px-4 py-2.5" style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}>
+          <div className="rounded-2xl rounded-tr-sm px-4 py-2.5" style={{ backgroundColor: 'color-mix(in srgb, var(--color-accent) 18%, white)', border: '1px solid color-mix(in srgb, var(--color-accent) 35%, white)', color: '#1e293b' }}>
             <p className="text-sm leading-relaxed break-words">{msg.body}</p>
           </div>
           <p className="text-[10px] text-muted mt-0.5 text-right">{formatTime(msg.created_at)}</p>
