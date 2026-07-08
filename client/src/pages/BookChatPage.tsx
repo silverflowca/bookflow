@@ -216,6 +216,7 @@ export default function BookChatPage() {
   const [shareMyProgress, setShareMyProgress] = useState(true);
   const [savingShare, setSavingShare] = useState(false);
   const [bookStats, setBookStats] = useState<{ total_words: number; avg_progress: number; total_readers: number } | null>(null);
+  const [lastChapterId, setLastChapterId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -259,6 +260,9 @@ export default function BookChatPage() {
     api.getBook(bookId).then(setBook).catch(() => {});
     api.getMyProfile().then((p: any) => {
       setShareMyProgress(p?.share_my_progress ?? true);
+    }).catch(() => {});
+    api.getReadingProgress(bookId).then(p => {
+      if (p?.current_chapter_id) setLastChapterId(p.current_chapter_id);
     }).catch(() => {});
     refreshStats();
   }, [bookId]);
@@ -341,24 +345,26 @@ export default function BookChatPage() {
           <ChevronLeft className="h-5 w-5" />
         </Link>
 
-        {book?.cover_image_url ? (
-          <img
-            src={book.cover_image_url}
-            alt={book.title}
-            className="w-9 h-12 rounded object-cover flex-shrink-0 shadow-sm"
-          />
-        ) : (
-          <div className="w-9 h-12 rounded bg-surface-hover flex items-center justify-center flex-shrink-0">
-            <BookOpen className="h-5 w-5 text-muted" />
-          </div>
-        )}
+        <Link to={lastChapterId ? `/book/${bookId}/chapter/${lastChapterId}` : `/book/${bookId}`} className="flex-shrink-0" title="Continue reading">
+          {book?.cover_image_url ? (
+            <img
+              src={book.cover_image_url}
+              alt={book.title}
+              className="w-9 h-12 rounded object-cover shadow-sm hover:opacity-80 transition-opacity"
+            />
+          ) : (
+            <div className="w-9 h-12 rounded bg-surface-hover flex items-center justify-center hover:bg-surface transition-colors">
+              <BookOpen className="h-5 w-5 text-muted" />
+            </div>
+          )}
+        </Link>
 
-        <div className="flex-1 min-w-0">
+        <Link to={lastChapterId ? `/book/${bookId}/chapter/${lastChapterId}` : `/book/${bookId}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity" title="Continue reading">
           <h1 className="text-base font-bold text-theme truncate leading-tight">
             {book?.title || 'Loading…'}
           </h1>
-          <p className="text-xs text-muted leading-tight">Book Chat</p>
-        </div>
+          <p className="text-xs text-muted leading-tight">{lastChapterId ? 'Continue reading ›' : 'Book Chat'}</p>
+        </Link>
 
         <button
           onClick={() => setShowReaders(v => !v)}
