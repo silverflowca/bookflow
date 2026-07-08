@@ -126,7 +126,14 @@ END $$;
 GRANT SELECT, INSERT, UPDATE ON bookflow.book_chat_messages TO authenticated;
 GRANT ALL ON bookflow.book_chat_messages TO service_role;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE bookflow.book_chat_messages;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'book_chat_messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE bookflow.book_chat_messages;
+  END IF;
+END $$;
 
 
 -- ─── 5. Book chat read receipts ─────────────────────────────
