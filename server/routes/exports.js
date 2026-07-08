@@ -135,7 +135,10 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
 
     const html = buildBookHtmlWithInline(book, book.chapters, inlineByChapter, options);
 
-    browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({
@@ -312,7 +315,10 @@ router.post('/:bookId/export/submission-package', authenticate, requireRole(['ow
 
     try {
       const puppeteer = (await import('puppeteer')).default;
-      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      const browser = await puppeteer.launch({
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      });
       const page = await browser.newPage();
       await page.setContent(buildBookHtml(book, book.chapters), { waitUntil: 'networkidle0' });
       const pdfBuffer = await page.pdf({ format: 'A4', margin: { top: '2cm', bottom: '2cm', left: '2.5cm', right: '2.5cm' } });

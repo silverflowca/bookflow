@@ -512,12 +512,12 @@ function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-4 border-b border-theme">
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-4 border-b border-theme shrink-0">
           <h2 className="font-semibold text-theme">PDF Export Options</h2>
           <button onClick={onClose} className="text-muted hover:text-theme">✕</button>
         </div>
-        <div className="p-4">
+        <div className="p-4 overflow-y-auto flex-1">
           <p className="text-sm text-muted mb-3">Choose what to include in the exported PDF:</p>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted uppercase tracking-wide">Inline Content</span>
@@ -542,7 +542,7 @@ function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: 
             ))}
           </div>
         </div>
-        <div className="flex gap-2 p-4 border-t border-theme">
+        <div className="flex gap-2 p-4 border-t border-theme shrink-0">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 rounded-lg text-sm border border-theme text-theme hover:bg-surface-hover"

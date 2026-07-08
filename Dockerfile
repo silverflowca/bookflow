@@ -33,8 +33,19 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init + Chromium for Puppeteer PDF export
+RUN apk add --no-cache \
+    dumb-init \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Tell Puppeteer to use the system Chromium instead of downloading its own
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
