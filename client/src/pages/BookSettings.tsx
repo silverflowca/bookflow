@@ -239,7 +239,7 @@ export default function BookSettings() {
       </div>
 
       {/* Sub-nav tabs */}
-      <div id="bf-settings-quicklinks" className="flex gap-1 mb-8 border-b border-theme overflow-x-auto">
+      <div id="bf-settings-quicklinks" className="flex flex-wrap gap-1 mb-8 border-b border-theme">
         {[
           { to: `/edit/book/${bookId}/settings`, label: 'Settings', icon: null, exact: true },
           { to: `/edit/book/${bookId}/collaborators`, label: 'Collaborators', icon: <Users className="h-3.5 w-3.5" /> },
