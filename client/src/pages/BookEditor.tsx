@@ -1025,7 +1025,7 @@ export default function BookEditor() {
                 {collaborators.length > 0 && (
                   <CollaboratorBadges collaborators={collaborators} bookId={bookId!} />
                 )}
-                {userRole === 'owner' && (
+                {['owner', 'author'].includes(userRole) && (
                   <Link to={`/edit/book/${bookId}/collaborators`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded" title="Collaborators">
                     <Users className="h-5 w-5" />
                   </Link>
@@ -1033,17 +1033,17 @@ export default function BookEditor() {
                 <Link to={`/edit/book/${bookId}/versions`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded" title="Version history">
                   <History className="h-5 w-5" />
                 </Link>
-                {userRole === 'owner' && (
+                {['owner', 'author'].includes(userRole) && (
                   <button onClick={() => setEditingBook(true)} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">
                     <Edit className="h-5 w-5" />
                   </button>
                 )}
-                {userRole === 'owner' && (
+                {['owner', 'author'].includes(userRole) && (
                   <Link to={`/edit/book/${bookId}/settings`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded">
                     <Settings className="h-5 w-5" />
                   </Link>
                 )}
-                {userRole === 'owner' && (
+                {['owner', 'author'].includes(userRole) && (
                   <Link to={`/edit/book/${bookId}/dashboard`} className="p-2 text-muted hover:text-theme hover:bg-surface-hover rounded" title="Dashboard">
                     <BarChart2 className="h-5 w-5" />
                   </Link>
@@ -1250,7 +1250,7 @@ export default function BookEditor() {
           </div>
 
           {/* Publish button */}
-          {userRole === 'owner' && (
+          {['owner', 'author'].includes(userRole) && (
             <button
               onClick={() => setShowPublishModal(true)}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-medium text-sm transition-colors ${
