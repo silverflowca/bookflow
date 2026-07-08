@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies (puppeteer will skip Chrome download — base image has it)
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy server
 COPY server.js ./
