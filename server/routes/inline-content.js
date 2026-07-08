@@ -549,6 +549,7 @@ router.post('/polls/:id/vote', authenticate, async (req, res) => {
   try {
     // Verify this is a poll
     const { data: content, error: contentError } = await supabase
+      .schema('bookflow')
       .from('inline_content')
       .select('content_type, content_data')
       .eq('id', req.params.id)
