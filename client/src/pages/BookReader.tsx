@@ -2038,7 +2038,7 @@ function ChapterContent({
     }
     collectTextNodes(parsedContent.content, 'n');
 
-    const formTypes = ['select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'signature'];
+    const formTypes = ['question', 'poll', 'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'signature'];
     const blockMediaTypes = ['image', 'drawing'];
     const unmatched = inlineContent.filter(
       ic => (formTypes.includes(ic.content_type) || blockMediaTypes.includes(ic.content_type)) &&
@@ -3836,7 +3836,7 @@ function PollBlock({ content, defaultVisibility = 'shared' }: { content: InlineC
   const { selected, results, totalVotes, voted, loading, loaded } = pollState;
 
   useEffect(() => {
-    if (loading || loaded) return;
+    if (loaded) return;
 
     let active = true;
     updateResponse(content.id, current => ({ ...current, loading: true }));
@@ -3862,7 +3862,7 @@ function PollBlock({ content, defaultVisibility = 'shared' }: { content: InlineC
     return () => {
       active = false;
     };
-  }, [content.id, loading, loaded, updateResponse]);
+  }, [content.id, loaded, updateResponse]);
 
   function selectOption(optionId: string) {
     if (voted) return;
