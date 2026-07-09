@@ -95,9 +95,9 @@ app.use('/api/chapters/:chapterId/comments', commentsRouter);
 app.use('/api/comments', commentsRouter); // for resolve/delete by commentId (no chapterId needed)
 app.use('/api/books/:bookId/reviews', reviewsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/books', exportsRoutes);
 app.use('/api/books/:bookId', publishRoutes);
 app.use('/api/public', publishRoutes);
-app.use('/api/books', exportsRoutes);
 app.use('/api/books', publishersRoutes);
 app.use('/api/clubs', clubsRoutes);
 app.use('/api/clubs/:clubId/chat', clubChatRoutes);
