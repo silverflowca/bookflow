@@ -28,6 +28,7 @@ router.get('/', authenticate, async (req, res) => {
         feature_demo_book_id: null,
         resend_api_key: '',
         email_from: '',
+        email_notifications_enabled: true,
       });
     }
 
@@ -41,6 +42,7 @@ router.get('/', authenticate, async (req, res) => {
       feature_demo_book_id: data.feature_demo_book_id || null,
       resend_api_key: data.resend_api_key || '',
       email_from: data.email_from || '',
+      email_notifications_enabled: data.email_notifications_enabled !== false,
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -50,7 +52,7 @@ router.get('/', authenticate, async (req, res) => {
 
 // Update app settings
 router.put('/', authenticate, async (req, res) => {
-  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline, feature_demo_book_id, resend_api_key, email_from } = req.body;
+  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline, feature_demo_book_id, resend_api_key, email_from, email_notifications_enabled } = req.body;
 
   try {
     const { data, error } = await supabase
@@ -66,6 +68,7 @@ router.put('/', authenticate, async (req, res) => {
         feature_demo_book_id: feature_demo_book_id || null,
         resend_api_key: resend_api_key || '',
         email_from: email_from || '',
+        email_notifications_enabled: email_notifications_enabled !== false,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
@@ -85,6 +88,7 @@ router.put('/', authenticate, async (req, res) => {
       feature_demo_book_id: data.feature_demo_book_id || null,
       resend_api_key: data.resend_api_key || '',
       email_from: data.email_from || '',
+      email_notifications_enabled: data.email_notifications_enabled !== false,
     });
   } catch (err) {
     console.error('Update settings error:', err);

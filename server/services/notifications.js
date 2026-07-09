@@ -89,14 +89,23 @@ export async function createNotification(supabase, { userId, type, title, body, 
 
     if (!profile?.email) return;
 
-    // 3. Check opt-out (absence = opted IN)
+    // 3. Check system-level master kill switch
+    const { data: sysSettings } = await supabase
+      .schema('bookflow')
+      .from('app_settings')
+      .select('email_notifications_enabled')
+      .limit(1)
+      .maybeSingle();
+    if (sysSettings?.email_notifications_enabled === false) return;
+
+    // 4. Check user opt-out (absence = opted IN)
     const prefs = profile.notification_prefs ?? {};
     if (prefs[type] === false) return;
 
-    // 4. Resolve from address from context chain
+    // 5. Resolve from address from context chain
     const from = await resolveEmailFrom(supabase, extras);
 
-    // 5. Send email
+    // 6. Send email
     const { subject, html } = getEmailTemplate(type, { title, body, ...extras });
     await sendEmail({ from, to: profile.email, subject, html });
   } catch (err) {

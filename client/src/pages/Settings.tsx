@@ -16,6 +16,7 @@ interface AppSettings {
   feature_demo_book_id: string | null;
   resend_api_key: string;
   email_from: string;
+  email_notifications_enabled: boolean;
 }
 
 const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string; preview: string }[] = [
@@ -30,8 +31,6 @@ export default function Settings() {
   const { profile, updateProfile } = useAuth();
   const [insertPanelEnabled, setInsertPanelEnabled] = useState(false);
   const [savingInsertPanel, setSavingInsertPanel] = useState(false);
-  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
-  const [savingNotifPref, setSavingNotifPref] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
     fileflow_url: '',
     fileflow_access_key: '',
@@ -40,6 +39,7 @@ export default function Settings() {
     restream_client_secret: '',
     resend_api_key: '',
     email_from: '',
+    email_notifications_enabled: true,
     home_tagline: '',
     feature_demo_book_id: null,
   });
@@ -68,7 +68,6 @@ export default function Settings() {
 
   useEffect(() => {
     setInsertPanelEnabled(profile?.enable_insert_panel ?? false);
-    setNotifPrefs(profile?.notification_prefs ?? {});
   }, [profile]);
 
   useEffect(() => {
@@ -109,6 +108,7 @@ export default function Settings() {
         feature_demo_book_id: data.feature_demo_book_id || null,
         resend_api_key: data.resend_api_key || '',
         email_from: data.email_from || '',
+        email_notifications_enabled: (data as any).email_notifications_enabled !== false,
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -122,6 +122,7 @@ export default function Settings() {
         feature_demo_book_id: null,
         resend_api_key: '',
         email_from: '',
+        email_notifications_enabled: true,
       });
     }
   }
@@ -131,21 +132,6 @@ export default function Settings() {
       const data = await api.listApiKeys();
       setApiKeys(data);
     } catch { /* silent */ }
-  }
-
-  async function toggleNotifPref(type: string, enabled: boolean) {
-    const updated = { ...notifPrefs, [type]: enabled };
-    setNotifPrefs(updated);
-    setSavingNotifPref(type);
-    try {
-      await api.updateMyProfile({ notification_prefs: updated });
-      updateProfile({ notification_prefs: updated });
-    } catch (err) {
-      console.error('Failed to save notification preference:', err);
-      setNotifPrefs(notifPrefs); // revert
-    } finally {
-      setSavingNotifPref(null);
-    }
   }
 
   async function toggleInsertPanel(enabled: boolean) {
@@ -722,54 +708,36 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Notification Preferences */}
+      {/* System Notifications — admin master control */}
       <div className="bg-white rounded-lg border mt-6">
         <div className="p-6">
           <div className="flex items-center gap-2 mb-1">
             <Bell className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold">Email Notifications</h2>
+            <h2 className="text-lg font-semibold">System Notifications</h2>
           </div>
           <p className="text-sm text-gray-500 mb-5">
-            Choose which events send you an email. Toggling off stops emails for that type — you'll still see in-app notifications.
+            Platform-wide email notification controls. Individual users manage their own preferences from their profile page.
           </p>
-          <div className="divide-y divide-gray-100">
-            {([
-              { type: 'comment',               label: 'New comments',            desc: 'Someone comments on your book' },
-              { type: 'comment_reply',         label: 'Comment replies',          desc: 'Someone replies to a comment' },
-              { type: 'invite',                label: 'Collaboration invites',    desc: 'You are invited to co-author a book' },
-              { type: 'review_submitted',      label: 'Review submitted',         desc: 'A review request is created on your book' },
-              { type: 'review_approved',       label: 'Review approved',          desc: 'Your review was approved' },
-              { type: 'review_rejected',       label: 'Review not approved',      desc: 'Your review was not approved' },
-              { type: 'feedback_reply',        label: 'Feedback replies',          desc: 'An admin replied to your feedback' },
-              { type: 'club_invite',           label: 'Club invites',             desc: 'You are invited to join a book club' },
-              { type: 'club_book_added',       label: 'New club book',            desc: 'A new book is added to your club' },
-              { type: 'club_discussion',       label: 'Club discussions',         desc: 'New discussion posted in your club' },
-              { type: 'club_discussion_reply', label: 'Discussion replies',       desc: 'Someone replies to a discussion you started' },
-              { type: 'chat_mention',          label: 'Chat mentions',            desc: 'You are @mentioned in club chat' },
-              { type: 'chat_message',          label: 'Club chat messages',       desc: 'New message in a club you belong to' },
-            ] as { type: string; label: string; desc: string }[]).map(({ type, label, desc }) => {
-              const enabled = notifPrefs[type] !== false;
-              const saving = savingNotifPref === type;
-              return (
-                <div key={type} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={enabled}
-                    disabled={saving}
-                    onClick={() => toggleNotifPref(type, !enabled)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 ${enabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                  >
-                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              );
-            })}
+          <div className="flex items-center justify-between py-3 border rounded-lg px-4 bg-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Email notifications enabled</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                When off, no emails are sent to any user regardless of their personal settings.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.email_notifications_enabled !== false}
+              onClick={() => setSettings(s => ({ ...s, email_notifications_enabled: !(s.email_notifications_enabled !== false) }))}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${settings.email_notifications_enabled !== false ? 'bg-indigo-600' : 'bg-gray-200'}`}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings.email_notifications_enabled !== false ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
           </div>
+          <p className="text-xs text-gray-400 mt-3">
+            Each user's email preferences are managed from their own profile page (sidebar → Email Notifications).
+          </p>
         </div>
       </div>
 

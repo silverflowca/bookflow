@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   User, BookOpen, Users, BarChart2, MapPin, Globe,
   Lock, Eye, EyeOff, Edit2, Save, X, Check,
-  BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2, GraduationCap
+  BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2, GraduationCap, Bell
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
@@ -59,6 +59,10 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
+  // Notification prefs (saves instantly, independent of edit mode)
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
+  const [savingNotif, setSavingNotif] = useState<string | null>(null);
+
   // Edit form state
   const [form, setForm] = useState({
     display_name: '',
@@ -103,12 +107,58 @@ export default function ProfilePage() {
           show_books_authored: result.profile.show_books_authored ?? true,
           share_my_progress: result.profile.share_my_progress ?? true,
         });
+        setNotifPrefs((result.profile as any).notification_prefs ?? {});
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load profile');
     } finally {
       setLoading(false);
     }
+  }
+
+  const NOTIF_TYPES = [
+    { type: 'comment',               label: 'New comments',           desc: 'Someone comments on your book' },
+    { type: 'comment_reply',         label: 'Comment replies',         desc: 'Someone replies to a comment' },
+    { type: 'invite',                label: 'Collaboration invites',   desc: 'Invited to co-author a book' },
+    { type: 'review_submitted',      label: 'Review submitted',        desc: 'A review is created on your book' },
+    { type: 'review_approved',       label: 'Review approved',         desc: 'Your review was approved' },
+    { type: 'review_rejected',       label: 'Review not approved',     desc: 'Your review was not approved' },
+    { type: 'feedback_reply',        label: 'Feedback replies',         desc: 'An admin replied to your feedback' },
+    { type: 'club_invite',           label: 'Club invites',            desc: 'Invited to join a book club' },
+    { type: 'club_book_added',       label: 'New club book',           desc: 'A book is added to your club' },
+    { type: 'club_discussion',       label: 'Club discussions',        desc: 'New discussion in your club' },
+    { type: 'club_discussion_reply', label: 'Discussion replies',      desc: 'Someone replies to your discussion' },
+    { type: 'chat_mention',          label: 'Chat mentions',           desc: 'You are @mentioned in chat' },
+    { type: 'chat_message',          label: 'Club chat messages',      desc: 'New messages in club chat' },
+  ] as const;
+
+  const allEnabled = NOTIF_TYPES.every(({ type }) => notifPrefs[type] !== false);
+
+  async function saveNotifPrefs(updated: Record<string, boolean>) {
+    setNotifPrefs(updated);
+    try {
+      await api.updateMyProfile({ notification_prefs: updated });
+    } catch {
+      setNotifPrefs(notifPrefs); // revert
+    }
+  }
+
+  async function toggleNotif(type: string, enabled: boolean) {
+    setSavingNotif(type);
+    await saveNotifPrefs({ ...notifPrefs, [type]: enabled });
+    setSavingNotif(null);
+  }
+
+  async function toggleAllNotif() {
+    setSavingNotif('__all__');
+    const updated: Record<string, boolean> = {};
+    if (allEnabled) {
+      // disable all
+      NOTIF_TYPES.forEach(({ type }) => { updated[type] = false; });
+    }
+    // if not all enabled, enable all (empty prefs = all on)
+    await saveNotifPrefs(updated);
+    setSavingNotif(null);
   }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -457,7 +507,7 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Sidebar — privacy settings (own profile only) */}
+        {/* Sidebar — own profile only */}
         {isOwnProfile && editing && (
           <div className="space-y-4">
             <div className="bg-surface border-2 border-theme rounded-xl p-5">
@@ -503,6 +553,48 @@ export default function ProfilePage() {
                 />
               </div>
             </div>
+
+            {/* Email Notification Preferences */}
+            <div className="bg-surface border-2 border-theme rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-theme flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-accent" /> Email Notifications
+                </h3>
+                <button
+                  type="button"
+                  onClick={toggleAllNotif}
+                  disabled={savingNotif === '__all__'}
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${allEnabled ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
+                  title={allEnabled ? 'Disable all email notifications' : 'Enable all email notifications'}
+                >
+                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${allEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {NOTIF_TYPES.map(({ type, label, desc }) => {
+                  const on = notifPrefs[type] !== false;
+                  return (
+                    <div key={type} className="flex items-start justify-between gap-2 py-1">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-theme leading-tight">{label}</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">{desc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={on}
+                        disabled={savingNotif === type || savingNotif === '__all__'}
+                        onClick={() => toggleNotif(type, !on)}
+                        className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${on ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
+                      >
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${on ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted mt-3">In-app notifications always appear regardless of these settings.</p>
+            </div>
           </div>
         )}
 
@@ -541,6 +633,42 @@ export default function ProfilePage() {
               >
                 Edit privacy settings →
               </button>
+            </div>
+
+            {/* Notification prefs summary — always visible, saves instantly */}
+            <div className="bg-surface border-2 border-theme rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-theme flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-accent" /> Email Notifications
+                </h3>
+                <button
+                  type="button"
+                  onClick={toggleAllNotif}
+                  disabled={savingNotif === '__all__'}
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${allEnabled ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
+                  title={allEnabled ? 'Disable all' : 'Enable all'}
+                >
+                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${allEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {NOTIF_TYPES.map(({ type, label }) => {
+                  const on = notifPrefs[type] !== false;
+                  return (
+                    <div key={type} className="flex items-center justify-between">
+                      <span className="text-xs text-muted">{label}</span>
+                      <button
+                        type="button"
+                        disabled={savingNotif === type || savingNotif === '__all__'}
+                        onClick={() => toggleNotif(type, !on)}
+                        className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-40 ${on ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
+                      >
+                        <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ${on ? 'translate-x-3' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="bg-surface border-2 border-theme rounded-xl p-5">
