@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { supabase } from '../config/supabase.js';
 import { authenticate } from '../middleware/auth.js';
+import { createNotification } from '../services/notifications.js';
 
 const router = express.Router();
 
@@ -25,12 +26,10 @@ export async function getClubRole(clubId, userId) {
   return member.role;
 }
 
-// ── Helper: send notification ──────────────────────────────────────────────────
+// ── Helper: send notification (delegates to centralized service) ───────────────
 async function notify(userId, type, title, body, extra = {}) {
   try {
-    await supabase.from('user_notifications').insert({
-      user_id: userId, type, title, body, ...extra,
-    });
+    await createNotification(supabase, { userId, type, title, body, ...extra });
   } catch (_) {}
 }
 

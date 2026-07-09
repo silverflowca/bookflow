@@ -89,7 +89,7 @@ router.put('/me', authenticate, async (req, res) => {
     display_name, bio, avatar_url, is_author,
     website_url, location,
     profile_public, show_reading_progress, show_clubs, show_books_authored,
-    share_my_progress,
+    share_my_progress, enable_insert_panel, notification_prefs,
   } = req.body;
 
   try {
@@ -105,6 +105,8 @@ router.put('/me', authenticate, async (req, res) => {
     if (show_clubs !== undefined)          update.show_clubs = show_clubs;
     if (show_books_authored !== undefined) update.show_books_authored = show_books_authored;
     if (share_my_progress !== undefined)   update.share_my_progress = share_my_progress;
+    if (enable_insert_panel !== undefined) update.enable_insert_panel = enable_insert_panel;
+    if (notification_prefs !== undefined)  update.notification_prefs = notification_prefs;
 
     const { data: profile, error } = await supabase
       .from('profiles')

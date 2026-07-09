@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.js'
 import { getClubRole } from './clubs.js'
 import { ensureClubChatFolder, postCompletionUpdate } from '../services/chat-status.js'
 import { FileFlowClient, getFileFlowToken } from '../services/fileflow.js'
+import { createNotification } from '../services/notifications.js'
 
 const router = express.Router({ mergeParams: true })
 
@@ -66,26 +67,17 @@ async function notifyMembers(supabase, clubId, excludeUserId, type, title, body,
     .maybeSingle()
   const clubDefault = settings?.default_notification_mode || 'all'
 
-  const rows = members
-    .filter(m => {
-      const mode = m.club_chat_member_prefs?.notification_mode || 'inherit'
-      const effective = mode === 'inherit' ? clubDefault : mode
-      if (effective === 'none') return false
-      if (effective === 'mentions' && type !== 'chat_mention') return false
-      return true
-    })
-    .map(m => ({
-      user_id: m.user_id,
-      type,
-      title,
-      body,
-      club_id: clubId,
-      ...extras
-    }))
+  const eligible = members.filter(m => {
+    const mode = m.club_chat_member_prefs?.notification_mode || 'inherit'
+    const effective = mode === 'inherit' ? clubDefault : mode
+    if (effective === 'none') return false
+    if (effective === 'mentions' && type !== 'chat_mention') return false
+    return true
+  })
 
-  if (rows.length > 0) {
-    await supabase.schema('bookflow').from('user_notifications').insert(rows)
-  }
+  await Promise.all(eligible.map(m =>
+    createNotification(supabase, { userId: m.user_id, type, title, body, club_id: clubId, ...extras })
+  ))
 }
 
 // ─── GET /api/clubs/:clubId/chat/messages ────────────────────────────────────
@@ -256,8 +248,8 @@ router.post('/messages', authenticate, async (req, res) => {
       .select('id, display_name').in('display_name', mentions)
     for (const mp of mentionedProfiles || []) {
       if (mp.id !== req.user.id) {
-        await supabase.schema('bookflow').from('user_notifications').insert({
-          user_id: mp.id,
+        await createNotification(supabase, {
+          userId: mp.id,
           type: 'chat_mention',
           title: `${senderName} mentioned you`,
           body: body?.slice(0, 120),

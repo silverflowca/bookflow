@@ -1,8 +1,8 @@
 import express from 'express';
-import nodemailer from 'nodemailer';
 import { supabase } from '../config/supabase.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { buildSnapshot } from './versions.js';
+import { sendEmail } from '../services/email.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -179,22 +179,12 @@ router.post('/invite', authenticate, requireRole(['owner', 'author']), async (re
 
     const senderName = profile?.display_name || 'A BookFlow author';
 
-    // Set up transporter
-    const smtpHost = process.env.SMTP_HOST;
-    if (!smtpHost) {
-      // No SMTP configured — return the link for manual sharing
+    if (!process.env.RESEND_API_KEY) {
+      // No email provider configured — return the link for manual sharing
       return res.json({ ok: true, manual: true, url: readUrl });
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-
     const personalNote = message ? `<p style="margin:16px 0;font-style:italic;color:#555;">"${message}"</p>` : '';
-
     const html = `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
         <h2 style="margin:0 0 8px;">${book.title}</h2>
@@ -206,12 +196,7 @@ router.post('/invite', authenticate, requireRole(['owner', 'author']), async (re
 
     const emailList = Array.isArray(emails) ? emails : [emails];
     await Promise.all(emailList.map(to =>
-      transporter.sendMail({
-        from: `"${senderName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-        to,
-        subject: `${senderName} invited you to read "${book.title}"`,
-        html,
-      })
+      sendEmail({ to, subject: `${senderName} invited you to read "${book.title}"`, html })
     ));
 
     res.json({ ok: true, sent: emailList.length });

@@ -344,7 +344,7 @@ function updateBlockIndent(editor: Editor | null, direction: 1 | -1): boolean {
 export default function ChapterEditor() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [title, setTitle] = useState('');
   const [liveEpisode, setLiveEpisode] = useState<{ id: string; title: string } | null>(null);
@@ -817,10 +817,11 @@ export default function ChapterEditor() {
   function handleEditorContextMenu(e: React.MouseEvent) {
     // Only fire inside the ProseMirror content (not on toolbar buttons etc.)
     e.preventDefault();
-    openCtxMenu(e.clientX, e.clientY);
+    if (profile?.enable_insert_panel) openCtxMenu(e.clientX, e.clientY);
   }
 
   function handleEditorTouchStart(e: React.TouchEvent) {
+    if (!profile?.enable_insert_panel) return;
     const touch = e.touches[0];
     longPressRef.current = setTimeout(() => {
       openCtxMenu(touch.clientX, touch.clientY);
@@ -1823,9 +1824,18 @@ export default function ChapterEditor() {
           className="fixed z-[9999] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 w-80"
           style={{ top: ctxMenu.y, left: ctxMenu.x }}
         >
-          <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-1">
-            Insert component
-          </p>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+              Insert component
+            </p>
+            <button
+              onClick={() => setCtxMenu(null)}
+              className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <div className="grid grid-cols-4 gap-1">
             {([
               { type: 'question',        icon: '❓', label: 'Question' },

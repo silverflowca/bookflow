@@ -485,11 +485,11 @@ class ApiClient {
   }
 
   // App Settings
-  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string; feature_demo_book_id: string | null }> {
+  async getAppSettings(): Promise<{ fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string; feature_demo_book_id: string | null; resend_api_key: string; email_from: string }> {
     return this.request('/settings');
   }
 
-  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string; feature_demo_book_id: string | null }): Promise<void> {
+  async updateAppSettings(settings: { fileflow_url: string; fileflow_access_key: string; deepgram_api_key: string; restream_client_id: string; restream_client_secret: string; home_tagline: string; feature_demo_book_id: string | null; resend_api_key?: string; email_from?: string }): Promise<void> {
     return this.request('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
@@ -1206,7 +1206,8 @@ class ApiClient {
     website_url?: string; location?: string;
     profile_public?: boolean; show_reading_progress?: boolean;
     show_clubs?: boolean; show_books_authored?: boolean;
-    share_my_progress?: boolean;
+    share_my_progress?: boolean; enable_insert_panel?: boolean;
+    notification_prefs?: Record<string, boolean>;
   }): Promise<any> {
     return this.request('/profile/me', { method: 'PUT', body: JSON.stringify(data) });
   }

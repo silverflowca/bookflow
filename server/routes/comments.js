@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { createNotification } from '../services/notifications.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -139,8 +140,8 @@ router.post('/', authenticate, async (req, res) => {
       .single();
 
     if (book && book.author_id !== req.user.id) {
-      await supabase.from('user_notifications').insert({
-        user_id: book.author_id,
+      await createNotification(supabase, {
+        userId: book.author_id,
         type: parent_id ? 'comment_reply' : 'comment',
         title: parent_id ? 'New reply to a comment' : `New comment on "${book.title}"`,
         body: body.substring(0, 120),

@@ -2,6 +2,7 @@ import express from 'express';
 import { supabase } from '../config/supabase.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { buildSnapshot } from './versions.js';
+import { createNotification, createNotifications } from '../services/notifications.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -95,16 +96,14 @@ router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res
     ];
     if (book?.author_id !== req.user.id) notifyUsers.push(book?.author_id);
 
-    for (const userId of notifyUsers.filter(Boolean)) {
-      await supabase.from('user_notifications').insert({
-        user_id: userId,
-        type: 'review_submitted',
-        title: `Review requested: "${book?.title}"`,
-        body: message?.substring(0, 120) || 'A new review has been submitted.',
-        book_id: bookId,
-        review_request_id: review.id,
-      });
-    }
+    await createNotifications(supabase, notifyUsers.filter(Boolean).map(userId => ({
+      userId,
+      type: 'review_submitted',
+      title: `Review requested: "${book?.title}"`,
+      body: message?.substring(0, 120) || 'A new review has been submitted.',
+      book_id: bookId,
+      review_request_id: review.id,
+    })));
 
     res.status(201).json(review);
   } catch (err) {
@@ -158,8 +157,8 @@ router.put('/:reviewId', authenticate, requireRole(['owner', 'reviewer']), async
       .eq('id', req.params.bookId)
       .single();
 
-    await supabase.from('user_notifications').insert({
-      user_id: review.submitted_by,
+    await createNotification(supabase, {
+      userId: review.submitted_by,
       type: status === 'approved' ? 'review_approved' : 'review_rejected',
       title: `Review ${status}: "${book?.title}"`,
       body: reviewer_note?.substring(0, 120) || null,

@@ -1,8 +1,9 @@
 import express from 'express';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { supabase } from '../config/supabase.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { createNotification } from '../services/notifications.js';
+import { sendEmail, getEmailTemplate } from '../services/email.js';
 
 const router = express.Router({ mergeParams: true });
 const collaboratorSelect = `
@@ -15,41 +16,6 @@ function buildOrigin() {
   return process.env.CLIENT_URL?.split(',')[0]?.trim() || 'http://localhost:5177';
 }
 
-async function maybeSendCollaboratorInviteEmail({ to, senderName, bookTitle, role, inviteUrl, requiresSignup }) {
-  const smtpHost = process.env.SMTP_HOST;
-  if (!smtpHost || !to) {
-    return { manual: true, email_sent: false };
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-
-  const html = `
-    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
-      <h2 style="margin:0 0 8px;">${bookTitle}</h2>
-      <p style="color:#555;margin:0 0 16px;">
-        ${senderName} shared a BookFlow book with you as ${role}.
-      </p>
-      <a href="${inviteUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
-        ${requiresSignup ? 'Accept Invite' : 'Open BookFlow'} →
-      </a>
-      <p style="margin-top:24px;font-size:12px;color:#888;">Or copy this link: ${inviteUrl}</p>
-    </div>
-  `;
-
-  await transporter.sendMail({
-    from: `"${senderName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-    to,
-    subject: `${senderName} shared "${bookTitle}" with you on BookFlow`,
-    html,
-  });
-
-  return { manual: false, email_sent: true };
-}
 
 // GET /api/books/:bookId/collaborators
 router.get('/', authenticate, requireRole(['owner', 'author']), async (req, res) => {
@@ -184,17 +150,6 @@ router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res
       throw error;
     }
 
-    // Create notification for the invitee (if they exist)
-    if (resolvedUserId) {
-      await supabase.from('user_notifications').insert({
-        user_id: resolvedUserId,
-        type: 'invite',
-        title: `You've been invited to collaborate on "${req.book.title || 'a book'}"`,
-        body: `Role: ${role}`,
-        book_id: bookId,
-      });
-    }
-
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('display_name, email')
@@ -206,21 +161,32 @@ router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res
       ? `${origin}/books/${bookId}/collaborators`
       : `${origin}/invite/${inviteToken}`;
 
-    const emailStatus = await maybeSendCollaboratorInviteEmail({
-      to: resolvedEmail,
-      senderName,
-      bookTitle: req.book.title || 'Untitled Book',
-      role,
-      inviteUrl,
-      requiresSignup: !resolvedUserId,
-    });
+    // Notify + email the invitee if they already have an account
+    if (resolvedUserId) {
+      await createNotification(supabase, {
+        userId: resolvedUserId,
+        type: 'invite',
+        title: `You've been invited to collaborate on "${req.book.title || 'a book'}"`,
+        body: `${senderName} added you as ${role}.`,
+        book_id: bookId,
+      });
+    } else if (resolvedEmail) {
+      // External invite — no account yet, send email directly
+      const { subject, html } = getEmailTemplate('invite', {
+        title: `${senderName} invited you to collaborate on "${req.book.title || 'a book'}"`,
+        body: `You have been invited as ${role}. Click below to accept.`,
+        invite_token: inviteToken,
+      });
+      await sendEmail({ to: resolvedEmail, subject, html });
+    }
 
+    const emailSent = !!(resolvedUserId || resolvedEmail);
     res.status(201).json({
       ...collab,
       invite_token: inviteToken,
       invite_url: inviteToken ? `${origin}/invite/${inviteToken}` : inviteUrl,
-      manual: emailStatus.manual,
-      email_sent: emailStatus.email_sent,
+      manual: !emailSent,
+      email_sent: emailSent,
       added_name: collab?.user?.display_name || resolvedDisplayName || resolvedEmail,
     });
   } catch (err) {

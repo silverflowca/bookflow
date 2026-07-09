@@ -18,6 +18,8 @@ export interface Profile {
   is_author: boolean;
   system_role?: SystemRole;
   share_my_progress?: boolean;
+  enable_insert_panel?: boolean;
+  notification_prefs?: Record<string, boolean>;
   created_at: string;
   updated_at: string;
 }

@@ -15,6 +15,7 @@ interface AppSettings {
   home_tagline: string;
   feature_demo_book_id: string | null;
   resend_api_key: string;
+  email_from: string;
 }
 
 const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string; preview: string }[] = [
@@ -38,6 +39,7 @@ export default function Settings() {
     restream_client_id: '',
     restream_client_secret: '',
     resend_api_key: '',
+    email_from: '',
     home_tagline: '',
     feature_demo_book_id: null,
   });
@@ -106,6 +108,7 @@ export default function Settings() {
         home_tagline: data.home_tagline || '',
         feature_demo_book_id: data.feature_demo_book_id || null,
         resend_api_key: data.resend_api_key || '',
+        email_from: data.email_from || '',
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -118,6 +121,7 @@ export default function Settings() {
         home_tagline: '',
         feature_demo_book_id: null,
         resend_api_key: '',
+        email_from: '',
       });
     }
   }
@@ -529,6 +533,22 @@ export default function Settings() {
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Leave empty to use the server's default key (if configured).
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Default From Address
+            </label>
+            <input
+              type="text"
+              value={settings.email_from}
+              onChange={(e) => setSettings({ ...settings, email_from: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="BookFlow <noreply@silverflow.ca>"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Used for system emails. Books and clubs can override this with their own address.
             </p>
           </div>
         </div>

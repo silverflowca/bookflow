@@ -16,6 +16,7 @@ import express from 'express';
 import multer from 'multer';
 import supabase from '../config/supabase.js';
 import { authenticate, requireSuperAdmin } from '../middleware/auth.js';
+import { createNotification, createNotifications } from '../services/notifications.js';
 
 const router = express.Router();
 
@@ -66,19 +67,6 @@ async function uploadToStorage(bucket, storagePath, buffer, mimeType) {
   return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${storagePath}`;
 }
 
-// ── Helper: notify user of a feedback reply ───────────────────────────────────
-async function notifyFeedbackReply(userId, feedbackTitle, commentBody) {
-  try {
-    await supabase.from('user_notifications').insert({
-      user_id: userId,
-      type: 'feedback_reply',
-      title: `Admin replied to your feedback: "${feedbackTitle}"`,
-      body: commentBody.slice(0, 300),
-    });
-  } catch (err) {
-    console.warn('[feedback] Failed to send notification:', err.message);
-  }
-}
 
 // ── GET /config — get feedback config singleton (admin only) ──────────────────
 router.get('/config', authenticate, requireSuperAdmin, async (_req, res) => {
@@ -455,24 +443,24 @@ router.post('/:id/comments', authenticate, async (req, res) => {
 
     // Notify: if owner replied → notify admins; if admin replied → notify owner
     if (isOwner) {
-      // Notify all super_admins
       const { data: admins } = await supabase
         .from('profiles')
         .select('id')
         .eq('system_role', 'super_admin');
       const adminIds = (admins || []).map(a => a.id).filter(aid => aid !== req.user.id);
-      if (adminIds.length > 0) {
-        await supabase.from('user_notifications').insert(
-          adminIds.map(adminId => ({
-            user_id: adminId,
-            type: 'feedback_reply',
-            title: `User replied to feedback: "${feedback.title}"`,
-            body: body.trim().slice(0, 300),
-          }))
-        );
-      }
+      await createNotifications(supabase, adminIds.map(userId => ({
+        userId,
+        type: 'feedback_reply',
+        title: `User replied to feedback: "${feedback.title}"`,
+        body: body.trim().slice(0, 300),
+      })));
     } else if (isAdmin && feedback.user_id !== req.user.id) {
-      await notifyFeedbackReply(feedback.user_id, feedback.title, body.trim());
+      await createNotification(supabase, {
+        userId: feedback.user_id,
+        type: 'feedback_reply',
+        title: `Admin replied to your feedback: "${feedback.title}"`,
+        body: body.trim().slice(0, 300),
+      });
     }
 
     res.status(201).json(comment);
