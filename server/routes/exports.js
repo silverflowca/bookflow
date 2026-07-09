@@ -106,19 +106,10 @@ router.get('/:bookId/publisher-metadata', authenticate, requireRole(['owner', 'a
 
 async function launchBrowser() {
   const puppeteer = (await import('puppeteer')).default;
-  try {
-    const chromium = (await import('@sparticuz/chromium')).default;
-    return puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
-  } catch {
-    // Fallback for local dev where @sparticuz/chromium may not have a binary
-    return puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
-  }
+  return puppeteer.launch({
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
 }
 
 // POST /api/books/:bookId/export/pdf

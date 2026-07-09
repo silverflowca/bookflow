@@ -33,8 +33,10 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init + Chromium (layer-cached — only rebuilds when Dockerfile changes)
+RUN apk add --no-cache dumb-init chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
