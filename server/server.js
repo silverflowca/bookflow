@@ -69,12 +69,22 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 
-// Health check
+// Health check — includes env/service status for debugging
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'bookflow-api',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    env: {
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      PORT: process.env.PORT || 8682,
+      PDF_SERVICE_URL: process.env.PDF_SERVICE_URL || null,
+      CHROMIUM_PATH: process.env.CHROMIUM_PATH || null,
+      RESEND_CONFIGURED: !!(process.env.RESEND_API_KEY),
+      FILEFLOW_URL: process.env.FILEFLOW_URL || null,
+      CLIENT_URL: process.env.CLIENT_URL || null,
+      SUPABASE_URL: process.env.SUPABASE_URL || null,
+    },
   });
 });
 
