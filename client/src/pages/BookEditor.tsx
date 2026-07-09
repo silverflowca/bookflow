@@ -511,8 +511,8 @@ function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: 
   const allChecked = PDF_EXPORT_OPTIONS.every(o => options[o.key]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-sm flex flex-col" style={{ maxHeight: 'min(90vh, 600px)' }}>
         <div className="flex items-center justify-between p-4 border-b border-theme shrink-0">
           <h2 className="font-semibold text-theme">PDF Export Options</h2>
           <button onClick={onClose} className="text-muted hover:text-theme">✕</button>
@@ -1111,8 +1111,8 @@ export default function BookEditor() {
                   </>
                 )}
                 <div className="min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold truncate">{book.title}</h1>
-                  {book.subtitle && <p className="text-muted text-sm truncate">{book.subtitle}</p>}
+                  <h1 className="text-xl sm:text-2xl font-bold break-words">{book.title}</h1>
+                  {book.subtitle && <p className="text-muted text-sm break-words">{book.subtitle}</p>}
                   <p className="text-xs text-muted mt-0.5">
                     Created {new Date(book.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     {' · '}Updated {fmtRelative(new Date(book.updated_at))}
