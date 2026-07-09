@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe, Loader2, Key, Plus, Trash2, Copy } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, ExternalLink, CheckCircle, XCircle, Radio, LayoutGrid, Globe, Loader2, Key, Plus, Trash2, Copy, PenLine, Bell } from 'lucide-react';
 import api from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { CoverSize } from '../contexts/ThemeContext';
 
 interface AppSettings {
@@ -13,6 +14,7 @@ interface AppSettings {
   restream_client_secret: string;
   home_tagline: string;
   feature_demo_book_id: string | null;
+  resend_api_key: string;
 }
 
 const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string; preview: string }[] = [
@@ -24,18 +26,25 @@ const COVER_SIZE_OPTIONS: { value: CoverSize; label: string; description: string
 export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { coverSize, setCoverSize } = useTheme();
+  const { profile, updateProfile } = useAuth();
+  const [insertPanelEnabled, setInsertPanelEnabled] = useState(false);
+  const [savingInsertPanel, setSavingInsertPanel] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
+  const [savingNotifPref, setSavingNotifPref] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
     fileflow_url: '',
     fileflow_access_key: '',
     deepgram_api_key: '',
     restream_client_id: '',
     restream_client_secret: '',
+    resend_api_key: '',
     home_tagline: '',
     feature_demo_book_id: null,
   });
   const [myBooks, setMyBooks] = useState<{ id: string; title: string }[]>([]);
   const [showKey, setShowKey] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
+  const [showResendKey, setShowResendKey] = useState(false);
   const [showRestreamSecret, setShowRestreamSecret] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -54,6 +63,11 @@ export default function Settings() {
   const [generatingKey, setGeneratingKey] = useState(false);
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
+
+  useEffect(() => {
+    setInsertPanelEnabled(profile?.enable_insert_panel ?? false);
+    setNotifPrefs(profile?.notification_prefs ?? {});
+  }, [profile]);
 
   useEffect(() => {
     loadSettings();
@@ -91,6 +105,7 @@ export default function Settings() {
         restream_client_secret: data.restream_client_secret || '',
         home_tagline: data.home_tagline || '',
         feature_demo_book_id: data.feature_demo_book_id || null,
+        resend_api_key: data.resend_api_key || '',
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -102,6 +117,7 @@ export default function Settings() {
         restream_client_secret: '',
         home_tagline: '',
         feature_demo_book_id: null,
+        resend_api_key: '',
       });
     }
   }
@@ -111,6 +127,36 @@ export default function Settings() {
       const data = await api.listApiKeys();
       setApiKeys(data);
     } catch { /* silent */ }
+  }
+
+  async function toggleNotifPref(type: string, enabled: boolean) {
+    const updated = { ...notifPrefs, [type]: enabled };
+    setNotifPrefs(updated);
+    setSavingNotifPref(type);
+    try {
+      await api.updateMyProfile({ notification_prefs: updated });
+      updateProfile({ notification_prefs: updated });
+    } catch (err) {
+      console.error('Failed to save notification preference:', err);
+      setNotifPrefs(notifPrefs); // revert
+    } finally {
+      setSavingNotifPref(null);
+    }
+  }
+
+  async function toggleInsertPanel(enabled: boolean) {
+    setInsertPanelEnabled(enabled);
+    setSavingInsertPanel(true);
+    try {
+      await api.updateMyProfile({ enable_insert_panel: enabled });
+      // Sync into auth context so ChapterEditor picks it up immediately
+      updateProfile({ enable_insert_panel: enabled });
+    } catch (err) {
+      console.error('Failed to save insert panel setting:', err);
+      setInsertPanelEnabled(!enabled); // revert on failure
+    } finally {
+      setSavingInsertPanel(false);
+    }
   }
 
   async function generateApiKey() {
@@ -448,6 +494,46 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Resend Email */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Key className="h-5 w-5 text-blue-500" />
+            <h2 className="text-lg font-semibold">Resend Email</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Used to send transactional emails (invites, notifications). Get your key at{' '}
+            <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              resend.com/api-keys
+            </a>.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Resend API Key
+            </label>
+            <div className="relative">
+              <input
+                type={showResendKey ? 'text' : 'password'}
+                value={settings.resend_api_key}
+                onChange={(e) => setSettings({ ...settings, resend_api_key: e.target.value })}
+                className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="re_xxxxxxxxxxxxxxxx"
+              />
+              <button
+                type="button"
+                onClick={() => setShowResendKey(!showResendKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showResendKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Leave empty to use the server's default key (if configured).
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Restream OAuth */}
       <div className="bg-white rounded-lg border mt-6">
         <div className="p-6">
@@ -613,6 +699,93 @@ export default function Settings() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-lg font-semibold">Email Notifications</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            Choose which events send you an email. Toggling off stops emails for that type — you'll still see in-app notifications.
+          </p>
+          <div className="divide-y divide-gray-100">
+            {([
+              { type: 'comment',               label: 'New comments',            desc: 'Someone comments on your book' },
+              { type: 'comment_reply',         label: 'Comment replies',          desc: 'Someone replies to a comment' },
+              { type: 'invite',                label: 'Collaboration invites',    desc: 'You are invited to co-author a book' },
+              { type: 'review_submitted',      label: 'Review submitted',         desc: 'A review request is created on your book' },
+              { type: 'review_approved',       label: 'Review approved',          desc: 'Your review was approved' },
+              { type: 'review_rejected',       label: 'Review not approved',      desc: 'Your review was not approved' },
+              { type: 'feedback_reply',        label: 'Feedback replies',          desc: 'An admin replied to your feedback' },
+              { type: 'club_invite',           label: 'Club invites',             desc: 'You are invited to join a book club' },
+              { type: 'club_book_added',       label: 'New club book',            desc: 'A new book is added to your club' },
+              { type: 'club_discussion',       label: 'Club discussions',         desc: 'New discussion posted in your club' },
+              { type: 'club_discussion_reply', label: 'Discussion replies',       desc: 'Someone replies to a discussion you started' },
+              { type: 'chat_mention',          label: 'Chat mentions',            desc: 'You are @mentioned in club chat' },
+              { type: 'chat_message',          label: 'Club chat messages',       desc: 'New message in a club you belong to' },
+            ] as { type: string; label: string; desc: string }[]).map(({ type, label, desc }) => {
+              const enabled = notifPrefs[type] !== false;
+              const saving = savingNotifPref === type;
+              return (
+                <div key={type} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled}
+                    disabled={saving}
+                    onClick={() => toggleNotifPref(type, !enabled)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 ${enabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                  >
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Editor Preferences */}
+      <div className="bg-white rounded-lg border mt-6">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <PenLine className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-lg font-semibold">Editor</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">Configure behaviour when editing chapters.</p>
+
+          <div className="flex items-center justify-between py-3 border-b last:border-b-0">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Insert Component Panel</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Right-click (or long-press on mobile) inside the chapter editor to open a quick-insert menu for questions, polls, media, and more.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={insertPanelEnabled}
+              disabled={savingInsertPanel}
+              onClick={() => toggleInsertPanel(!insertPanelEnabled)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 ${
+                insertPanelEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  insertPanelEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 

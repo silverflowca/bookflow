@@ -26,6 +26,7 @@ router.get('/', authenticate, async (req, res) => {
         restream_client_secret: '',
         home_tagline: '',
         feature_demo_book_id: null,
+        resend_api_key: '',
       });
     }
 
@@ -37,6 +38,7 @@ router.get('/', authenticate, async (req, res) => {
       restream_client_secret: data.restream_client_secret || '',
       home_tagline: data.home_tagline || '',
       feature_demo_book_id: data.feature_demo_book_id || null,
+      resend_api_key: data.resend_api_key || '',
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -46,7 +48,7 @@ router.get('/', authenticate, async (req, res) => {
 
 // Update app settings
 router.put('/', authenticate, async (req, res) => {
-  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline, feature_demo_book_id } = req.body;
+  const { fileflow_url, fileflow_access_key, deepgram_api_key, restream_client_id, restream_client_secret, home_tagline, feature_demo_book_id, resend_api_key } = req.body;
 
   try {
     const { data, error } = await supabase
@@ -60,6 +62,7 @@ router.put('/', authenticate, async (req, res) => {
         restream_client_secret: restream_client_secret || '',
         home_tagline: home_tagline || '',
         feature_demo_book_id: feature_demo_book_id || null,
+        resend_api_key: resend_api_key || '',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
@@ -77,6 +80,7 @@ router.put('/', authenticate, async (req, res) => {
       restream_client_secret: data.restream_client_secret || '',
       home_tagline: data.home_tagline || '',
       feature_demo_book_id: data.feature_demo_book_id || null,
+      resend_api_key: data.resend_api_key || '',
     });
   } catch (err) {
     console.error('Update settings error:', err);
