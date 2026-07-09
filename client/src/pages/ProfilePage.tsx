@@ -643,27 +643,34 @@ export default function ProfilePage() {
                 </h3>
                 <button
                   type="button"
+                  role="switch"
+                  aria-checked={allEnabled}
                   onClick={toggleAllNotif}
                   disabled={savingNotif === '__all__'}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${allEnabled ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
-                  title={allEnabled ? 'Disable all' : 'Enable all'}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 ${allEnabled ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
+                  title={allEnabled ? 'Disable all email notifications' : 'Enable all email notifications'}
                 >
-                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${allEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                  <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${allEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                 </button>
               </div>
-              <div className="space-y-1.5">
-                {NOTIF_TYPES.map(({ type, label }) => {
+              <div className="space-y-2">
+                {NOTIF_TYPES.map(({ type, label, desc }) => {
                   const on = notifPrefs[type] !== false;
                   return (
-                    <div key={type} className="flex items-center justify-between">
-                      <span className="text-xs text-muted">{label}</span>
+                    <div key={type} className="flex items-start justify-between gap-2 py-0.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-theme leading-tight">{label}</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">{desc}</p>
+                      </div>
                       <button
                         type="button"
+                        role="switch"
+                        aria-checked={on}
                         disabled={savingNotif === type || savingNotif === '__all__'}
                         onClick={() => toggleNotif(type, !on)}
-                        className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-40 ${on ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
+                        className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-40 ${on ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
                       >
-                        <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ${on ? 'translate-x-3' : 'translate-x-0'}`} />
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${on ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                     </div>
                   );
