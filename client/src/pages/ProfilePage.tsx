@@ -79,11 +79,8 @@ function Toggle({
       aria-checked={value}
       disabled={disabled}
       onClick={onChange}
-      className={`relative flex-shrink-0 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-40 cursor-pointer ${ismd ? 'h-6 w-11' : 'h-5 w-9'}`}
-      style={{
-        backgroundColor: value ? 'var(--color-accent)' : '#d1d5db',
-        focusRingColor: 'var(--color-accent)',
-      }}
+      className={`relative flex-shrink-0 rounded-full transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 cursor-pointer ${ismd ? 'h-6 w-11' : 'h-5 w-9'}`}
+      style={{ backgroundColor: value ? 'var(--color-accent)' : '#d1d5db' }}
     >
       <span
         className="pointer-events-none inline-block rounded-full bg-white shadow transition-transform duration-200 ease-in-out"
