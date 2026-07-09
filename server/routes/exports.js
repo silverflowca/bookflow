@@ -104,17 +104,46 @@ router.get('/:bookId/publisher-metadata', authenticate, requireRole(['owner', 'a
   }
 });
 
-async function launchBrowser() {
+async function generatePdf(html) {
+  const pdfServiceUrl = process.env.PDF_SERVICE_URL;
+
+  if (pdfServiceUrl) {
+    // Delegate to dedicated pdf-service (Railway or local)
+    const resp = await fetch(`${pdfServiceUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `pdf-service returned ${resp.status}`);
+    }
+    const { pdf } = await resp.json();
+    return Buffer.from(pdf, 'base64');
+  }
+
+  // Fallback: in-process Puppeteer (requires CHROMIUM_PATH or bundled Chrome)
   const puppeteer = (await import('puppeteer')).default;
-  return puppeteer.launch({
+  const browser = await puppeteer.launch({
     executablePath: process.env.CHROMIUM_PATH || undefined,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      margin: { top: '2cm', bottom: '2cm', left: '2.5cm', right: '2.5cm' },
+      printBackground: true,
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close().catch(() => {});
+  }
 }
 
 // POST /api/books/:bookId/export/pdf
 router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']), async (req, res) => {
-  let browser;
   try {
     const book = await fetchBookFull(req.params.bookId);
     const options = req.body.options || {};
@@ -138,28 +167,17 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
     }
 
     const html = buildBookHtmlWithInline(book, book.chapters, inlineByChapter, options);
-
-    browser = await launchBrowser();
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: { top: '2cm', bottom: '2cm', left: '2.5cm', right: '2.5cm' },
-      printBackground: true,
-    });
-    await browser.close();
-    browser = null;
+    const pdfBuffer = await generatePdf(html);
 
     const fileName = `${(book.title || 'book').replace(/[^a-z0-9]/gi, '_')}.pdf`;
-    const result = await uploadToBackups(req.params.bookId, book.title, Buffer.from(pdfBuffer), fileName, 'application/pdf', req.user.id, extractJwt(req));
+    const result = await uploadToBackups(req.params.bookId, book.title, pdfBuffer, fileName, 'application/pdf', req.user.id, extractJwt(req));
 
     if (result) return res.json(result);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(Buffer.from(pdfBuffer));
+    res.send(pdfBuffer);
   } catch (err) {
-    if (browser) await browser.close().catch(() => {});
     res.status(500).json({ error: err.message });
   }
 });
@@ -315,13 +333,9 @@ router.post('/:bookId/export/submission-package', authenticate, requireRole(['ow
     } catch { /* epub-gen not installed, skip */ }
 
     try {
-      const pkgBrowser = await launchBrowser();
-      const pkgPage = await pkgBrowser.newPage();
-      await pkgPage.setContent(buildBookHtml(book, book.chapters), { waitUntil: 'networkidle0' });
-      const pkgPdf = await pkgPage.pdf({ format: 'A4', margin: { top: '2cm', bottom: '2cm', left: '2.5cm', right: '2.5cm' } });
-      await pkgBrowser.close();
-      fs.writeFileSync(path.join(tmpDir, `${safeName}.pdf`), Buffer.from(pkgPdf));
-    } catch { /* chromium unavailable, skip PDF in package */ }
+      const pkgPdf = await generatePdf(buildBookHtml(book, book.chapters));
+      fs.writeFileSync(path.join(tmpDir, `${safeName}.pdf`), pkgPdf);
+    } catch { /* pdf unavailable, skip PDF in package */ }
 
     const zipPath = path.join(os.tmpdir(), `${safeName}_submission.zip`);
     await new Promise((resolve, reject) => {
