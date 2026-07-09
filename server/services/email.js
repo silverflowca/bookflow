@@ -7,22 +7,24 @@
  * Gracefully no-ops if RESEND_API_KEY is not set.
  */
 
-const RESEND_API_KEY    = process.env.RESEND_API_KEY;
-export const EMAIL_FROM = process.env.EMAIL_FROM || 'BookFlow <noreply@silverflow.ca>';
-const CLIENT_URL        = (process.env.CLIENT_URL || 'http://localhost:5177').split(',')[0].trim();
+const ENV_RESEND_API_KEY = process.env.RESEND_API_KEY;
+export const EMAIL_FROM  = process.env.EMAIL_FROM || 'BookFlow <noreply@silverflow.ca>';
+const CLIENT_URL         = (process.env.CLIENT_URL || 'http://localhost:5177').split(',')[0].trim();
 
 // ── Resend API wrapper ────────────────────────────────────────────────────────
 
 // `from` is optional — callers can pass a context-resolved address; falls back to EMAIL_FROM
-export async function sendEmail({ from, to, subject, html }) {
-  if (!RESEND_API_KEY) return false;
+// `apiKey` is optional — callers can pass the DB-stored key; falls back to process.env.RESEND_API_KEY
+export async function sendEmail({ from, to, subject, html, apiKey } = {}) {
+  const key = apiKey || ENV_RESEND_API_KEY;
+  if (!key) return false;
   if (!to) return false;
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Authorization': `Bearer ${key}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ from: from || EMAIL_FROM, to, subject, html }),
@@ -43,7 +45,7 @@ export async function sendEmail({ from, to, subject, html }) {
 // ── Shared layout wrapper ─────────────────────────────────────────────────────
 
 function layout({ title, preheader, body, ctaLabel, ctaUrl }) {
-  const settingsUrl = `${CLIENT_URL}/settings?tab=notifications`;
+  const settingsUrl = `${CLIENT_URL}/profile`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,7 +102,7 @@ export function getEmailTemplate(type, data = {}) {
   const bookUrl    = book_id    ? `${CLIENT_URL}/book/${book_id}` : CLIENT_URL;
   const clubUrl    = club_id    ? `${CLIENT_URL}/clubs/${club_id}` : CLIENT_URL;
   const inviteUrl  = invite_token ? `${CLIENT_URL}/invite/${invite_token}` : bookUrl;
-  const settingsUrl = `${CLIENT_URL}/settings?tab=notifications`;
+  const settingsUrl = `${CLIENT_URL}/profile`;
 
   switch (type) {
     case 'invite':

@@ -89,11 +89,11 @@ export async function createNotification(supabase, { userId, type, title, body, 
 
     if (!profile?.email) return;
 
-    // 3. Check system-level master kill switch
+    // 3. Check system-level master kill switch + load resend key
     const { data: sysSettings } = await supabase
       .schema('bookflow')
       .from('app_settings')
-      .select('email_notifications_enabled')
+      .select('email_notifications_enabled, resend_api_key')
       .limit(1)
       .maybeSingle();
     if (sysSettings?.email_notifications_enabled === false) return;
@@ -105,9 +105,10 @@ export async function createNotification(supabase, { userId, type, title, body, 
     // 5. Resolve from address from context chain
     const from = await resolveEmailFrom(supabase, extras);
 
-    // 6. Send email
+    // 6. Send email (use DB key if env key not set)
+    const apiKey = sysSettings?.resend_api_key || undefined;
     const { subject, html } = getEmailTemplate(type, { title, body, ...extras });
-    await sendEmail({ from, to: profile.email, subject, html });
+    await sendEmail({ from, to: profile.email, subject, html, apiKey });
   } catch (err) {
     // Email failure never breaks the request
     console.error('[notify] email failed:', err.message);

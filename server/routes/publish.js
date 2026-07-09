@@ -179,7 +179,12 @@ router.post('/invite', authenticate, requireRole(['owner', 'author']), async (re
 
     const senderName = profile?.display_name || 'A BookFlow author';
 
-    if (!process.env.RESEND_API_KEY) {
+    // Load DB resend key as fallback to env var
+    const { data: appSettings } = await supabase
+      .schema('bookflow').from('app_settings').select('resend_api_key').limit(1).maybeSingle();
+    const apiKey = appSettings?.resend_api_key || process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
       // No email provider configured — return the link for manual sharing
       return res.json({ ok: true, manual: true, url: readUrl });
     }
@@ -196,7 +201,7 @@ router.post('/invite', authenticate, requireRole(['owner', 'author']), async (re
 
     const emailList = Array.isArray(emails) ? emails : [emails];
     await Promise.all(emailList.map(to =>
-      sendEmail({ to, subject: `${senderName} invited you to read "${book.title}"`, html })
+      sendEmail({ to, subject: `${senderName} invited you to read "${book.title}"`, html, apiKey })
     ));
 
     res.json({ ok: true, sent: emailList.length });

@@ -565,28 +565,59 @@ const SECTIONS: Section[] = [
     title: 'Comments & Notifications',
     color: 'text-amber-700',
     bg: 'bg-amber-50 border-amber-200',
-    intro: 'Stay on top of comments, replies, reviews, and activity across your books.',
+    intro: 'Stay on top of comments, replies, reviews, and activity across your books — in-app and by email.',
     faqs: [
       {
         q: 'Where do I find my notifications?',
-        a: 'Click the bell icon in the top navigation bar to open your Inbox. Notifications include: new comments, replies to your comments, @mentions, review approvals/rejections, and club invitations.',
+        a: 'Click the bell icon in the top navigation bar to open your Inbox. All notification types appear here as in-app alerts regardless of your email preferences.',
         tags: ['notifications', 'inbox', 'bell'],
       },
       {
         q: 'What notification types exist?',
         a: (
-          <ul className="space-y-0.5 text-sm columns-2">
-            <li>• New comment on your book</li>
-            <li>• Reply to your comment</li>
-            <li>• @mention in a comment</li>
-            <li>• Review submitted (for authors)</li>
-            <li>• Review approved / rejected</li>
-            <li>• Club invitation received</li>
-            <li>• Collaborator invitation</li>
-            <li>• Feedback reply</li>
-          </ul>
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="font-medium mb-1">Books & Collaboration</p>
+              <ul className="space-y-0.5 ml-2">
+                <li>• New comment on your book</li>
+                <li>• Reply to your comment</li>
+                <li>• Collaborator invitation received</li>
+                <li>• Review submitted (authors)</li>
+                <li>• Review approved / rejected</li>
+                <li>• Feedback reply from admin</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium mb-1">Reading Clubs</p>
+              <ul className="space-y-0.5 ml-2">
+                <li>• Club invitation received</li>
+                <li>• Join request submitted (club owners/admins)</li>
+                <li>• Join request approved</li>
+                <li>• Book added to your club</li>
+                <li>• New club discussion post</li>
+                <li>• Reply to your discussion post</li>
+                <li>• New club chat message</li>
+                <li>• @mention in club chat</li>
+              </ul>
+            </div>
+          </div>
         ),
         tags: ['notifications', 'types'],
+      },
+      {
+        q: 'Do notifications get sent by email?',
+        a: 'Yes — every notification type also sends an email to your registered address. Each email includes a "Manage email preferences" link that takes you to your Profile where you can turn off any type individually. Admins can also disable all email notifications system-wide from the Admin Settings page.',
+        tags: ['email', 'notifications', 'preferences'],
+      },
+      {
+        q: 'How do I turn off email notifications?',
+        a: (
+          <ul className="space-y-1.5 text-sm">
+            <li><strong>Per type:</strong> Go to your Profile → scroll to Email Notifications → toggle off any types you don\'t want.</li>
+            <li><strong>All at once (admin only):</strong> Admin panel → Settings → turn off "Email Notifications Enabled".</li>
+          </ul>
+        ),
+        tags: ['email', 'unsubscribe', 'opt out', 'preferences', 'profile'],
       },
       {
         q: 'How do I resolve a comment?',
@@ -702,6 +733,21 @@ const SECTIONS: Section[] = [
         q: 'How do I manage API keys?',
         a: 'Go to Settings → API Keys (for admin users). Create a named key, copy it once (it is only shown once), and use it to authenticate against the BookFlow API. Revoke keys at any time.',
         tags: ['api', 'keys', 'admin', 'developer'],
+      },
+      {
+        q: 'How do I enable email sending? (Admin)',
+        a: (
+          <div className="space-y-2 text-sm">
+            <p>BookFlow sends transactional emails (invites, notifications, replies) via <strong>Resend</strong>. To enable it:</p>
+            <ol className="list-decimal ml-4 space-y-1">
+              <li>Create a free account at <strong>resend.com</strong> and generate an API key.</li>
+              <li>Go to <strong>Settings → Resend Email</strong> and paste your <code>re_xxxx</code> key.</li>
+              <li>Click <strong>Save</strong>. Emails will be sent from <code>noreply@silverflow.ca</code> by default.</li>
+            </ol>
+            <p className="text-muted">To use a custom sender address, set the "From" address in Settings → Resend Email → Email From field.</p>
+          </div>
+        ),
+        tags: ['email', 'resend', 'admin', 'setup', 'notifications'],
       },
     ],
   },

@@ -172,12 +172,14 @@ router.post('/', authenticate, requireRole(['owner', 'author']), async (req, res
       });
     } else if (resolvedEmail) {
       // External invite — no account yet, send email directly
+      const { data: appSettings } = await supabase
+        .schema('bookflow').from('app_settings').select('resend_api_key').limit(1).maybeSingle();
       const { subject, html } = getEmailTemplate('invite', {
         title: `${senderName} invited you to collaborate on "${req.book.title || 'a book'}"`,
         body: `You have been invited as ${role}. Click below to accept.`,
         invite_token: inviteToken,
       });
-      await sendEmail({ to: resolvedEmail, subject, html });
+      await sendEmail({ to: resolvedEmail, subject, html, apiKey: appSettings?.resend_api_key || undefined });
     }
 
     const emailSent = !!(resolvedUserId || resolvedEmail);
