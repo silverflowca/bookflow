@@ -511,47 +511,50 @@ function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: 
   const allChecked = PDF_EXPORT_OPTIONS.every(o => options[o.key]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-surface rounded-t-xl sm:rounded-xl shadow-xl w-full max-w-sm flex flex-col" style={{ maxHeight: 'min(90vh, 600px)' }}>
-        <div className="flex items-center justify-between p-4 border-b border-theme shrink-0">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm flex flex-col overflow-hidden" style={{ maxHeight: '85vh' }}>
+        {/* Header — fixed */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-theme flex-shrink-0">
           <h2 className="font-semibold text-theme">PDF Export Options</h2>
-          <button onClick={onClose} className="text-muted hover:text-theme">✕</button>
+          <button onClick={onClose} className="text-muted hover:text-theme text-lg leading-none">✕</button>
         </div>
-        <div className="p-4 overflow-y-auto flex-1">
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           <p className="text-sm text-muted mb-3">Choose what to include in the exported PDF:</p>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted uppercase tracking-wide">Inline Content</span>
-            <button
-              onClick={() => selectAll(!allChecked)}
-              className="text-xs text-accent hover:underline"
-            >
+            <button onClick={() => selectAll(!allChecked)} className="text-xs text-accent hover:underline">
               {allChecked ? 'Deselect all' : 'Select all'}
             </button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {PDF_EXPORT_OPTIONS.map(opt => (
               <label key={opt.key} className="flex items-center gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={!!options[opt.key]}
                   onChange={() => toggle(opt.key)}
-                  className="h-4 w-4 rounded border-theme accent-accent"
+                  className="h-4 w-4 rounded border-theme accent-accent flex-shrink-0"
                 />
                 <span className="text-sm text-theme group-hover:text-accent transition-colors">{opt.label}</span>
               </label>
             ))}
           </div>
         </div>
-        <div className="flex gap-2 p-4 border-t border-theme shrink-0">
+
+        {/* Footer — always visible */}
+        <div className="flex gap-3 px-5 py-4 border-t border-theme flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg text-sm border border-theme text-theme hover:bg-surface-hover"
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm border-2 border-theme text-theme hover:bg-surface-hover font-medium"
           >
             Cancel
           </button>
           <button
             onClick={() => onExport(options)}
-            className="flex-1 px-4 py-2 rounded-lg text-sm bg-accent text-white hover:opacity-90 font-medium"
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             Download PDF
           </button>
