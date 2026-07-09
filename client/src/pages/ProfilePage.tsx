@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   User, BookOpen, Users, BarChart2, MapPin, Globe,
-  Lock, Eye, EyeOff, Edit2, Save, X, Check,
-  BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2, GraduationCap, Bell
+  Check, BookMarked, CheckCircle2, Mail, AtSign, Camera, Loader2,
+  GraduationCap, Bell, Lock, Eye, EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
@@ -24,6 +24,7 @@ interface ProfileData {
     show_clubs: boolean;
     show_books_authored: boolean;
     share_my_progress: boolean;
+    notification_prefs?: Record<string, boolean>;
   };
   authored_books: any[];
   currently_reading: any[];
@@ -48,27 +49,77 @@ function fmtDate(dateStr: string) {
   return d.toLocaleDateString(undefined, opts);
 }
 
+const NOTIF_TYPES = [
+  { type: 'comment',               label: 'New comments',           desc: 'Someone comments on your book' },
+  { type: 'comment_reply',         label: 'Comment replies',         desc: 'Someone replies to a comment' },
+  { type: 'invite',                label: 'Collaboration invites',   desc: 'Invited to co-author a book' },
+  { type: 'review_submitted',      label: 'Review submitted',        desc: 'A review is created on your book' },
+  { type: 'review_approved',       label: 'Review approved',         desc: 'Your review was approved' },
+  { type: 'review_rejected',       label: 'Review not approved',     desc: 'Your review was not approved' },
+  { type: 'feedback_reply',        label: 'Feedback replies',        desc: 'An admin replied to your feedback' },
+  { type: 'club_invite',           label: 'Club invites',            desc: 'Invited to join a book club' },
+  { type: 'club_book_added',       label: 'New club book',           desc: 'A book is added to your club' },
+  { type: 'club_discussion',       label: 'Club discussions',        desc: 'New discussion in your club' },
+  { type: 'club_discussion_reply', label: 'Discussion replies',      desc: 'Someone replies to your discussion' },
+  { type: 'chat_mention',          label: 'Chat mentions',           desc: 'You are @mentioned in chat' },
+  { type: 'chat_message',          label: 'Club chat messages',      desc: 'New messages in club chat' },
+] as const;
+
+/** A toggle that uses inline style for color so CSS vars resolve correctly */
+function Toggle({
+  value, onChange, disabled, size = 'md',
+}: {
+  value: boolean; onChange: () => void; disabled?: boolean; size?: 'sm' | 'md';
+}) {
+  const ismd = size === 'md';
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      disabled={disabled}
+      onClick={onChange}
+      className={`relative flex-shrink-0 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-40 cursor-pointer ${ismd ? 'h-6 w-11' : 'h-5 w-9'}`}
+      style={{
+        backgroundColor: value ? 'var(--color-accent)' : '#d1d5db',
+        focusRingColor: 'var(--color-accent)',
+      }}
+    >
+      <span
+        className="pointer-events-none inline-block rounded-full bg-white shadow transition-transform duration-200 ease-in-out"
+        style={{
+          width: ismd ? '1.25rem' : '1rem',
+          height: ismd ? '1.25rem' : '1rem',
+          transform: value
+            ? `translateX(${ismd ? '1.375rem' : '1.125rem'})`
+            : 'translateX(0.125rem)',
+          display: 'block',
+          marginTop: ismd ? '1px' : '2px',
+        }}
+      />
+    </button>
+  );
+}
+
 export default function ProfilePage() {
   const { userId } = useParams<{ userId?: string }>();
   const { user } = useAuth();
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Notification prefs (saves instantly, independent of edit mode)
-  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
-  const [savingNotif, setSavingNotif] = useState<string | null>(null);
-
-  // Edit form state
+  // Form fields (text inputs — debounced save)
   const [form, setForm] = useState({
     display_name: '',
     bio: '',
     website_url: '',
     location: '',
+  });
+
+  // Boolean toggles (instant save)
+  const [toggles, setToggles] = useState({
     is_author: false,
     profile_public: true,
     show_reading_progress: true,
@@ -77,7 +128,13 @@ export default function ProfilePage() {
     share_my_progress: true,
   });
 
+  // Notification prefs
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
+  const [savingNotif, setSavingNotif] = useState<string | null>(null);
+
   const isOwnProfile = !userId || userId === user?.id;
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
     loadProfile();
@@ -87,12 +144,9 @@ export default function ProfilePage() {
     setLoading(true);
     setError('');
     try {
-      let result: ProfileData;
-      if (isOwnProfile) {
-        result = await api.getMyProfile();
-      } else {
-        result = await api.getPublicProfile(userId!);
-      }
+      const result: ProfileData = isOwnProfile
+        ? await api.getMyProfile()
+        : await api.getPublicProfile(userId!);
       setData(result);
       if (isOwnProfile) {
         setForm({
@@ -100,6 +154,8 @@ export default function ProfilePage() {
           bio: result.profile.bio || '',
           website_url: result.profile.website_url || '',
           location: result.profile.location || '',
+        });
+        setToggles({
           is_author: result.profile.is_author ?? false,
           profile_public: result.profile.profile_public ?? true,
           show_reading_progress: result.profile.show_reading_progress ?? true,
@@ -107,7 +163,8 @@ export default function ProfilePage() {
           show_books_authored: result.profile.show_books_authored ?? true,
           share_my_progress: result.profile.share_my_progress ?? true,
         });
-        setNotifPrefs((result.profile as any).notification_prefs ?? {});
+        setNotifPrefs(result.profile.notification_prefs ?? {});
+        isFirstLoad.current = true; // reset so text debounce doesn't fire on init
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load profile');
@@ -116,30 +173,51 @@ export default function ProfilePage() {
     }
   }
 
-  const NOTIF_TYPES = [
-    { type: 'comment',               label: 'New comments',           desc: 'Someone comments on your book' },
-    { type: 'comment_reply',         label: 'Comment replies',         desc: 'Someone replies to a comment' },
-    { type: 'invite',                label: 'Collaboration invites',   desc: 'Invited to co-author a book' },
-    { type: 'review_submitted',      label: 'Review submitted',        desc: 'A review is created on your book' },
-    { type: 'review_approved',       label: 'Review approved',         desc: 'Your review was approved' },
-    { type: 'review_rejected',       label: 'Review not approved',     desc: 'Your review was not approved' },
-    { type: 'feedback_reply',        label: 'Feedback replies',         desc: 'An admin replied to your feedback' },
-    { type: 'club_invite',           label: 'Club invites',            desc: 'Invited to join a book club' },
-    { type: 'club_book_added',       label: 'New club book',           desc: 'A book is added to your club' },
-    { type: 'club_discussion',       label: 'Club discussions',        desc: 'New discussion in your club' },
-    { type: 'club_discussion_reply', label: 'Discussion replies',      desc: 'Someone replies to your discussion' },
-    { type: 'chat_mention',          label: 'Chat mentions',           desc: 'You are @mentioned in chat' },
-    { type: 'chat_message',          label: 'Club chat messages',      desc: 'New messages in club chat' },
-  ] as const;
+  // Debounced save for text fields
+  const saveForm = useCallback(async (values: typeof form) => {
+    setSaveStatus('saving');
+    try {
+      await api.updateMyProfile(values);
+      setData(prev => prev ? { ...prev, profile: { ...prev.profile, ...values } } : prev);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch {
+      setSaveStatus('idle');
+    }
+  }, []);
 
-  const allEnabled = NOTIF_TYPES.every(({ type }) => notifPrefs[type] !== false);
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => saveForm(form), 800);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [form, saveForm]);
+
+  // Instant save for boolean toggles
+  async function handleToggle(key: keyof typeof toggles) {
+    const next = { ...toggles, [key]: !toggles[key] };
+    setToggles(next);
+    try {
+      await api.updateMyProfile({ [key]: next[key] });
+      setData(prev => prev ? { ...prev, profile: { ...prev.profile, [key]: next[key] } } : prev);
+    } catch {
+      setToggles(toggles); // revert
+    }
+  }
+
+  // Notification prefs
+  const allNotifEnabled = NOTIF_TYPES.every(({ type }) => notifPrefs[type] !== false);
 
   async function saveNotifPrefs(updated: Record<string, boolean>) {
+    const prev = notifPrefs;
     setNotifPrefs(updated);
     try {
       await api.updateMyProfile({ notification_prefs: updated });
     } catch {
-      setNotifPrefs(notifPrefs); // revert
+      setNotifPrefs(prev);
     }
   }
 
@@ -152,11 +230,9 @@ export default function ProfilePage() {
   async function toggleAllNotif() {
     setSavingNotif('__all__');
     const updated: Record<string, boolean> = {};
-    if (allEnabled) {
-      // disable all
+    if (allNotifEnabled) {
       NOTIF_TYPES.forEach(({ type }) => { updated[type] = false; });
     }
-    // if not all enabled, enable all (empty prefs = all on)
     await saveNotifPrefs(updated);
     setSavingNotif(null);
   }
@@ -168,7 +244,6 @@ export default function ProfilePage() {
     try {
       const { avatar_url } = await api.uploadAvatar(file);
       setData(prev => prev ? { ...prev, profile: { ...prev.profile, avatar_url } } : prev);
-      // Refresh auth context profile
       window.dispatchEvent(new CustomEvent('bf-profile-updated', { detail: { avatar_url } }));
     } catch (err: any) {
       alert(err.message || 'Failed to upload avatar');
@@ -177,25 +252,10 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const updated = await api.updateMyProfile(form);
-      setData(prev => prev ? { ...prev, profile: { ...prev.profile, ...updated } } : prev);
-      setEditing(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err: any) {
-      alert(err.message || 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
       </div>
     );
   }
@@ -247,9 +307,9 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex-1 min-w-0">
-            {editing ? (
+            {isOwnProfile ? (
               <input
-                className="text-2xl font-bold text-theme bg-transparent border-b-2 border-accent outline-none w-full mb-2"
+                className="text-2xl font-bold text-theme bg-transparent border-b-2 border-transparent hover:border-theme focus:border-accent outline-none w-full mb-2 transition-colors"
                 value={form.display_name}
                 onChange={e => setForm(f => ({ ...f, display_name: e.target.value }))}
                 placeholder="Display name"
@@ -258,49 +318,44 @@ export default function ProfilePage() {
               <h1 className="text-2xl font-bold text-theme mb-1">{p.display_name}</h1>
             )}
 
-            {/* Username + email (own profile only) */}
-            {isOwnProfile && !editing && (
+            {/* Username + email row */}
+            {isOwnProfile && (
               <div className="flex flex-wrap items-center gap-3 mb-2 text-xs text-muted">
-                <span className="flex items-center gap-1">
-                  <AtSign className="h-3 w-3" />{p.display_name}
-                </span>
+                <span className="flex items-center gap-1"><AtSign className="h-3 w-3" />{p.display_name}</span>
                 {p.email && (
-                  <span className="flex items-center gap-1">
-                    <Mail className="h-3 w-3" />{p.email}
-                  </span>
+                  <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{p.email}</span>
                 )}
               </div>
             )}
 
-            {p.is_author && !editing && (
+            {p.is_author && !isOwnProfile && (
               <span className="inline-flex items-center gap-1 text-xs font-medium bg-accent/10 text-accent px-2 py-0.5 rounded-full mb-2">
                 <BookOpen className="h-3 w-3" /> Author
               </span>
             )}
 
-            {editing ? (
+            {isOwnProfile ? (
               <textarea
-                className="w-full text-sm text-muted bg-surface-hover border border-theme rounded-lg p-2 outline-none resize-none mt-1"
+                className="w-full text-sm text-theme bg-transparent border-b-2 border-transparent hover:border-theme focus:border-accent outline-none resize-none mt-1 transition-colors"
                 rows={2}
                 value={form.bio}
                 onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
-                placeholder="Bio"
+                placeholder="Write a short bio…"
               />
             ) : p.bio ? (
               <p className="text-sm text-muted mb-2">{p.bio}</p>
             ) : null}
 
-            {/* Location / website */}
-            {editing ? (
+            {isOwnProfile ? (
               <div className="flex flex-col sm:flex-row gap-2 mt-2">
                 <input
-                  className="flex-1 text-sm bg-surface-hover border border-theme rounded-lg px-3 py-1.5 outline-none text-theme"
+                  className="flex-1 text-sm text-theme bg-transparent border-b border-transparent hover:border-theme focus:border-accent outline-none transition-colors placeholder:text-muted"
                   value={form.location}
                   onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
                   placeholder="Location"
                 />
                 <input
-                  className="flex-1 text-sm bg-surface-hover border border-theme rounded-lg px-3 py-1.5 outline-none text-theme"
+                  className="flex-1 text-sm text-theme bg-transparent border-b border-transparent hover:border-theme focus:border-accent outline-none transition-colors placeholder:text-muted"
                   value={form.website_url}
                   onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))}
                   placeholder="Website URL"
@@ -308,9 +363,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted">
-                {p.location && (
-                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{p.location}</span>
-                )}
+                {p.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{p.location}</span>}
                 {p.website_url && (
                   <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-accent hover:underline">
                     <Globe className="h-3 w-3" />{p.website_url.replace(/^https?:\/\//, '')}
@@ -324,37 +377,17 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Edit / Save buttons (own profile only) */}
+          {/* Auto-save status */}
           {isOwnProfile && (
-            <div className="flex gap-2 flex-shrink-0">
-              {editing ? (
-                <>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 theme-button-primary px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-60"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => { setEditing(false); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted hover:text-theme border-2 border-theme"
-                  >
-                    <X className="h-3.5 w-3.5" /> Cancel
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted hover:text-theme border-2 border-theme hover:bg-surface-hover transition-colors"
-                >
-                  <Edit2 className="h-3.5 w-3.5" /> Edit Profile
-                </button>
+            <div className="flex-shrink-0 flex items-center gap-1.5 text-xs min-w-[70px] justify-end">
+              {saveStatus === 'saving' && (
+                <span className="flex items-center gap-1 text-muted">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+                </span>
               )}
-              {saved && (
-                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <Check className="h-3.5 w-3.5" /> Saved
+              {saveStatus === 'saved' && (
+                <span className="flex items-center gap-1 text-green-600">
+                  <Check className="h-3 w-3" /> Saved
                 </span>
               )}
             </div>
@@ -366,11 +399,11 @@ export default function ProfilePage() {
       {data.stats && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
           {[
-            { label: 'Books Read', value: data.stats.total_read, icon: CheckCircle2 },
-            { label: 'In Progress', value: data.stats.total_started - data.stats.total_read, icon: BookMarked },
-            { label: 'Clubs', value: data.stats.clubs_count, icon: Users },
-            { label: 'Study Groups', value: data.stats.study_groups_count ?? 0, icon: GraduationCap },
-            { label: 'Authored', value: data.stats.books_authored, icon: BookOpen },
+            { label: 'Books Read',    value: data.stats.total_read,                              icon: CheckCircle2 },
+            { label: 'In Progress',   value: data.stats.total_started - data.stats.total_read,   icon: BookMarked },
+            { label: 'Clubs',         value: data.stats.clubs_count,                             icon: Users },
+            { label: 'Study Groups',  value: data.stats.study_groups_count ?? 0,                 icon: GraduationCap },
+            { label: 'Authored',      value: data.stats.books_authored,                          icon: BookOpen },
           ].map(stat => (
             <div key={stat.label} className="bg-surface border-2 border-theme rounded-xl p-4 text-center">
               <stat.icon className="h-5 w-5 text-accent mx-auto mb-1" />
@@ -455,9 +488,7 @@ export default function ProfilePage() {
                         : <BookOpen className="h-6 w-6 text-muted m-auto mt-6" />}
                     </div>
                     <p className="text-xs text-theme truncate leading-tight">{book.title}</p>
-                    {isOwnProfile && (
-                      <p className="text-[10px] text-muted capitalize">{book.status}</p>
-                    )}
+                    {isOwnProfile && <p className="text-[10px] text-muted capitalize">{book.status}</p>}
                   </Link>
                 ))}
               </div>
@@ -484,19 +515,11 @@ export default function ProfilePage() {
                       </Link>
                       <p className="text-xs text-muted capitalize">{club.role}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <Link
-                          to={`/clubs/${club.id}?tab=books`}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-theme px-2.5 py-1 text-xs font-medium text-theme hover:bg-surface-hover transition-colors"
-                        >
-                          <BookOpen className="h-3.5 w-3.5 text-accent" />
-                          Books
+                        <Link to={`/clubs/${club.id}?tab=books`} className="inline-flex items-center gap-1.5 rounded-md border border-theme px-2.5 py-1 text-xs font-medium text-theme hover:bg-surface-hover transition-colors">
+                          <BookOpen className="h-3.5 w-3.5 text-accent" /> Books
                         </Link>
-                        <Link
-                          to={`/clubs/${club.id}?tab=members`}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-theme px-2.5 py-1 text-xs font-medium text-theme hover:bg-surface-hover transition-colors"
-                        >
-                          <Users className="h-3.5 w-3.5 text-accent" />
-                          Members
+                        <Link to={`/clubs/${club.id}?tab=members`} className="inline-flex items-center gap-1.5 rounded-md border border-theme px-2.5 py-1 text-xs font-medium text-theme hover:bg-surface-hover transition-colors">
+                          <Users className="h-3.5 w-3.5 text-accent" /> Members
                         </Link>
                       </div>
                     </div>
@@ -508,176 +531,92 @@ export default function ProfilePage() {
         </div>
 
         {/* Sidebar — own profile only */}
-        {isOwnProfile && editing && (
+        {isOwnProfile && (
           <div className="space-y-4">
+            {/* Privacy Settings */}
             <div className="bg-surface border-2 border-theme rounded-xl p-5">
               <h3 className="text-sm font-semibold text-theme mb-4 flex items-center gap-2">
                 <Lock className="h-4 w-4 text-accent" /> Privacy Settings
               </h3>
               <div className="space-y-3">
-                <PrivacyToggle
-                  label="Public profile"
-                  description="Anyone can view your profile"
-                  value={form.profile_public}
-                  onChange={v => setForm(f => ({ ...f, profile_public: v }))}
-                />
-                <PrivacyToggle
-                  label="Show reading progress"
-                  description="Show books you're reading"
-                  value={form.show_reading_progress}
-                  onChange={v => setForm(f => ({ ...f, show_reading_progress: v }))}
-                />
-                <PrivacyToggle
-                  label="Show clubs"
-                  description="Show clubs you belong to"
-                  value={form.show_clubs}
-                  onChange={v => setForm(f => ({ ...f, show_clubs: v }))}
-                />
-                <PrivacyToggle
-                  label="Show authored books"
-                  description="Show books you've written"
-                  value={form.show_books_authored}
-                  onChange={v => setForm(f => ({ ...f, show_books_authored: v }))}
-                />
-                <PrivacyToggle
-                  label="Share my reading progress in book chats"
-                  description="Your chapter and component completions are posted as status updates in book chats"
-                  value={form.share_my_progress}
-                  onChange={v => setForm(f => ({ ...f, share_my_progress: v }))}
-                />
-                <PrivacyToggle
-                  label="Author account"
-                  description="Mark yourself as an author"
-                  value={form.is_author}
-                  onChange={v => setForm(f => ({ ...f, is_author: v }))}
-                />
+                {([
+                  { key: 'profile_public',        label: 'Public profile',              desc: 'Anyone can view your profile' },
+                  { key: 'show_reading_progress', label: 'Show reading progress',        desc: 'Show books you\'re reading' },
+                  { key: 'show_clubs',            label: 'Show clubs',                  desc: 'Show clubs you belong to' },
+                  { key: 'show_books_authored',   label: 'Show authored books',          desc: 'Show books you\'ve written' },
+                  { key: 'share_my_progress',     label: 'Share progress in book chats', desc: 'Chapter completions posted as chat status updates' },
+                  { key: 'is_author',             label: 'Author account',              desc: 'Mark yourself as an author' },
+                ] as const).map(({ key, label, desc }) => (
+                  <div key={key} className="flex items-start gap-3">
+                    <Toggle value={toggles[key]} onChange={() => handleToggle(key)} size="sm" />
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleToggle(key)}>
+                      <p className="text-sm font-medium text-theme leading-tight">{label}</p>
+                      <p className="text-xs text-muted">{desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Email Notification Preferences */}
+            {/* Privacy summary pills */}
+            <div className="bg-surface border-2 border-theme rounded-xl p-4">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Visibility</p>
+              <ul className="space-y-1.5 text-xs text-muted">
+                <li className="flex items-center gap-2">
+                  {toggles.profile_public ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
+                  Profile is {toggles.profile_public ? 'public' : 'private'}
+                </li>
+                <li className="flex items-center gap-2">
+                  {toggles.show_reading_progress ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
+                  Reading progress {toggles.show_reading_progress ? 'visible' : 'hidden'}
+                </li>
+                <li className="flex items-center gap-2">
+                  {toggles.show_clubs ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
+                  Clubs {toggles.show_clubs ? 'visible' : 'hidden'}
+                </li>
+                <li className="flex items-center gap-2">
+                  {toggles.show_books_authored ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
+                  Authored books {toggles.show_books_authored ? 'visible' : 'hidden'}
+                </li>
+              </ul>
+            </div>
+
+            {/* Email Notifications */}
             <div className="bg-surface border-2 border-theme rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-theme flex items-center gap-2">
                   <Bell className="h-4 w-4 text-accent" /> Email Notifications
                 </h3>
-                <button
-                  type="button"
-                  onClick={toggleAllNotif}
+                <Toggle
+                  value={allNotifEnabled}
+                  onChange={toggleAllNotif}
                   disabled={savingNotif === '__all__'}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${allEnabled ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
-                  title={allEnabled ? 'Disable all email notifications' : 'Enable all email notifications'}
-                >
-                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${allEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
+                  size="md"
+                />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {NOTIF_TYPES.map(({ type, label, desc }) => {
                   const on = notifPrefs[type] !== false;
                   return (
-                    <div key={type} className="flex items-start justify-between gap-2 py-1">
-                      <div className="min-w-0">
+                    <div key={type} className="flex items-start gap-3">
+                      <Toggle
+                        value={on}
+                        onChange={() => toggleNotif(type, !on)}
+                        disabled={savingNotif === type || savingNotif === '__all__'}
+                        size="sm"
+                      />
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleNotif(type, !on)}>
                         <p className="text-xs font-medium text-theme leading-tight">{label}</p>
                         <p className="text-[11px] text-muted leading-tight mt-0.5">{desc}</p>
                       </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={on}
-                        disabled={savingNotif === type || savingNotif === '__all__'}
-                        onClick={() => toggleNotif(type, !on)}
-                        className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${on ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
-                      >
-                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${on ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </button>
                     </div>
                   );
                 })}
               </div>
               <p className="text-[11px] text-muted mt-3">In-app notifications always appear regardless of these settings.</p>
             </div>
-          </div>
-        )}
 
-        {/* Sidebar — privacy summary (own profile, not editing) */}
-        {isOwnProfile && !editing && (
-          <div className="space-y-4">
-            <div className="bg-surface border-2 border-theme rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-theme mb-3 flex items-center gap-2">
-                <Lock className="h-4 w-4 text-accent" /> Privacy
-              </h3>
-              <ul className="space-y-2 text-xs text-muted">
-                <li className="flex items-center gap-2">
-                  {p.profile_public ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
-                  Profile is {p.profile_public ? 'public' : 'private'}
-                </li>
-                <li className="flex items-center gap-2">
-                  {p.show_reading_progress ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
-                  Reading progress {p.show_reading_progress ? 'visible' : 'hidden'}
-                </li>
-                <li className="flex items-center gap-2">
-                  {p.show_clubs ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
-                  Clubs {p.show_clubs ? 'visible' : 'hidden'}
-                </li>
-                <li className="flex items-center gap-2">
-                  {p.show_books_authored ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
-                  Authored books {p.show_books_authored ? 'visible' : 'hidden'}
-                </li>
-                <li className="flex items-center gap-2">
-                  {p.share_my_progress ? <Eye className="h-3.5 w-3.5 text-green-500" /> : <EyeOff className="h-3.5 w-3.5 text-muted" />}
-                  Progress sharing {p.share_my_progress ? 'on' : 'off'}
-                </li>
-              </ul>
-              <button
-                onClick={() => setEditing(true)}
-                className="mt-3 w-full text-xs text-accent hover:underline text-left"
-              >
-                Edit privacy settings →
-              </button>
-            </div>
-
-            {/* Notification prefs summary — always visible, saves instantly */}
-            <div className="bg-surface border-2 border-theme rounded-xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-theme flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-accent" /> Email Notifications
-                </h3>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={allEnabled}
-                  onClick={toggleAllNotif}
-                  disabled={savingNotif === '__all__'}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 ${allEnabled ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
-                  title={allEnabled ? 'Disable all email notifications' : 'Enable all email notifications'}
-                >
-                  <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${allEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {NOTIF_TYPES.map(({ type, label, desc }) => {
-                  const on = notifPrefs[type] !== false;
-                  return (
-                    <div key={type} className="flex items-start justify-between gap-2 py-0.5">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-theme leading-tight">{label}</p>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">{desc}</p>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={on}
-                        disabled={savingNotif === type || savingNotif === '__all__'}
-                        onClick={() => toggleNotif(type, !on)}
-                        className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-40 ${on ? 'bg-accent' : 'bg-gray-200 dark:bg-gray-600'}`}
-                      >
-                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${on ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
+            {/* Reading Stats */}
             <div className="bg-surface border-2 border-theme rounded-xl p-5">
               <h3 className="text-sm font-semibold text-theme mb-2 flex items-center gap-2">
                 <BarChart2 className="h-4 w-4 text-accent" /> Reading Stats
@@ -698,33 +637,5 @@ export default function ProfilePage() {
         )}
       </div>
     </div>
-  );
-}
-
-function PrivacyToggle({
-  label, description, value, onChange,
-}: {
-  label: string; description: string; value: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className="flex items-start gap-3 w-full text-left hover:bg-surface-hover rounded-lg p-1.5 -mx-1.5 transition-colors"
-    >
-      <div
-        className="relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition-colors"
-        style={{ backgroundColor: value ? 'var(--color-accent)' : '#d1d5db', border: value ? 'none' : '1px solid #9ca3af' }}
-      >
-        <span
-          className="absolute top-0.5 h-4 w-4 rounded-full shadow transition-transform bg-white"
-          style={{ transform: value ? 'translateX(1rem)' : 'translateX(0.125rem)' }}
-        />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-theme leading-tight">{label}</p>
-        <p className="text-xs text-muted">{description}</p>
-      </div>
-    </button>
   );
 }
