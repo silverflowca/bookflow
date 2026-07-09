@@ -533,6 +533,25 @@ export default function ProfilePage() {
         {/* Sidebar — own profile only */}
         {isOwnProfile && (
           <div className="space-y-4">
+            {/* Reading Stats — top of sidebar */}
+            <div className="bg-surface border-2 border-theme rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-theme mb-3 flex items-center gap-2">
+                <BarChart2 className="h-4 w-4 text-accent" /> Reading Stats
+              </h3>
+              {data.stats && (
+                <ul className="space-y-1.5 text-xs text-muted">
+                  <li className="flex justify-between"><span>Books completed</span><span className="font-medium text-theme">{data.stats.total_read}</span></li>
+                  <li className="flex justify-between"><span>In progress</span><span className="font-medium text-theme">{data.stats.total_started}</span></li>
+                  {data.stats.avg_progress !== undefined && (
+                    <li className="flex justify-between"><span>Avg progress</span><span className="font-medium text-theme">{data.stats.avg_progress}%</span></li>
+                  )}
+                  <li className="flex justify-between"><span>Clubs joined</span><span className="font-medium text-theme">{data.stats.clubs_count}</span></li>
+                  <li className="flex justify-between"><span>Study groups</span><span className="font-medium text-theme">{data.stats.study_groups_count ?? 0}</span></li>
+                  <li className="flex justify-between"><span>Books authored</span><span className="font-medium text-theme">{data.stats.books_authored}</span></li>
+                </ul>
+              )}
+            </div>
+
             {/* Privacy Settings */}
             <div className="bg-surface border-2 border-theme rounded-xl p-5">
               <h3 className="text-sm font-semibold text-theme mb-4 flex items-center gap-2">
@@ -616,23 +635,6 @@ export default function ProfilePage() {
               <p className="text-[11px] text-muted mt-3">In-app notifications always appear regardless of these settings.</p>
             </div>
 
-            {/* Reading Stats */}
-            <div className="bg-surface border-2 border-theme rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-theme mb-2 flex items-center gap-2">
-                <BarChart2 className="h-4 w-4 text-accent" /> Reading Stats
-              </h3>
-              {data.stats && (
-                <ul className="space-y-1 text-xs text-muted">
-                  <li className="flex justify-between"><span>Books completed</span><span className="font-medium text-theme">{data.stats.total_read}</span></li>
-                  <li className="flex justify-between"><span>In progress</span><span className="font-medium text-theme">{data.stats.total_started}</span></li>
-                  {data.stats.avg_progress !== undefined && (
-                    <li className="flex justify-between"><span>Avg progress</span><span className="font-medium text-theme">{data.stats.avg_progress}%</span></li>
-                  )}
-                  <li className="flex justify-between"><span>Clubs joined</span><span className="font-medium text-theme">{data.stats.clubs_count}</span></li>
-                  <li className="flex justify-between"><span>Books authored</span><span className="font-medium text-theme">{data.stats.books_authored}</span></li>
-                </ul>
-              )}
-            </div>
           </div>
         )}
       </div>
