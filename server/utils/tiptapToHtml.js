@@ -3,6 +3,8 @@
  * Handles all standard TipTap StarterKit nodes + marks used in BookFlow.
  */
 
+import QRCode from 'qrcode';
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -175,7 +177,7 @@ function renderNode(node) {
       ).join('\n')}\n</div>\n`;
 
     case 'inlineFormWidget': {
-      // Emit a placeholder that will be replaced with the actual inline content HTML
+      // Emit a placeholder that will be replaced with the actual inline content HTML.
       const widgetId = node.attrs?.id || node.attrs?.contentId || '';
       if (widgetId) return `<!-- INLINE_WIDGET:${widgetId} -->\n`;
       return '';
@@ -212,6 +214,8 @@ const DEFAULT_PDF_OPTIONS = {
   includeVideo: true,
   includeNotes: true,
   includeLinks: true,
+  qrBook: true,
+  qrChapter: true,
 };
 
 function box(bgColor, borderColor, borderStyle, content) {
@@ -375,6 +379,32 @@ function buildInlineContentHtml(block, options = {}) {
 }
 
 /**
+ * Walk a TipTap document JSON and collect all inlineFormWidget nodes,
+ * keyed by their contentId. Returns a map of id → { content_type, content_data }.
+ * Used as a fallback when the DB inline_content record is not found.
+ */
+function extractWidgetFallbacks(doc) {
+  const map = {};
+  function walk(node) {
+    if (!node) return;
+    if (node.type === 'inlineFormWidget') {
+      const id = node.attrs?.contentId || node.attrs?.id;
+      const contentType = node.attrs?.contentType;
+      let contentData = node.attrs?.contentData;
+      if (typeof contentData === 'string') {
+        try { contentData = JSON.parse(contentData); } catch { contentData = null; }
+      }
+      if (id && contentType && contentData) {
+        map[id] = { content_type: contentType, content_data: contentData };
+      }
+    }
+    if (node.content) node.content.forEach(walk);
+  }
+  walk(doc);
+  return map;
+}
+
+/**
  * Build a complete styled HTML document for a book, including inline content blocks.
  *
  * @param {object} book              Book record with author_name, title, etc.
@@ -383,14 +413,41 @@ function buildInlineContentHtml(block, options = {}) {
  * @param {object} options           PDF export options (see DEFAULT_PDF_OPTIONS)
  * @returns {string}                 Complete HTML document string
  */
-export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, options = {}) {
+/**
+ * Build a QR code as an inline SVG (no external requests — works inside sandboxed iframes).
+ * @param {string} url   - The URL to encode
+ * @param {string} label - Caption shown below the QR code
+ * @param {number} size  - Display size in px (default 120)
+ * @returns {Promise<string>} HTML string with inline SVG
+ */
+async function qrCodeHtml(url, label, size = 120) {
+  try {
+    const svg = await QRCode.toString(url, {
+      type: 'svg',
+      width: size,
+      margin: 2,
+      color: { dark: '#111827', light: '#ffffff' },
+    });
+    return `<div style="display:inline-block;text-align:center;margin:0.5rem">
+      <div style="width:${size}px;height:${size}px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;display:inline-block">${svg}</div>
+      <p style="margin:0.3rem 0 0;font-size:0.65rem;color:#6b7280;max-width:${size + 20}px">${escapeHtml(label)}</p>
+    </div>`;
+  } catch {
+    return '';
+  }
+}
+
+export async function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, options = {}) {
   const opts = { ...DEFAULT_PDF_OPTIONS, ...options };
 
+  const baseUrl = opts.clientUrl || 'https://books.silverflow.ca';
+  const bookId  = opts.bookId  || book.id || '';
+
   const coverImg = book.cover_image_url
-    ? `<div class="cover"><img src="${escapeHtml(book.cover_image_url)}" alt="Cover"></div>`
+    ? `<img class="cover-img" src="${escapeHtml(book.cover_image_url)}" alt="Cover">`
     : '';
 
-  const chaptersHtml = chapters.map(ch => {
+  const chaptersHtml = (await Promise.all(chapters.map(async ch => {
     let chapterHtml = tiptapToHtml(ch.content);
 
     // Replace inline widget placeholders with actual styled blocks
@@ -400,10 +457,17 @@ export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, op
       inlineMap[block.id] = block;
     }
 
+    // Build a fallback map from the TipTap JSON in case the DB record isn't found
+    // (e.g. visibility filter excluded it, or it was inserted without saving to DB)
+    const widgetFallbacks = extractWidgetFallbacks(ch.content);
+
     chapterHtml = chapterHtml.replace(/<!-- INLINE_WIDGET:([a-f0-9-]+) -->/g, (_, id) => {
       const block = inlineMap[id];
-      if (!block) return '';
-      return buildInlineContentHtml(block, opts);
+      if (block) return buildInlineContentHtml(block, opts);
+      // Fallback: render directly from TipTap node attrs
+      const fallback = widgetFallbacks[id];
+      if (fallback) return buildInlineContentHtml(fallback, opts);
+      return '';
     });
 
     // Also render any inline content that appears at start/end of chapter
@@ -417,14 +481,30 @@ export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, op
       .map(b => buildInlineContentHtml(b, opts))
       .join('');
 
+    // Chapter QR code (inline SVG — no external requests)
+    let chapterQrHtml = '';
+    if (opts.qrChapter && bookId && ch.id) {
+      const chapterUrl = `${baseUrl}/book/${bookId}/chapter/${ch.id}`;
+      chapterQrHtml = `<div style="float:right;margin:0 0 0.75rem 1.25rem;page-break-inside:avoid;break-inside:avoid">
+        ${await qrCodeHtml(chapterUrl, 'Read chapter online', 100)}
+      </div>`;
+    }
+
     return `
       <section class="chapter">
         <h1 class="chapter-title">${escapeHtml(ch.title || 'Untitled Chapter')}</h1>
+        ${chapterQrHtml}
         ${startBlocks}
         ${chapterHtml}
         ${endBlocks}
+        <div style="clear:both"></div>
       </section>`;
-  }).join('\n');
+  }))).join('\n');
+
+  // Generate book-level QR code (inline SVG) before building the HTML string
+  const bookQrHtml = (opts.qrBook && bookId)
+    ? `<div style="margin-top:1.5rem;page-break-inside:avoid;break-inside:avoid">${await qrCodeHtml(`${baseUrl}/book/${bookId}`, 'Scan to read online', 130)}</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -446,8 +526,15 @@ export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, op
   }
 
   /* ── Title page ── */
-  .cover img { width: 100%; max-height: 480px; object-fit: contain; margin-bottom: 2rem; border-radius: 8px; }
-  .title-page { text-align: center; padding: 3rem 0 4rem; }
+  .title-page {
+    text-align: center;
+    padding: 3rem 0 4rem;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-after: always;
+    break-after: page;
+  }
+  .title-page .cover-img { width: 100%; max-height: 420px; object-fit: contain; margin-bottom: 2rem; border-radius: 8px; }
   .title-page h1 { font-size: 2.5rem; font-weight: 700; margin: 0 0 0.75rem; color: #111827; }
   .title-page .subtitle { font-size: 1.25rem; color: #6b7280; margin: 0 0 1.5rem; font-style: italic; }
   .title-page .author { font-size: 1.1rem; color: #374151; margin: 0 0 1rem; }
@@ -574,12 +661,13 @@ export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, op
 </style>
 </head>
 <body>
-  ${coverImg}
   <div class="title-page">
+    ${coverImg}
     <h1>${escapeHtml(book.title || 'Untitled')}</h1>
     ${book.subtitle ? `<p class="subtitle">${escapeHtml(book.subtitle)}</p>` : ''}
     ${book.author_name ? `<p class="author">By ${escapeHtml(book.author_name)}</p>` : ''}
     ${book.description ? `<p class="description">${escapeHtml(book.description)}</p>` : ''}
+    ${bookQrHtml}
   </div>
   ${chaptersHtml}
 </body>
@@ -589,6 +677,6 @@ export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, op
 /**
  * Wrap chapter HTML into a full styled HTML document (legacy — kept for EPUB/submission package).
  */
-export function buildBookHtml(book, chapters) {
+export async function buildBookHtml(book, chapters) {
   return buildBookHtmlWithInline(book, chapters, {}, DEFAULT_PDF_OPTIONS);
 }

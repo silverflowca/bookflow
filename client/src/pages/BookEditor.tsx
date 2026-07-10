@@ -496,9 +496,14 @@ const PDF_EXPORT_OPTIONS: { key: string; label: string }[] = [
   { key: 'includeLinks',     label: 'Link Cards' },
 ];
 
+const PDF_QR_OPTIONS: { key: string; label: string; desc: string }[] = [
+  { key: 'qrBook',    label: 'Book QR Code on cover page', desc: 'Scan to open this book online' },
+  { key: 'qrChapter', label: 'Chapter QR Code on each chapter', desc: 'Scan to jump to that chapter online' },
+];
+
 function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: (opts: Record<string, boolean>) => void }) {
   const [options, setOptions] = useState<Record<string, boolean>>(
-    Object.fromEntries(PDF_EXPORT_OPTIONS.map(o => [o.key, true]))
+    Object.fromEntries([...PDF_EXPORT_OPTIONS, ...PDF_QR_OPTIONS].map(o => [o.key, true]))
   );
 
   function toggle(key: string) {
@@ -506,10 +511,10 @@ function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: 
   }
 
   function selectAll(val: boolean) {
-    setOptions(Object.fromEntries(PDF_EXPORT_OPTIONS.map(o => [o.key, val])));
+    setOptions(Object.fromEntries([...PDF_EXPORT_OPTIONS, ...PDF_QR_OPTIONS].map(o => [o.key, val])));
   }
 
-  const allChecked = PDF_EXPORT_OPTIONS.every(o => options[o.key]);
+  const allChecked = [...PDF_EXPORT_OPTIONS, ...PDF_QR_OPTIONS].every(o => options[o.key]);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -541,6 +546,27 @@ function PdfExportModal({ onClose, onExport }: { onClose: () => void; onExport: 
                 <span className="text-sm text-theme group-hover:text-accent transition-colors">{opt.label}</span>
               </label>
             ))}
+          </div>
+
+          {/* QR Code section */}
+          <div className="mt-5 pt-4 border-t border-theme">
+            <span className="text-xs font-semibold text-muted uppercase tracking-wide">QR Codes (links to live book)</span>
+            <div className="space-y-2.5 mt-2.5">
+              {PDF_QR_OPTIONS.map(opt => (
+                <label key={opt.key} className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={!!options[opt.key]}
+                    onChange={() => toggle(opt.key)}
+                    className="h-4 w-4 rounded border-theme accent-accent flex-shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <span className="text-sm text-theme group-hover:text-accent transition-colors block">{opt.label}</span>
+                    <span className="text-xs text-muted">{opt.desc}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 

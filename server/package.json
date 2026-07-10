@@ -23,6 +23,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "pg": "^8.22.0",
-    "puppeteer": "^24.40.0"
+    "puppeteer": "^24.40.0",
+    "qrcode": "^1.5.4"
   }
 }

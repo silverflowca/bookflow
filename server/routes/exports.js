@@ -180,7 +180,8 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
       }
     }
 
-    const html = buildBookHtmlWithInline(book, book.chapters, inlineByChapter, options);
+    const clientUrl = process.env.CLIENT_URL?.split(',')[0]?.trim() || 'https://books.silverflow.ca';
+    const html = await buildBookHtmlWithInline(book, book.chapters, inlineByChapter, { ...options, clientUrl, bookId });
     res.json({ html, title: book.title || 'book' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -338,7 +339,7 @@ router.post('/:bookId/export/submission-package', authenticate, requireRole(['ow
     } catch { /* epub-gen not installed, skip */ }
 
     try {
-      const pkgPdf = await generatePdf(buildBookHtml(book, book.chapters));
+      const pkgPdf = await generatePdf(await buildBookHtml(book, book.chapters));
       fs.writeFileSync(path.join(tmpDir, `${safeName}.pdf`), pkgPdf);
     } catch { /* pdf unavailable, skip PDF in package */ }
 
