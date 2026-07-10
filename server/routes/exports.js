@@ -156,16 +156,13 @@ async function generatePdf(html) {
 }
 
 // POST /api/books/:bookId/export/pdf
+// Returns { html, title } — client renders it in a print window and calls window.print()
 router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']), async (req, res) => {
-  const t0 = Date.now();
   const bookId = req.params.bookId;
-  console.log(`[pdf/export] START bookId=${bookId} user=${req.user?.id} pdfService=${process.env.PDF_SERVICE_URL || 'none (puppeteer fallback)'}`);
   try {
     const book = await fetchBookFull(bookId);
     const options = req.body.options || {};
-    console.log(`[pdf/export] book="${book.title}" chapters=${book.chapters.length}`);
 
-    // Fetch all inline content for all chapters
     const chapterIds = book.chapters.map(ch => ch.id);
     let inlineByChapter = {};
     if (chapterIds.length > 0) {
@@ -184,25 +181,8 @@ router.post('/:bookId/export/pdf', authenticate, requireRole(['owner', 'author']
     }
 
     const html = buildBookHtmlWithInline(book, book.chapters, inlineByChapter, options);
-    console.log(`[pdf/export] html built (${html.length} chars) — generating PDF`);
-    const pdfBuffer = await generatePdf(html);
-    console.log(`[pdf/export] PDF generated — ${pdfBuffer.length} bytes`);
-
-    const fileName = `${(book.title || 'book').replace(/[^a-z0-9]/gi, '_')}.pdf`;
-    console.log(`[pdf/export] uploading to FileFlow as "${fileName}"`);
-    const result = await uploadToBackups(req.params.bookId, book.title, pdfBuffer, fileName, 'application/pdf', req.user.id, extractJwt(req));
-
-    if (result) {
-      console.log(`[pdf/export] DONE (fileflow) elapsed=${Date.now() - t0}ms url=${result.download_url}`);
-      return res.json(result);
-    }
-
-    console.log(`[pdf/export] DONE (direct) elapsed=${Date.now() - t0}ms`);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(pdfBuffer);
+    res.json({ html, title: book.title || 'book' });
   } catch (err) {
-    console.error(`[pdf/export] ERROR elapsed=${Date.now() - t0}ms:`, err.message);
     res.status(500).json({ error: err.message });
   }
 });

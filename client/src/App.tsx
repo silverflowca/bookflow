@@ -37,6 +37,7 @@ import DocsPage from './pages/DocsPage';
 import MyFeedbackPage from './pages/MyFeedbackPage';
 import BookChatPage from './pages/BookChatPage';
 import BookSignaturesPage from './pages/BookSignaturesPage';
+import BookPrintPage from './pages/BookPrintPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -137,6 +138,12 @@ function AppRoutes() {
         <Route path="edit/book/:bookId/dashboard" element={
           <ProtectedRoute>
             <BookDashboardPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="edit/book/:bookId/print" element={
+          <ProtectedRoute>
+            <BookPrintPage />
           </ProtectedRoute>
         } />
 

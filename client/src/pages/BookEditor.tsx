@@ -1038,18 +1038,10 @@ export default function BookEditor() {
     }
   }
 
-  async function handlePdfExport(options: Record<string, boolean>) {
+  function handlePdfExport(options: Record<string, boolean>) {
     if (!bookId) return;
     setShowPdfExportModal(false);
-    setExporting('pdf');
-    try {
-      const result = await api.exportPdf(bookId, options);
-      if (result?.download_url) window.open(result.download_url, '_blank');
-    } catch (err) {
-      alert(`PDF export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setExporting(null);
-    }
+    navigate(`/edit/book/${bookId}/print`, { state: { options } });
   }
 
   if (loading) {
