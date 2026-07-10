@@ -214,11 +214,11 @@ const DEFAULT_PDF_OPTIONS = {
 };
 
 function box(bgColor, borderColor, borderStyle, content) {
-  return `<div style="margin:0.75rem 0;padding:0.75rem 1rem;background:${bgColor};border:1.5px ${borderStyle} ${borderColor};border-radius:8px;font-size:0.9375rem">${content}</div>\n`;
+  return `<div style="margin:0.75rem 0;padding:0.75rem 1rem;background:${bgColor};border:1.5px ${borderStyle} ${borderColor};border-radius:8px;font-size:0.9375rem;page-break-inside:avoid;break-inside:avoid">${content}</div>\n`;
 }
 
 function badge(emoji, label, bgColor, borderColor) {
-  return `<div style="margin:0.75rem 0;display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:${bgColor};border:1.5px solid ${borderColor};border-radius:6px;font-size:0.875rem">${emoji} <strong>${escapeHtml(label)}</strong></div>\n`;
+  return `<div style="margin:0.75rem 0;display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.75rem;background:${bgColor};border:1.5px solid ${borderColor};border-radius:6px;font-size:0.875rem;page-break-inside:avoid;break-inside:avoid">${emoji} <strong>${escapeHtml(label)}</strong></div>\n`;
 }
 
 function buildInlineContentHtml(block, options = {}) {
@@ -286,7 +286,7 @@ function buildInlineContentHtml(block, options = {}) {
       if (!opts.includeImages) return '';
       if (!data.url) return '';
       const caption = data.caption ? `<p style="margin:0.35rem 0 0;font-size:0.875rem;color:#6b7280;text-align:center;font-style:italic">${escapeHtml(data.caption)}</p>` : '';
-      return `<div style="margin:1rem 0;text-align:center">\n<img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.caption || '')}" style="max-width:100%;border-radius:6px">\n${caption}</div>\n`;
+      return `<div style="margin:1rem 0;text-align:center;page-break-inside:avoid;break-inside:avoid">\n<img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.caption || '')}" style="max-width:100%;border-radius:6px">\n${caption}</div>\n`;
     }
 
     case 'audio': {
@@ -505,8 +505,49 @@ export function buildBookHtmlWithInline(book, chapters, inlineByChapter = {}, op
   mark { padding: 0.05em 0.2em; border-radius: 2px; }
 
   @media print {
-    .chapter { page-break-before: always; }
-    body { padding: 0; }
+    body { padding: 0; margin: 0; }
+
+    /* Each chapter always starts on a new page */
+    .chapter { page-break-before: always; break-before: page; }
+
+    /* Never break inside these elements */
+    blockquote,
+    pre,
+    table,
+    figure,
+    img,
+    .inline-poll,
+    .inline-question,
+    .inline-image,
+    .inline-link-card,
+    .inline-widget {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* Keep headings with the paragraph that follows them */
+    h1, h2, h3, h4, h5, h6 {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    /* Keep list items together; avoid orphaned single list items */
+    ul, ol {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* Avoid a page break immediately after the chapter title */
+    .chapter-title {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    /* Orphan/widow control — require at least 3 lines at top/bottom of page */
+    p {
+      orphans: 3;
+      widows: 3;
+    }
   }
 </style>
 </head>
