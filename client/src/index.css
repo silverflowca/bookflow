@@ -240,19 +240,9 @@ body {
   padding: 0.5rem 0.75rem;
   vertical-align: top;
   position: relative;
-  overflow: hidden;
   word-break: break-word;
 }
-/* Resize handle hit areas — shown on hover via CSS cursor,
-   actual drag is handled by TableResizePlugin */
-.ProseMirror td:hover,
-.ProseMirror th:hover {
-  outline: none;
-}
-.ProseMirror-focused td,
-.ProseMirror-focused th {
-  cursor: text;
-}
+/* Resize handle hit areas — cursor set dynamically by TableResizePlugin */
 .ProseMirror th {
   background: var(--color-surface-hover);
   font-weight: 700;

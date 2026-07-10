@@ -250,42 +250,45 @@ export function createTableResizePlugin(): Plugin {
     clearCursor();
   }
 
-  // Stored so we can remove them on destroy
-  let docMouseMove: ((e: MouseEvent) => void) | null = null;
+  // Permanent hover listener (attached once the view is available)
+  let hoverListener: ((e: MouseEvent) => void) | null = null;
+  // Drag listeners (attached only during an active drag)
   let docMouseUp: ((e: MouseEvent) => void) | null = null;
 
-  function attachDocListeners(view: EditorView) {
-    docMouseMove = (e: MouseEvent) => onMouseMove(view, e);
-    docMouseUp   = (e: MouseEvent) => { onMouseUp(view, e); detachDocListeners(); };
-    document.addEventListener('mousemove', docMouseMove);
-    document.addEventListener('mouseup',   docMouseUp);
-  }
-
-  function detachDocListeners() {
-    if (docMouseMove) document.removeEventListener('mousemove', docMouseMove);
-    if (docMouseUp)   document.removeEventListener('mouseup',   docMouseUp);
-    docMouseMove = null;
-    docMouseUp   = null;
+  function attachDragListeners(view: EditorView) {
+    const upHandler = (e: MouseEvent) => {
+      onMouseUp(view, e);
+      document.removeEventListener('mouseup', upHandler);
+      docMouseUp = null;
+    };
+    docMouseUp = upHandler;
+    document.addEventListener('mouseup', docMouseUp);
   }
 
   return new Plugin({
     key: tableResizePluginKey,
+    view(editorView) {
+      // Attach a permanent document-level mousemove so hover cursors work
+      // even when the editor is focused (ProseMirror doesn't block document events).
+      hoverListener = (e: MouseEvent) => onMouseMove(editorView, e);
+      document.addEventListener('mousemove', hoverListener);
+      return {
+        destroy() {
+          if (hoverListener) document.removeEventListener('mousemove', hoverListener);
+          if (docMouseUp)   document.removeEventListener('mouseup',   docMouseUp);
+          hoverListener = null;
+          docMouseUp    = null;
+        },
+      };
+    },
     props: {
       handleDOMEvents: {
-        mousemove(view, event) {
-          // Only handle hover cursor when not dragging (drag is handled at document level)
-          if (!drag) onMouseMove(view, event as MouseEvent);
-          return false;
-        },
         mousedown(view, event) {
           const started = onMouseDown(view, event as MouseEvent);
-          if (started) attachDocListeners(view);
+          if (started) attachDragListeners(view);
           return started;
         },
       },
-    },
-    destroy() {
-      detachDocListeners();
     },
   });
 }
