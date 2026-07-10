@@ -626,6 +626,7 @@ body {
   border-collapse: collapse;
   width: 100%;
   min-width: 32rem;
+  table-layout: fixed;
 }
 .reader-content th,
 .reader-content td {

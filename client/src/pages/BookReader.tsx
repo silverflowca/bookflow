@@ -2386,7 +2386,7 @@ function TipTapNode({
     case 'table':
       return (
         <div className="my-5 overflow-x-auto">
-          <table className="min-w-full border-collapse text-left text-sm">
+          <table className="min-w-full border-collapse text-left text-sm" style={{ tableLayout: 'fixed' }}>
             <tbody>{renderChildren(node.content || [], nodeKeyPrefix || 'table')}</tbody>
           </table>
         </div>
@@ -2395,11 +2395,19 @@ function TipTapNode({
     case 'tableRow':
       return <tr>{renderChildren(node.content || [], nodeKeyPrefix || 'tr')}</tr>;
 
-    case 'tableHeader':
-      return <th className="border border-theme bg-surface-hover px-3 py-2 font-semibold align-top">{renderChildren(node.content || [], nodeKeyPrefix || 'th')}</th>;
+    case 'tableHeader': {
+      const thStyle: React.CSSProperties = {};
+      if (node.attrs?.width) thStyle.width = node.attrs.width;
+      if (node.attrs?.height) thStyle.height = node.attrs.height;
+      return <th className="border border-theme bg-surface-hover px-3 py-2 font-semibold align-top" style={thStyle}>{renderChildren(node.content || [], nodeKeyPrefix || 'th')}</th>;
+    }
 
-    case 'tableCell':
-      return <td className="border border-theme px-3 py-2 align-top">{renderChildren(node.content || [], nodeKeyPrefix || 'td')}</td>;
+    case 'tableCell': {
+      const tdStyle: React.CSSProperties = {};
+      if (node.attrs?.width) tdStyle.width = node.attrs.width;
+      if (node.attrs?.height) tdStyle.height = node.attrs.height;
+      return <td className="border border-theme px-3 py-2 align-top" style={tdStyle}>{renderChildren(node.content || [], nodeKeyPrefix || 'td')}</td>;
+    }
 
     case 'horizontalRule':
       return <hr className="my-6 border-theme" />;

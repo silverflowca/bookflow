@@ -422,16 +422,18 @@ function jsonContentToHtml(content: unknown): string {
     return `<blockquote>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</blockquote>`;
   }
   if (node.type === 'table') {
-    return `<div class="table-scroll"><table><tbody>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tbody></table></div>`;
+    return `<div class="table-scroll"><table style="table-layout:fixed"><tbody>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tbody></table></div>`;
   }
   if (node.type === 'tableRow') {
     return `<tr>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tr>`;
   }
   if (node.type === 'tableHeader') {
-    return `<th>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</th>`;
+    const thStyle = [node.attrs?.width ? `width:${node.attrs.width}` : '', node.attrs?.height ? `height:${node.attrs.height}` : ''].filter(Boolean).join(';');
+    return `<th${thStyle ? ` style="${thStyle}"` : ''}>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</th>`;
   }
   if (node.type === 'tableCell') {
-    return `<td>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</td>`;
+    const tdStyle = [node.attrs?.width ? `width:${node.attrs.width}` : '', node.attrs?.height ? `height:${node.attrs.height}` : ''].filter(Boolean).join(';');
+    return `<td${tdStyle ? ` style="${tdStyle}"` : ''}>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</td>`;
   }
   if (node.type === 'hardBreak') return '<br>';
   if (node.content) {
