@@ -65,6 +65,19 @@ function styleAttr(styles) {
   return css ? ` style="${escapeHtml(css)}"` : '';
 }
 
+/** Build HTML attribute string for table cells (colspan, rowspan, width, height). */
+function buildCellAttrs(attrs) {
+  if (!attrs) return '';
+  let result = '';
+  if (attrs.colspan && attrs.colspan !== 1) result += ` colspan="${Number(attrs.colspan)}"`;
+  if (attrs.rowspan && attrs.rowspan !== 1) result += ` rowspan="${Number(attrs.rowspan)}"`;
+  const styles = [];
+  if (attrs.width) styles.push(`width:${escapeHtml(String(attrs.width))}`);
+  if (attrs.height) styles.push(`height:${escapeHtml(String(attrs.height))}`);
+  if (styles.length) result += ` style="${styles.join(';')}"`;
+  return result;
+}
+
 function renderMarks(text, marks = []) {
   let result = escapeHtml(text);
   for (const mark of marks) {
@@ -158,11 +171,15 @@ function renderNode(node) {
     case 'tableRow':
       return `<tr>${(node.content || []).map(renderNode).join('')}</tr>\n`;
 
-    case 'tableHeader':
-      return `<th>${(node.content || []).map(renderNode).join('')}</th>\n`;
+    case 'tableHeader': {
+      const thAttrs = buildCellAttrs(node.attrs);
+      return `<th${thAttrs}>${(node.content || []).map(renderNode).join('')}</th>\n`;
+    }
 
-    case 'tableCell':
-      return `<td>${(node.content || []).map(renderNode).join('')}</td>\n`;
+    case 'tableCell': {
+      const tdAttrs = buildCellAttrs(node.attrs);
+      return `<td${tdAttrs}>${(node.content || []).map(renderNode).join('')}</td>\n`;
+    }
 
     case 'horizontalRule':
       return '<hr>\n';
@@ -602,7 +619,7 @@ export async function buildBookHtmlWithInline(book, chapters, inlineByChapter = 
 
   /* ── Tables ── */
   .table-scroll { overflow-x: auto; margin: 1rem 0; }
-  table { border-collapse: collapse; width: 100%; min-width: 400px; }
+  table { border-collapse: collapse; width: 100%; min-width: 400px; table-layout: fixed; }
   th, td { border: 1px solid #d1d5db; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
   th { background: #f3f4f6; font-weight: 700; color: #111827; }
   th > p, td > p { margin: 0; }

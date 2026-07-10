@@ -231,14 +231,27 @@ body {
   border-collapse: collapse;
   margin: 1rem 0;
   width: 100%;
-  table-layout: auto;
+  table-layout: fixed;
 }
 .ProseMirror th,
 .ProseMirror td {
   border: 1px solid var(--color-border);
-  min-width: 6rem;
+  min-width: 40px;
   padding: 0.5rem 0.75rem;
   vertical-align: top;
+  position: relative;
+  overflow: hidden;
+  word-break: break-word;
+}
+/* Resize handle hit areas — shown on hover via CSS cursor,
+   actual drag is handled by TableResizePlugin */
+.ProseMirror td:hover,
+.ProseMirror th:hover {
+  outline: none;
+}
+.ProseMirror-focused td,
+.ProseMirror-focused th {
+  cursor: text;
 }
 .ProseMirror th {
   background: var(--color-surface-hover);

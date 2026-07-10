@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
+import { createTableResizePlugin } from './TableResizePlugin';
 
 export const Table = Node.create({
   name: 'table',
@@ -15,6 +16,10 @@ export const Table = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     return ['table', mergeAttributes(HTMLAttributes), ['tbody', 0]];
+  },
+
+  addProseMirrorPlugins() {
+    return [createTableResizePlugin()];
   },
 });
 
@@ -46,6 +51,20 @@ const cellAttributes = {
     renderHTML: (attributes: Record<string, unknown>) => (
       attributes.rowspan && attributes.rowspan !== 1 ? { rowspan: attributes.rowspan } : {}
     ),
+  },
+  width: {
+    default: null,
+    parseHTML: (element: HTMLElement) =>
+      element.style.width || element.getAttribute('width') || null,
+    renderHTML: (attributes: Record<string, unknown>) =>
+      attributes.width ? { style: `width:${attributes.width}` } : {},
+  },
+  height: {
+    default: null,
+    parseHTML: (element: HTMLElement) =>
+      element.style.height || element.getAttribute('height') || null,
+    renderHTML: (attributes: Record<string, unknown>) =>
+      attributes.height ? { style: `height:${attributes.height}` } : {},
   },
 };
 
