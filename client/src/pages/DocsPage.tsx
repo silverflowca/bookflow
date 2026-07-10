@@ -125,8 +125,84 @@ const SECTIONS: Section[] = [
       },
       {
         q: 'Can I export my book?',
-        a: 'Yes. From the Book Editor toolbar, use the Download icon to export as PDF, EPUB, DOCX, or a BookFlow JSON archive. JSON exports can be re-imported to create a new copy.',
+        a: (
+          <div className="space-y-2 text-sm">
+            <p>Yes. From the Book Editor toolbar, click the <strong>Download icon</strong> to choose your format:</p>
+            <ul className="space-y-1 ml-2">
+              <li>• <strong>PDF</strong> — opens a full-page print preview, then click "Print / Save as PDF"</li>
+              <li>• <strong>EPUB</strong> — downloads a standard e-book file compatible with most e-readers</li>
+              <li>• <strong>DOCX</strong> — downloads a Microsoft Word document</li>
+              <li>• <strong>BookFlow JSON</strong> — a complete archive that can be re-imported to create a new copy</li>
+            </ul>
+          </div>
+        ),
         tags: ['export', 'pdf', 'epub', 'docx', 'download'],
+      },
+      {
+        q: 'How does the PDF export work?',
+        a: (
+          <div className="space-y-2 text-sm">
+            <p>PDF export uses your browser's built-in print engine — no external tools required. Here's the flow:</p>
+            <ol className="space-y-1 ml-2 list-decimal list-inside">
+              <li>Click <strong>Download → PDF</strong> in the Book Editor toolbar</li>
+              <li>Choose which inline content to include (polls, questions, images, etc.) and click <strong>Download PDF</strong></li>
+              <li>A full-page <strong>print preview</strong> opens in the same tab, showing the formatted book</li>
+              <li>Click <strong>Print / Save as PDF</strong> in the top toolbar — your browser's print dialog opens</li>
+              <li>Choose <strong>Save as PDF</strong> (or your printer) and confirm</li>
+            </ol>
+            <p className="text-gray-500 mt-1">Tip: In Chrome/Edge, set "Destination" to "Save as PDF" and margins to "None" for the cleanest output. The preview handles page breaks automatically — chapters always start on a new page, and widgets are never split mid-element.</p>
+          </div>
+        ),
+        tags: ['pdf', 'print', 'export', 'download', 'save as pdf'],
+      },
+      {
+        q: 'What are the BookFlow URL patterns?',
+        a: (
+          <div className="space-y-3 text-sm">
+            <p>Every page in BookFlow has a predictable URL. Here are the key ones:</p>
+            <div>
+              <p className="font-semibold mb-1">Reading</p>
+              <ul className="space-y-0.5 ml-2 font-mono text-xs">
+                <li><span className="text-purple-700">/book/:bookId</span> — read a book by ID</li>
+                <li><span className="text-purple-700">/read/:slug</span> — read a published book by its slug</li>
+                <li><span className="text-purple-700">/read/share/:token</span> — access a private book via share token</li>
+                <li><span className="text-purple-700">/bl/:slug</span> — book landing page (cover + chapter list)</li>
+                <li><span className="text-purple-700">/book-landing/:slug</span> — same as above (long form)</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Editing</p>
+              <ul className="space-y-0.5 ml-2 font-mono text-xs">
+                <li><span className="text-purple-700">/edit/book/:bookId</span> — Book Editor (chapters list)</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/chapter/:chapterId</span> — Chapter Editor</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/settings</span> — Book Settings</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/collaborators</span> — Collaborators</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/versions</span> — Version History</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/activity</span> — Activity Log</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/dashboard</span> — Book Dashboard (responses)</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/signatures</span> — Signatures</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/print</span> — PDF print preview</li>
+                <li><span className="text-purple-700">/edit/book/:bookId/submit</span> — Publisher submission</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Account & Community</p>
+              <ul className="space-y-0.5 ml-2 font-mono text-xs">
+                <li><span className="text-purple-700">/dashboard</span> — your books dashboard</li>
+                <li><span className="text-purple-700">/inbox</span> — notifications inbox</li>
+                <li><span className="text-purple-700">/profile</span> — your profile</li>
+                <li><span className="text-purple-700">/profile/:userId</span> — another user's profile</li>
+                <li><span className="text-purple-700">/settings</span> — account settings</li>
+                <li><span className="text-purple-700">/clubs</span> — reading clubs</li>
+                <li><span className="text-purple-700">/clubs/:clubId</span> — a specific club</li>
+                <li><span className="text-purple-700">/book/:bookId/chat</span> — book chat</li>
+                <li><span className="text-purple-700">/live</span> — live episodes</li>
+                <li><span className="text-purple-700">/docs</span> or <span className="text-purple-700">/help</span> — this help page</li>
+              </ul>
+            </div>
+          </div>
+        ),
+        tags: ['url', 'link', 'navigate', 'route', 'slug', 'direct link', 'address'],
       },
       {
         q: 'How do I save a version snapshot?',
@@ -809,17 +885,20 @@ const SECTIONS: Section[] = [
 const NAVIGATION_RESULTS: NavigationResult[] = [
   { id: 'books', title: 'Books', description: 'Open your dashboard and manage your books.', to: '/dashboard', icon: <BookOpen className="h-4 w-4" />, tags: ['books', 'dashboard', 'my books', 'read books'] },
   { id: 'book-chat', title: 'Book Chat', description: 'Open the real-time chat for a book.', to: '/dashboard', icon: <MessageSquare className="h-4 w-4" />, tags: ['book chat', 'chat', 'readers', 'realtime', 'messages'] },
+  { id: 'inbox', title: 'Inbox', description: 'View your notifications and alerts.', to: '/inbox', icon: <Bell className="h-4 w-4" />, tags: ['inbox', 'notifications', 'alerts', 'bell'] },
+  { id: 'profile', title: 'Profile', description: 'View and edit your public profile.', to: '/profile', icon: <UserPlus className="h-4 w-4" />, tags: ['profile', 'avatar', 'bio', 'public profile'] },
   { id: 'clubs', title: 'Clubs', description: 'Browse or manage your book clubs.', to: '/clubs', icon: <Users className="h-4 w-4" />, tags: ['clubs', 'book clubs', 'groups'] },
   { id: 'study-groups', title: 'Study Groups', description: 'Jump to the study groups view inside clubs.', to: '/clubs?tab=bookstudy', icon: <Users className="h-4 w-4" />, tags: ['study groups', 'study', 'book study'] },
   { id: 'live', title: 'Live', description: 'Open the live broadcasting and scheduling area.', to: '/live', icon: <Radio className="h-4 w-4" />, tags: ['live', 'streaming', 'broadcast'] },
   { id: 'tutorial', title: 'Tutorial', description: 'Learn how BookFlow works with guided walkthroughs.', to: '/docs', icon: <Lightbulb className="h-4 w-4" />, tags: ['tutorial', 'guide', 'walkthrough'] },
-  { id: 'my-settings', title: 'Settings', description: 'Manage your profile, preferences, and account settings.', to: '/settings', icon: <Settings className="h-4 w-4" />, tags: ['settings', 'profile', 'preferences', 'account'] },
+  { id: 'my-settings', title: 'Settings', description: 'Manage your profile, preferences, and account settings.', to: '/settings', icon: <Settings className="h-4 w-4" />, tags: ['settings', 'profile', 'preferences', 'account', 'notifications', 'theme'] },
+  { id: 'notification-prefs', title: 'Notification Preferences', description: 'Turn individual notification types on or off.', to: '/profile', icon: <Bell className="h-4 w-4" />, tags: ['notifications', 'email', 'preferences', 'opt out', 'turn off'] },
   { id: 'help', title: 'Help', description: 'Search BookFlow documentation and support articles.', to: '/docs', icon: <HelpCircle className="h-4 w-4" />, tags: ['help', 'docs', 'documentation', 'faq'] },
   { id: 'admin-users', title: 'Admin · Users', description: 'Manage users and super admin access.', to: '/admin?tab=users', icon: <Shield className="h-4 w-4" />, tags: ['admin', 'users', 'system administration', 'management'], adminOnly: true },
   { id: 'admin-books', title: 'Admin · Books', description: 'Review, archive, and manage books system-wide.', to: '/admin?tab=books', icon: <BookOpen className="h-4 w-4" />, tags: ['admin', 'books', 'archive'], adminOnly: true },
   { id: 'admin-clubs', title: 'Admin · Clubs', description: 'Inspect and manage clubs across the platform.', to: '/admin?tab=clubs', icon: <Users className="h-4 w-4" />, tags: ['admin', 'clubs', 'book clubs'], adminOnly: true },
   { id: 'admin-carousel', title: 'Admin · Carousel', description: 'Adjust the home-page carousel settings.', to: '/admin?tab=carousel', icon: <Radio className="h-4 w-4" />, tags: ['admin', 'carousel', 'home page'], adminOnly: true },
-  { id: 'admin-settings', title: 'Admin · Settings', description: 'Open the admin settings area.', to: '/admin?tab=settings', icon: <Settings className="h-4 w-4" />, tags: ['admin', 'settings', 'system settings'], adminOnly: true },
+  { id: 'admin-settings', title: 'Admin · Settings', description: 'Open the admin settings area.', to: '/admin?tab=settings', icon: <Settings className="h-4 w-4" />, tags: ['admin', 'settings', 'system settings', 'email notifications'], adminOnly: true },
   { id: 'admin-feedback', title: 'Admin · Feedback', description: 'Review feedback, bug reports, and feature requests.', to: '/admin?tab=feedback', icon: <Shield className="h-4 w-4" />, tags: ['admin', 'feedback', 'bugs', 'feature requests'], adminOnly: true },
 ];
 
