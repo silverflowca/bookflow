@@ -72,7 +72,7 @@ export default function BookPrintPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-theme flex-shrink-0 shadow-sm">
+      <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-theme flex-shrink-0 shadow-sm sticky top-0 z-50">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-sm text-muted hover:text-theme transition-colors"

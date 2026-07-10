@@ -490,7 +490,8 @@ const PDF_EXPORT_OPTIONS: { key: string; label: string }[] = [
   { key: 'includeScripture', label: 'Scripture Blocks' },
   { key: 'includeForms',     label: 'Form Fields (select, textbox, radio…)' },
   { key: 'includeSignatures', label: 'Signature Blocks' },
-  { key: 'includeAudio',     label: 'Audio & Video Blocks' },
+  { key: 'includeAudio',     label: 'Audio Blocks' },
+  { key: 'includeVideo',     label: 'Video Blocks' },
   { key: 'includeNotes',     label: 'Notes & Annotations' },
   { key: 'includeLinks',     label: 'Link Cards' },
 ];

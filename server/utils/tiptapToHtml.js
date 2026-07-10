@@ -209,6 +209,7 @@ const DEFAULT_PDF_OPTIONS = {
   includeForms: true,
   includeSignatures: true,
   includeAudio: true,
+  includeVideo: true,
   includeNotes: true,
   includeLinks: true,
 };
@@ -291,12 +292,33 @@ function buildInlineContentHtml(block, options = {}) {
 
     case 'audio': {
       if (!opts.includeAudio) return '';
-      return badge('🎵', data.title || 'Audio', '#fff7ed', '#fed7aa');
+      const audioTitle = escapeHtml(data.title || 'Audio');
+      const audioUrl = data.url ? escapeHtml(data.url) : '';
+      return box('#fff7ed', '#fed7aa', 'solid',
+        `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:${audioUrl ? '0.35rem' : '0'}">
+          <span style="font-size:1.1rem">🎵</span>
+          <strong style="color:#c2410c">${audioTitle}</strong>
+        </div>
+        ${audioUrl ? `<p style="margin:0;font-size:0.8rem"><a href="${audioUrl}" style="color:#ea580c;word-break:break-all">${audioUrl}</a></p>` : ''}`
+      );
     }
 
     case 'video': {
-      if (!opts.includeAudio) return '';
-      return badge('🎬', data.title || 'Video', '#fff1f2', '#fecdd3');
+      if (!opts.includeVideo) return '';
+      const videoTitle = escapeHtml(data.title || 'Video');
+      const videoUrl = data.url ? escapeHtml(data.url) : '';
+      const thumbnail = data.thumbnail_url || data.poster_url || data.cover_image_url || '';
+      const thumbnailHtml = thumbnail
+        ? `<a href="${videoUrl || '#'}" style="display:block;margin-bottom:0.5rem"><img src="${escapeHtml(thumbnail)}" alt="${videoTitle}" style="max-width:100%;max-height:180px;object-fit:cover;border-radius:6px;border:1px solid #fecdd3"></a>`
+        : `<div style="width:100%;height:80px;background:#ffe4e6;border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:0.5rem;font-size:2rem">🎬</div>`;
+      return `<div style="margin:0.75rem 0;padding:0.75rem 1rem;background:#fff1f2;border:1.5px solid #fecdd3;border-radius:8px;font-size:0.9375rem;page-break-inside:avoid;break-inside:avoid">
+        ${thumbnailHtml}
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:${videoUrl ? '0.35rem' : '0'}">
+          <span style="font-size:1.1rem">🎬</span>
+          <strong style="color:#be123c">${videoTitle}</strong>
+        </div>
+        ${videoUrl ? `<p style="margin:0;font-size:0.8rem"><a href="${videoUrl}" style="color:#e11d48;word-break:break-all">${videoUrl}</a></p>` : ''}
+      </div>\n`;
     }
 
     case 'code_block': {
