@@ -161,13 +161,28 @@ function ClassOverviewTab({
                 <BookOpen className="h-6 w-6 text-white" />
               </div>
             )}
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="font-semibold text-theme">{currentBook.book.title}</p>
               <p className="text-xs text-muted mt-1">Currently reading</p>
+              {isTeacher && (
+                <button onClick={() => onGoToTab('settings')} className="text-xs text-violet-500 hover:text-violet-600 mt-1 transition-colors">
+                  Change book →
+                </button>
+              )}
             </div>
           </div>
         ) : (
-          <p className="text-muted text-sm">No book assigned yet.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-muted text-sm flex-1">No book assigned yet.</p>
+            {isTeacher && (
+              <button
+                onClick={() => onGoToTab('settings')}
+                className="theme-button-primary px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
+              >
+                <BookOpen className="h-4 w-4" /> Assign Book
+              </button>
+            )}
+          </div>
         )}
       </div>
 
