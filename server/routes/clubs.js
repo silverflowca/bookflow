@@ -62,7 +62,7 @@ router.get('/', authenticate, async (req, res) => {
     } else {
       query = query.eq('created_by', req.user.id);
     }
-    if (type === 'club' || type === 'study_group') {
+    if (['club', 'study_group', 'online_class'].includes(type)) {
       query = query.eq('club_type', type);
     }
 
