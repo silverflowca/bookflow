@@ -460,7 +460,7 @@ export default function ClubsPage() {
             className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium"
           >
             <Plus className="h-5 w-5" />
-            {mainTab === 'bookstudy' ? 'New Study Group' : 'New Club'}
+            {mainTab === 'bookstudy' ? 'New Study Group' : mainTab === 'onlineclasses' ? 'New Class' : 'New Club'}
           </button>
         </div>
       </div>
