@@ -499,6 +499,97 @@ export default function Home() {
 
       {/* Book Study Section */}
       <BookStudySection />
+
+      {/* ── Footer ── */}
+      <footer style={{ background: '#0f0c29', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+          {/* Top row: brand + columns */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+            {/* Brand */}
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="h-7 w-7" style={{ color: '#a78bfa' }} />
+                <span className="text-xl font-bold text-white">BookFlow</span>
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                The interactive book platform for authors, educators, churches, and communities.
+              </p>
+            </div>
+
+            {/* Platform */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#a78bfa' }}>Platform</p>
+              <ul className="space-y-2.5">
+                {[
+                  { label: 'Home', to: '/' },
+                  { label: 'Dashboard', to: '/dashboard' },
+                  { label: 'Book Clubs', to: '/clubs' },
+                  { label: 'Study Groups', to: '/clubs?tab=bookstudy' },
+                  { label: 'Help & Docs', to: '/docs' },
+                ].map(l => (
+                  <li key={l.to}>
+                    <Link to={l.to} className="text-sm transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Authors */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#a78bfa' }}>Authors</p>
+              <ul className="space-y-2.5">
+                {[
+                  { label: 'Start Writing', to: '/register' },
+                  { label: 'My Books', to: '/dashboard' },
+                  { label: 'Export & PDF', to: '/docs' },
+                  { label: 'Collaborators', to: '/dashboard' },
+                  { label: 'Publish & Share', to: '/dashboard' },
+                ].map(l => (
+                  <li key={l.label}>
+                    <Link to={l.to} className="text-sm transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Account */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#a78bfa' }}>Account</p>
+              <ul className="space-y-2.5">
+                {[
+                  { label: 'Sign Up Free', to: '/register' },
+                  { label: 'Login', to: '/login' },
+                  { label: 'Profile', to: '/profile' },
+                  { label: 'Settings', to: '/settings' },
+                  { label: 'Inbox', to: '/inbox' },
+                ].map(l => (
+                  <li key={l.label}>
+                    <Link to={l.to} className="text-sm transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }} className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              &copy; {new Date().getFullYear()} BookFlow &mdash; All rights reserved.
+            </p>
+            <div className="flex items-center gap-5">
+              <Link to="/bl/about" className="text-xs transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.45)' }}>About</Link>
+              <Link to="/docs" className="text-xs transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.45)' }}>Help</Link>
+              <Link to="/register" className="text-xs transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.45)' }}>Sign Up</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

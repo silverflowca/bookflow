@@ -418,9 +418,9 @@ export default function Layout() {
                     <span className="hidden md:inline">Live</span>
                   </span>
                   {/* Tutorial + Help + Admin — only on xl screens */}
-                  <button id="bf-tutorial-btn" onClick={() => setTutorialActive(true)} className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                    <GraduationCap className="h-4 w-4" /> Tutorial
-                  </button>
+                  <Link to="/clubs?tab=onlineclasses" className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <GraduationCap className="h-4 w-4" /> Online Classes
+                  </Link>
                   <Link to="/docs" className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <HelpCircle className="h-4 w-4" /> Help
                   </Link>
@@ -521,12 +521,9 @@ export default function Layout() {
                   <span className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-muted/40 cursor-not-allowed select-none">
                     <Video className="h-5 w-5 flex-shrink-0" /> Live <span className="ml-1 text-xs">(coming soon)</span>
                   </span>
-                  <button
-                    onClick={() => { setTutorialActive(true); setShowMobileMenu(false); }}
-                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full"
-                  >
-                    <GraduationCap className="h-5 w-5 text-accent flex-shrink-0" /> Tutorial
-                  </button>
+                  <Link to="/clubs?tab=onlineclasses" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full">
+                    <GraduationCap className="h-5 w-5 text-accent flex-shrink-0" /> Online Classes
+                  </Link>
                   <button
                     onClick={() => { openFeedback(); setShowMobileMenu(false); }}
                     className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors w-full"
@@ -672,14 +669,18 @@ export default function Layout() {
 
       {/* Footer */}
       <footer className="bg-surface border-t-2 border-strong mt-auto hidden md:block">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-1">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
             <p className="text-xs text-muted">
-              &copy; {new Date().getFullYear()} BookFlow. Interactive book platform.
+              &copy; {new Date().getFullYear()} BookFlow &mdash; All rights reserved.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="text-xs text-muted hover:text-theme transition-colors">About</a>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <Link to="/" className="text-xs text-muted hover:text-theme transition-colors">Home</Link>
+              <Link to="/dashboard" className="text-xs text-muted hover:text-theme transition-colors">Books</Link>
+              <Link to="/clubs" className="text-xs text-muted hover:text-theme transition-colors">Book Clubs</Link>
+              <Link to="/clubs?tab=bookstudy" className="text-xs text-muted hover:text-theme transition-colors">Study Groups</Link>
               <Link to="/docs" className="text-xs text-muted hover:text-theme transition-colors">Help</Link>
+              <Link to="/bl/about" className="text-xs text-muted hover:text-theme transition-colors">About</Link>
             </div>
           </div>
         </div>
