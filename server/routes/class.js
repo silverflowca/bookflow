@@ -191,6 +191,110 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MY PROGRESS (student self-view)
+// GET /api/clubs/:clubId/class/my-progress
+// ═══════════════════════════════════════════════════════════════════════════════
+router.get('/:clubId/class/my-progress', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+
+  const userId = req.user.id;
+
+  try {
+    // Current book
+    const { data: clubBook } = await supabase
+      .schema('bookflow')
+      .from('club_books')
+      .select('book_id, book:books(id, title, cover_image_url)')
+      .eq('club_id', clubId)
+      .eq('is_current', true)
+      .maybeSingle();
+
+    if (!clubBook) return res.json({ chapters: [], book: null, completion_pct: 0, items_completed: 0, items_total: 0, submissions: [] });
+
+    const book = Array.isArray(clubBook.book) ? clubBook.book[0] : clubBook.book;
+
+    // Chapters
+    const { data: chapters } = await supabase
+      .schema('bookflow')
+      .from('chapters')
+      .select('id, title, order_index, content')
+      .eq('book_id', clubBook.book_id)
+      .eq('status', 'published')
+      .order('order_index', { ascending: true });
+
+    const chapterIds = (chapters || []).map(c => c.id);
+
+    // Inline trackable content totals per chapter
+    const { data: allInline } = await supabase
+      .schema('bookflow')
+      .from('inline_content')
+      .select('id, chapter_id, content_type')
+      .in('chapter_id', chapterIds)
+      .in('content_type', TRACKABLE_TYPES);
+
+    const totalByChapter = {};
+    for (const ch of (chapters || [])) {
+      const formCount = (allInline || []).filter(ic => ic.chapter_id === ch.id).length;
+      const mediaCount = extractMediaKeys(ch.content?.content || [], ch.id).length;
+      totalByChapter[ch.id] = formCount + mediaCount;
+    }
+    const grandTotal = Object.values(totalByChapter).reduce((a, b) => a + b, 0);
+
+    // My completions
+    const { data: completions } = await supabase
+      .schema('bookflow')
+      .from('chapter_item_completions')
+      .select('chapter_id, item_key, completed_at')
+      .eq('user_id', userId)
+      .in('chapter_id', chapterIds);
+
+    const chapters_breakdown = (chapters || []).map(ch => ({
+      chapter_id: ch.id,
+      title: ch.title,
+      completed: (completions || []).filter(c => c.chapter_id === ch.id).length,
+      total: totalByChapter[ch.id] || 0,
+    }));
+
+    const completedCount = (completions || []).length;
+
+    // My submissions with prompts and feedback
+    const { data: submissions } = await supabase
+      .schema('bookflow')
+      .from('class_submissions')
+      .select(`
+        id, title, status, submitted_at, created_at,
+        prompt:class_submission_prompts(id, title, prompt_type, due_date),
+        feedback:class_submission_feedback(grade, feedback_text)
+      `)
+      .eq('club_id', clubId)
+      .eq('student_id', userId)
+      .order('created_at', { ascending: false });
+
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+    const normalizedSubs = (submissions || []).map(s => ({
+      ...s,
+      prompt: norm(s.prompt),
+      feedback: norm(s.feedback),
+    }));
+
+    res.json({
+      book,
+      chapters: chapters_breakdown,
+      items_completed: completedCount,
+      items_total: grandTotal,
+      completion_pct: grandTotal > 0 ? Math.round((completedCount / grandTotal) * 100) : 0,
+      submissions: normalizedSubs,
+    });
+  } catch (err) {
+    console.error('My progress error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SESSIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 

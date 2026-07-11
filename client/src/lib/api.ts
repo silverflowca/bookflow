@@ -1463,6 +1463,17 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/class/submissions/${subId}/feedback`, { method: 'POST', body: JSON.stringify(data) });
   }
 
+  async getMyClassProgress(clubId: string): Promise<{
+    book: { id: string; title: string; cover_image_url?: string } | null;
+    chapters: { chapter_id: string; title: string; completed: number; total: number }[];
+    items_completed: number;
+    items_total: number;
+    completion_pct: number;
+    submissions: (ClassSubmission & { feedback?: ClassSubmissionFeedback | null })[];
+  }> {
+    return this.request(`/clubs/${clubId}/class/my-progress`);
+  }
+
   async getClassAnswers(clubId: string, params?: { student_id?: string }): Promise<ClassAnswerFeedback[]> {
     const qs = params?.student_id ? `?student_id=${params.student_id}` : '';
     return this.request(`/clubs/${clubId}/class/answers${qs}`);

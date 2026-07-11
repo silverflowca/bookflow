@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
-  Settings, ArrowLeft,
+  Settings, ArrowLeft, TrendingUp,
 } from 'lucide-react';
 import ClubChatPanel from '../chat/ClubChatPanel';
 import ClassRosterPanel from './ClassRosterPanel';
@@ -10,8 +10,9 @@ import ClassSessionsPanel from './ClassSessionsPanel';
 import ClassSubmissionsPanel from './ClassSubmissionsPanel';
 import ClassMembersPanel from './ClassMembersPanel';
 import ClassSettingsPanel from './ClassSettingsPanel';
+import ClassProgressPanel from './ClassProgressPanel';
 
-type ClassTab = 'overview' | 'roster' | 'schedule' | 'assignments' | 'chat' | 'members' | 'settings';
+type ClassTab = 'overview' | 'roster' | 'progress' | 'schedule' | 'assignments' | 'chat' | 'members' | 'settings';
 
 interface ClubBook {
   id: string;
@@ -48,9 +49,10 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   const currentBook = club.books?.find(b => b.is_current);
   const memberCount = club.member_count ?? (club.members?.filter(m => m.invite_accepted_at).length ?? 0);
 
-  const tabs: { key: ClassTab; label: string; icon: React.ReactNode; teacherOnly?: boolean }[] = [
+  const tabs: { key: ClassTab; label: string; icon: React.ReactNode; teacherOnly?: boolean; studentOnly?: boolean }[] = [
     { key: 'overview', label: 'Overview', icon: <BookOpen className="h-4 w-4" /> },
     { key: 'roster', label: 'Roster', icon: <GraduationCap className="h-4 w-4" />, teacherOnly: true },
+    { key: 'progress', label: 'My Progress', icon: <TrendingUp className="h-4 w-4" />, studentOnly: true },
     { key: 'schedule', label: 'Schedule', icon: <Calendar className="h-4 w-4" /> },
     { key: 'assignments', label: 'Assignments', icon: <BookOpen className="h-4 w-4" /> },
     { key: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
@@ -58,7 +60,11 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
     { key: 'settings', label: 'Settings', icon: <Settings className="h-4 w-4" />, teacherOnly: true },
   ];
 
-  const visibleTabs = tabs.filter(t => !t.teacherOnly || isTeacher);
+  const visibleTabs = tabs.filter(t => {
+    if (t.teacherOnly && !isTeacher) return false;
+    if (t.studentOnly && isTeacher) return false;
+    return true;
+  });
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -107,6 +113,9 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       )}
       {tab === 'roster' && isTeacher && (
         <ClassRosterPanel clubId={club.id} />
+      )}
+      {tab === 'progress' && !isTeacher && (
+        <ClassProgressPanel clubId={club.id} />
       )}
       {tab === 'schedule' && (
         <ClassSessionsPanel clubId={club.id} isTeacher={isTeacher} />
@@ -162,7 +171,7 @@ function ClassOverviewTab({
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {isTeacher && (
+        {isTeacher ? (
           <button
             onClick={() => onGoToTab('roster')}
             className="theme-section rounded-xl p-4 text-left hover:shadow-md transition-shadow"
@@ -170,6 +179,15 @@ function ClassOverviewTab({
             <GraduationCap className="h-5 w-5 text-violet-500 mb-2" />
             <p className="font-semibold text-theme text-sm">View Roster</p>
             <p className="text-xs text-muted mt-0.5">Track student progress</p>
+          </button>
+        ) : (
+          <button
+            onClick={() => onGoToTab('progress')}
+            className="theme-section rounded-xl p-4 text-left hover:shadow-md transition-shadow"
+          >
+            <TrendingUp className="h-5 w-5 text-violet-500 mb-2" />
+            <p className="font-semibold text-theme text-sm">My Progress</p>
+            <p className="text-xs text-muted mt-0.5">Chapters & grades</p>
           </button>
         )}
         <button
