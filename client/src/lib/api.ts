@@ -1471,6 +1471,15 @@ class ApiClient {
   async postAnswerFeedback(clubId: string, responseId: string, data: { grade?: number; feedback_text?: string; student_id: string }): Promise<ClassAnswerFeedback> {
     return this.request(`/clubs/${clubId}/class/answers/${responseId}/feedback`, { method: 'POST', body: JSON.stringify(data) });
   }
+
+  async searchClubUsers(clubId: string, q: string): Promise<{ id: string; display_name: string; avatar_url?: string; email?: string }[]> {
+    return this.request(`/clubs/${clubId}/search-users?q=${encodeURIComponent(q)}`);
+  }
+
+  async inviteClubMember(clubId: string, data: { email?: string; userId?: string }): Promise<{ id: string; invite_token?: string }> {
+    return this.request(`/clubs/${clubId}/invite`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
 }
 
 export const api = new ApiClient();

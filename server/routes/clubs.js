@@ -325,6 +325,45 @@ router.delete('/:clubId', authenticate, async (req, res) => {
   }
 });
 
+// ── GET /api/clubs/:clubId/search-users — search existing users to invite ────
+router.get('/:clubId/search-users', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const { q } = req.query;
+
+  const role = await getClubRole(clubId, req.user.id);
+  if (!role || !['owner', 'admin'].includes(role)) {
+    return res.status(403).json({ error: 'Only owners/admins can search users' });
+  }
+
+  if (!q || q.trim().length < 2) return res.json([]);
+
+  try {
+    // Get existing member user IDs to exclude
+    const { data: existing } = await supabase
+      .schema('bookflow')
+      .from('club_members')
+      .select('user_id')
+      .eq('club_id', clubId)
+      .not('user_id', 'is', null);
+
+    const excludeIds = [req.user.id, ...(existing || []).map(m => m.user_id).filter(Boolean)];
+
+    const { data: users, error } = await supabase
+      .schema('bookflow')
+      .from('profiles')
+      .select('id, display_name, avatar_url, email')
+      .or(`display_name.ilike.%${q.trim()}%,email.ilike.%${q.trim()}%`)
+      .not('id', 'in', `(${excludeIds.join(',')})`)
+      .limit(10);
+
+    if (error) throw error;
+    res.json(users || []);
+  } catch (err) {
+    console.error('Search users error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/clubs/:clubId/invite — invite a member ─────────────────────────
 router.post('/:clubId/invite', authenticate, async (req, res) => {
   const role = await getClubRole(req.params.clubId, req.user.id);
@@ -332,38 +371,61 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
     return res.status(403).json({ error: 'Only owners/admins can invite members' });
   }
 
-  const { email } = req.body;
-  if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
+  const { email, userId } = req.body;
+  if (!email?.trim() && !userId) return res.status(400).json({ error: 'Email or userId is required' });
+
+  const clubId = req.params.clubId;
 
   try {
-    // Check if user exists by email
+    const { data: club } = await supabase.schema('bookflow').from('book_clubs').select('name').eq('id', clubId).single();
+
+    // ── Direct add by userId (existing user search flow) ────────────────────
+    if (userId) {
+      const { data: existing } = await supabase.schema('bookflow')
+        .from('club_members')
+        .select('id, invite_accepted_at')
+        .eq('club_id', clubId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (existing?.invite_accepted_at) return res.status(409).json({ error: 'User is already a member' });
+      if (existing) return res.status(409).json({ error: 'User already has a pending invite' });
+
+      const { data: member, error } = await supabase.schema('bookflow')
+        .from('club_members')
+        .insert({ club_id: clubId, user_id: userId, invited_by: req.user.id, role: 'member', invite_accepted_at: new Date().toISOString() })
+        .select()
+        .single();
+      if (error) throw error;
+
+      await notify(userId, 'club_invite',
+        `You've been added to "${club.name}"`,
+        `You've been added to the class "${club.name}" by a teacher.`,
+        { club_id: clubId }
+      );
+      return res.status(201).json(member);
+    }
+
+    // ── Email invite flow ────────────────────────────────────────────────────
     const { data: targetProfile } = await supabase
       .from('profiles')
       .select('id, display_name, email')
       .eq('email', email.trim().toLowerCase())
       .maybeSingle();
 
-    // Check existing membership
     if (targetProfile) {
-      const { data: existing } = await supabase
+      const { data: existing } = await supabase.schema('bookflow')
         .from('club_members')
         .select('id, invite_accepted_at')
-        .eq('club_id', req.params.clubId)
+        .eq('club_id', clubId)
         .eq('user_id', targetProfile.id)
         .maybeSingle();
-      if (existing?.invite_accepted_at) {
-        return res.status(409).json({ error: 'User is already a member' });
-      }
-      if (existing) {
-        return res.status(409).json({ error: 'User already has a pending invite' });
-      }
+      if (existing?.invite_accepted_at) return res.status(409).json({ error: 'User is already a member' });
+      if (existing) return res.status(409).json({ error: 'User already has a pending invite' });
     }
 
-    const { data: club } = await supabase.from('book_clubs').select('name').eq('id', req.params.clubId).single();
     const inviteToken = crypto.randomBytes(24).toString('hex');
-
     const memberRecord = {
-      club_id: req.params.clubId,
+      club_id: clubId,
       user_id: targetProfile?.id || null,
       invited_by: req.user.id,
       invited_email: email.trim().toLowerCase(),
@@ -371,14 +433,13 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
       role: 'member',
     };
 
-    const { data: member, error } = await supabase
+    const { data: member, error } = await supabase.schema('bookflow')
       .from('club_members')
       .insert(memberRecord)
       .select()
       .single();
     if (error) throw error;
 
-    // Send in-app notification if user exists
     if (targetProfile) {
       await notify(targetProfile.id, 'club_invite',
         `You've been invited to join "${club.name}"`,
