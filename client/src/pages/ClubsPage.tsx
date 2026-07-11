@@ -427,7 +427,9 @@ export default function ClubsPage() {
       <div className="mb-8 rounded-2xl overflow-hidden shadow-md">
         {mainTab === 'clubs'
           ? <ExpandableImage src="/bookflow_clubs.png" alt="Book Clubs" />
-          : <ExpandableImage src="/bookstudy.png" alt="Book Study Groups" />
+          : mainTab === 'onlineclasses'
+            ? <ExpandableImage src="/bookflow_classes.png" alt="Online Classes" />
+            : <ExpandableImage src="/bookstudy.png" alt="Book Study Groups" />
         }
       </div>
 
