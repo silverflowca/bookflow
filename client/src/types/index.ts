@@ -762,3 +762,92 @@ export interface FeedbackConfig {
   };
   updated_at: string;
 }
+
+// ── Online Classes ─────────────────────────────────────────────────────────────
+
+export type ClassPromptType = 'journal' | 'essay' | 'assignment' | 'scribe';
+
+export interface ClassSession {
+  id: string;
+  club_id: string;
+  title: string;
+  description?: string;
+  session_date: string;
+  duration_minutes: number;
+  meeting_url?: string;
+  notes?: string;
+  is_published: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassPrompt {
+  id: string;
+  club_id: string;
+  chapter_id?: string;
+  title: string;
+  body?: string;
+  prompt_type: ClassPromptType;
+  is_required: boolean;
+  due_date?: string;
+  sort_order: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassSubmissionFeedback {
+  id: string;
+  submission_id: string;
+  club_id: string;
+  created_by: string;
+  grade?: number;
+  feedback_text?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassSubmission {
+  id: string;
+  club_id: string;
+  prompt_id?: string;
+  chapter_id?: string;
+  student_id: string;
+  title?: string;
+  body: string;
+  status: 'draft' | 'submitted' | 'graded';
+  submitted_at?: string;
+  created_at: string;
+  updated_at: string;
+  student?: Profile;
+  prompt?: ClassPrompt;
+  feedback?: ClassSubmissionFeedback;
+}
+
+export interface ClassAnswerFeedback {
+  id: string;
+  club_id: string;
+  response_id: string;
+  student_id: string;
+  created_by: string;
+  grade?: number;
+  feedback_text?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassRosterEntry {
+  user_id: string;
+  display_name: string;
+  avatar_url?: string;
+  role: string;
+  enrolled_at: string;
+  items_completed: number;
+  items_total: number;
+  completion_pct: number;
+  chapters_breakdown: { chapter_id: string; completed: number; total: number }[];
+  submissions_submitted: number;
+  submissions_graded: number;
+  last_active?: string;
+}

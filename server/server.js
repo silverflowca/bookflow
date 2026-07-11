@@ -38,6 +38,7 @@ import savedBooksRoutes from './routes/saved-books.js';
 import bookLandingRoutes from './routes/book-landing.js';
 import importRoutes from './routes/import.js';
 import bookChatRoutes from './routes/book-chat.js';
+import classRoutes from './routes/class.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { startStatusCron } from './services/chat-status.js';
 
@@ -110,6 +111,7 @@ app.use('/api/books/:bookId', publishRoutes);
 app.use('/api/public', publishRoutes);
 app.use('/api/books', publishersRoutes);
 app.use('/api/clubs', clubsRoutes);
+app.use('/api/clubs', classRoutes);
 app.use('/api/clubs/:clubId/chat', clubChatRoutes);
 app.use('/api/clubs/chat', clubChatRoutes);  // for /unread-all (no clubId)
 app.use('/api/books/:bookId/activity', activityRoutes);

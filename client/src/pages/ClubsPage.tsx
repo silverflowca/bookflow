@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X, Expand, LayoutGrid, LayoutList } from 'lucide-react';
+import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X, Expand, LayoutGrid, LayoutList, GraduationCap, Video, MessageSquare } from 'lucide-react';
 import api from '../lib/api';
 
 function ExpandableImage({ src, alt }: { src: string; alt: string }) {
@@ -46,7 +46,7 @@ interface Club {
   visibility: 'public' | 'private';
   max_members: number;
   created_at: string;
-  club_type: 'club' | 'study_group';
+  club_type: 'club' | 'study_group' | 'online_class';
   member_count?: number;
   allow_join_requests?: boolean;
   creator?: { id: string; display_name: string; avatar_url?: string };
@@ -141,7 +141,7 @@ function ClubRow({ club, onOpen }: { club: Club; onOpen: (id: string) => void })
 }
 
 interface CreateClubModalProps {
-  clubType: 'club' | 'study_group';
+  clubType: 'club' | 'study_group' | 'online_class';
   onClose: () => void;
   onCreate: (club: Club) => void;
 }
@@ -154,7 +154,7 @@ function CreateClubModal({ clubType, onClose, onCreate }: CreateClubModalProps) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const label = clubType === 'study_group' ? 'Study Group' : 'Book Club';
+  const label = clubType === 'study_group' ? 'Study Group' : clubType === 'online_class' ? 'Online Class' : 'Book Club';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -183,7 +183,7 @@ function CreateClubModal({ clubType, onClose, onCreate }: CreateClubModalProps) 
               value={name}
               onChange={e => setName(e.target.value)}
               className="w-full px-3 py-2 theme-input rounded-lg text-sm"
-              placeholder={clubType === 'study_group' ? 'e.g. Sunday Morning Bible Study' : 'e.g. Sci-Fi Saturday Club'}
+              placeholder={clubType === 'study_group' ? 'e.g. Sunday Morning Bible Study' : clubType === 'online_class' ? 'e.g. Discerners & Feelers — Session 1' : 'e.g. Sci-Fi Saturday Club'}
               required
             />
           </div>
@@ -194,7 +194,7 @@ function CreateClubModal({ clubType, onClose, onCreate }: CreateClubModalProps) 
               onChange={e => setDescription(e.target.value)}
               className="w-full px-3 py-2 theme-input rounded-lg text-sm resize-none"
               rows={3}
-              placeholder={clubType === 'study_group' ? 'What book or topic will your group study?' : 'What is this club about?'}
+              placeholder={clubType === 'study_group' ? 'What book or topic will your group study?' : clubType === 'online_class' ? 'Describe your class — topic, level, what students will learn...' : 'What is this club about?'}
             />
           </div>
           <div>
@@ -313,20 +313,25 @@ export default function ClubsPage() {
   const [publicStudyGroups, setPublicStudyGroups] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams] = useSearchParams();
-  const [mainTab, setMainTab] = useState<'clubs' | 'bookstudy'>(
-    searchParams.get('tab') === 'bookstudy' ? 'bookstudy' : 'clubs'
+  const [mainTab, setMainTab] = useState<'clubs' | 'bookstudy' | 'onlineclasses'>(
+    searchParams.get('tab') === 'bookstudy' ? 'bookstudy' : searchParams.get('tab') === 'onlineclasses' ? 'onlineclasses' : 'clubs'
   );
 
   // Sync tab when URL search param changes (e.g. clicking nav link while already on /clubs)
   useEffect(() => {
-    setMainTab(searchParams.get('tab') === 'bookstudy' ? 'bookstudy' : 'clubs');
+    const t = searchParams.get('tab');
+    setMainTab(t === 'bookstudy' ? 'bookstudy' : t === 'onlineclasses' ? 'onlineclasses' : 'clubs');
   }, [searchParams]);
   const [tab, setTab] = useState<'mine' | 'discover'>('mine');
   const [sgTab, setSgTab] = useState<'mine' | 'discover'>('mine');
   const [search, setSearch] = useState('');
   const [sgSearch, setSgSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [createType, setCreateType] = useState<'club' | 'study_group'>('club');
+  const [createType, setCreateType] = useState<'club' | 'study_group' | 'online_class'>('club');
+  const [myClasses, setMyClasses] = useState<Club[]>([]);
+  const [publicClasses, setPublicClasses] = useState<Club[]>([]);
+  const [ocTab, setOcTab] = useState<'mine' | 'discover'>('mine');
+  const [ocSearch, setOcSearch] = useState('');
   const [joinRequestClub, setJoinRequestClub] = useState<Club | null>(null);
   const [requestedClubIds, setRequestedClubIds] = useState<Set<string>>(new Set());
   const [clubView, setClubView] = useState<'card' | 'list'>(() =>
@@ -345,16 +350,20 @@ export default function ClubsPage() {
 
   async function loadClubs() {
     try {
-      const [mine, pub, minesg, pubsg] = await Promise.all([
+      const [mine, pub, minesg, pubsg, mineoc, puboc] = await Promise.all([
         api.getMyClubs('club').catch(() => []),
         api.getPublicClubs(undefined, 'club').catch(() => []),
         api.getMyClubs('study_group').catch(() => []),
         api.getPublicClubs(undefined, 'study_group').catch(() => []),
+        api.getMyClubs('online_class').catch(() => []),
+        api.getPublicClubs(undefined, 'online_class').catch(() => []),
       ]);
       setMyClubs(mine);
       setPublicClubs(pub);
       setMyStudyGroups(minesg);
       setPublicStudyGroups(pubsg);
+      setMyClasses(mineoc);
+      setPublicClasses(puboc);
     } catch (err) {
       console.error('Failed to load clubs:', err);
     } finally {
@@ -380,7 +389,16 @@ export default function ClubsPage() {
     }
   }
 
-  function openCreate(type: 'club' | 'study_group') {
+  async function handleOcSearch() {
+    try {
+      const results = await api.getPublicClubs(ocSearch, 'online_class');
+      setPublicClasses(results);
+    } catch (err) {
+      console.error('Search failed:', err);
+    }
+  }
+
+  function openCreate(type: 'club' | 'study_group' | 'online_class') {
     setCreateType(type);
     setShowCreate(true);
   }
@@ -388,6 +406,8 @@ export default function ClubsPage() {
   function handleCreated(club: Club) {
     if (club.club_type === 'study_group') {
       setMyStudyGroups(prev => [club, ...prev]);
+    } else if (club.club_type === 'online_class') {
+      setMyClasses(prev => [club, ...prev]);
     } else {
       setMyClubs(prev => [club, ...prev]);
     }
@@ -397,6 +417,7 @@ export default function ClubsPage() {
 
   const myClubIds = new Set(myClubs.map(c => c.id));
   const mySgIds = new Set(myStudyGroups.map(c => c.id));
+  const myClassIds = new Set(myClasses.map(c => c.id));
   const displayedPublic = publicClubs;
   const displayedPublicSg = publicStudyGroups;
 
@@ -413,7 +434,7 @@ export default function ClubsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-theme theme-title">Book Clubs & Study Groups</h1>
+          <h1 className="text-2xl font-bold text-theme theme-title">Book Clubs, Study Groups & Online Classes</h1>
           <p className="text-muted mt-1">Read together, discuss together</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -435,7 +456,7 @@ export default function ClubsPage() {
             </button>
           </div>
           <button
-            onClick={() => openCreate(mainTab === 'bookstudy' ? 'study_group' : 'club')}
+            onClick={() => openCreate(mainTab === 'bookstudy' ? 'study_group' : mainTab === 'onlineclasses' ? 'online_class' : 'club')}
             className="flex items-center gap-2 theme-button-primary px-4 py-2 rounded-lg font-medium"
           >
             <Plus className="h-5 w-5" />
@@ -444,7 +465,7 @@ export default function ClubsPage() {
         </div>
       </div>
 
-      {/* Main tab bar — Clubs | Book Study Groups */}
+      {/* Main tab bar — Clubs | Book Study Groups | Online Classes */}
       <div className="flex gap-1 mb-6 border-b border-surface-hover">
         <button
           onClick={() => setMainTab('clubs')}
@@ -467,6 +488,17 @@ export default function ClubsPage() {
         >
           <BookOpen className="h-4 w-4" />
           Book Study Groups
+        </button>
+        <button
+          onClick={() => setMainTab('onlineclasses')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            mainTab === 'onlineclasses'
+              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+              : 'border-transparent text-muted hover:text-theme'
+          }`}
+        >
+          <GraduationCap className="h-4 w-4" />
+          Online Classes
         </button>
       </div>
 
@@ -749,6 +781,147 @@ export default function ClubsPage() {
                         <div className="flex-1 min-w-0">
                           <ClubRow club={club} onOpen={id => navigate(`/clubs/${id}`)} />
                         </div>
+                        {joinBtn}
+                      </div>
+                    ) : (
+                      <div key={club.id} className="flex flex-col">
+                        <ClubCard club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                        <div className="mt-1">{joinBtn}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Online Classes tab ─────────────────────────────────────────── */}
+      {mainTab === 'onlineclasses' && (
+        <>
+          <h2 className="text-xl font-bold text-theme mb-1">Online Classes</h2>
+          <p className="text-muted text-sm mb-6 max-w-2xl">Host or join interactive online classes built around your books — combine live sessions, structured lessons, and group interaction in one place.</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                <GraduationCap className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Structured Lessons</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Deliver your book content as a series of lessons with embedded questions, quizzes, and assignments — all inside BookFlow.</p>
+              </div>
+            </div>
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                <Video className="h-4 w-4 text-violet-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Live Sessions</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Schedule and host live class sessions. Participants follow along in the book while you present — everyone stays on the same page.</p>
+              </div>
+            </div>
+            <div className="theme-section rounded-xl p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center flex-shrink-0">
+                <MessageSquare className="h-4 w-4 text-teal-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-theme text-sm">Student Interaction</h3>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">Students submit answers, participate in polls, and chat with classmates — all tracked so you can see who's engaged and progressing.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-tabs: Mine | Discover */}
+          <div className="flex gap-1 mb-6 theme-section p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setOcTab('mine')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${ocTab === 'mine' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+            >
+              My Classes {myClasses.length > 0 && <span className="ml-1 opacity-60">({myClasses.length})</span>}
+            </button>
+            <button
+              onClick={() => setOcTab('discover')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${ocTab === 'discover' ? 'theme-button-primary' : 'text-muted hover:text-theme'}`}
+            >
+              Discover
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong" />
+            </div>
+          ) : ocTab === 'mine' ? (
+            myClasses.length === 0 ? (
+              <div className="text-center py-16 theme-section border-dashed rounded-xl">
+                <GraduationCap className="h-12 w-12 text-muted mx-auto mb-4" />
+                <h3 className="font-semibold text-theme mb-2">No online classes yet</h3>
+                <p className="text-muted text-sm mb-4">Create your first online class or ask a teacher for an invite link to join one.</p>
+                <button onClick={() => openCreate('online_class')} className="theme-button-primary px-4 py-2 rounded-lg text-sm font-medium">
+                  Create Your First Class
+                </button>
+              </div>
+            ) : (
+              <div className={clubView === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}>
+                {myClasses.map(club => clubView === 'list'
+                  ? <ClubRow key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                  : <ClubCard key={club.id} club={club} onOpen={id => navigate(`/clubs/${id}`)} />
+                )}
+              </div>
+            )
+          ) : (
+            <div>
+              <div className="flex gap-2 mb-6">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+                  <input
+                    type="text"
+                    value={ocSearch}
+                    onChange={e => setOcSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleOcSearch()}
+                    placeholder="Search public online classes..."
+                    className="w-full pl-9 pr-3 py-2 theme-input rounded-lg text-sm"
+                  />
+                </div>
+                <button onClick={handleOcSearch} className="theme-button-secondary px-4 py-2 rounded-lg text-sm">
+                  Search
+                </button>
+              </div>
+
+              {publicClasses.length === 0 ? (
+                <div className="text-center py-16 text-muted">
+                  <Globe className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>No public online classes found.</p>
+                </div>
+              ) : (
+                <div className={clubView === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}>
+                  {publicClasses.map(club => {
+                    const isMember = myClassIds.has(club.id);
+                    const requested = requestedClubIds.has(club.id);
+                    const joinBtn = isMember ? (
+                      <button
+                        onClick={() => navigate(`/clubs/${club.id}`)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-primary rounded-lg flex-shrink-0"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Enrolled — Open
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => !requested && setJoinRequestClub(club)}
+                        disabled={requested}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs theme-button-secondary rounded-lg disabled:opacity-50 flex-shrink-0"
+                      >
+                        {requested
+                          ? <><Check className="h-3.5 w-3.5 text-green-400" /> Request Sent</>
+                          : <><UserPlus className="h-3.5 w-3.5" /> Request to Enroll</>
+                        }
+                      </button>
+                    );
+                    return clubView === 'list' ? (
+                      <div key={club.id} className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0"><ClubRow club={club} onOpen={id => navigate(`/clubs/${id}`)} /></div>
                         {joinBtn}
                       </div>
                     ) : (

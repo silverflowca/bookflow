@@ -110,7 +110,7 @@ router.get('/public', authenticate, async (req, res) => {
       .limit(50);
 
     if (search) query = query.ilike('name', `%${search}%`);
-    if (type === 'club' || type === 'study_group') query = query.eq('club_type', type);
+    if (['club', 'study_group', 'online_class'].includes(type)) query = query.eq('club_type', type);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -137,7 +137,8 @@ router.get('/public', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   const { name, description, visibility = 'private', max_members = 50, club_type = 'club' } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Club name is required' });
-  const validType = club_type === 'study_group' ? 'study_group' : 'club';
+  const VALID_TYPES = ['club', 'study_group', 'online_class'];
+  const validType = VALID_TYPES.includes(club_type) ? club_type : 'club';
 
   try {
     const { data: club, error } = await supabase

@@ -23,6 +23,12 @@ import type {
   AnnotationCommand,
   ShareableUser,
   MediaResponseRecord,
+  ClassSession,
+  ClassPrompt,
+  ClassSubmission,
+  ClassSubmissionFeedback,
+  ClassAnswerFeedback,
+  ClassRosterEntry,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -933,12 +939,12 @@ class ApiClient {
 
   // ── Book Clubs ─────────────────────────────────────────────────────────────
 
-  async getMyClubs(type?: 'club' | 'study_group'): Promise<any[]> {
+  async getMyClubs(type?: 'club' | 'study_group' | 'online_class'): Promise<any[]> {
     const qs = type ? `?type=${type}` : '';
     return this.request(`/clubs${qs}`);
   }
 
-  async getPublicClubs(search?: string, type?: 'club' | 'study_group'): Promise<any[]> {
+  async getPublicClubs(search?: string, type?: 'club' | 'study_group' | 'online_class'): Promise<any[]> {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (type) params.set('type', type);
@@ -946,7 +952,7 @@ class ApiClient {
     return this.request(`/clubs/public${qs}`);
   }
 
-  async createClub(data: { name: string; description?: string; cover_image_url?: string; visibility?: string; max_members?: number; club_type?: 'club' | 'study_group' }): Promise<any> {
+  async createClub(data: { name: string; description?: string; cover_image_url?: string; visibility?: string; max_members?: number; club_type?: 'club' | 'study_group' | 'online_class' }): Promise<any> {
     return this.request('/clubs', { method: 'POST', body: JSON.stringify(data) });
   }
 
@@ -1394,6 +1400,76 @@ class ApiClient {
 
   async updateFeedbackConfig(data: Partial<Pick<FeedbackConfig, 'enabled' | 'config'>>): Promise<FeedbackConfig> {
     return this.request('/feedback/config', { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  // ── Online Classes ────────────────────────────────────────────────────────
+
+  async getClassRoster(clubId: string): Promise<{ members: ClassRosterEntry[]; chapters: { id: string; title: string }[] }> {
+    return this.request(`/clubs/${clubId}/class/roster`);
+  }
+
+  async getClassSessions(clubId: string): Promise<ClassSession[]> {
+    return this.request(`/clubs/${clubId}/class/sessions`);
+  }
+
+  async createClassSession(clubId: string, data: Partial<ClassSession>): Promise<ClassSession> {
+    return this.request(`/clubs/${clubId}/class/sessions`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateClassSession(clubId: string, id: string, data: Partial<ClassSession>): Promise<ClassSession> {
+    return this.request(`/clubs/${clubId}/class/sessions/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteClassSession(clubId: string, id: string): Promise<{ success: boolean }> {
+    return this.request(`/clubs/${clubId}/class/sessions/${id}`, { method: 'DELETE' });
+  }
+
+  async getClassPrompts(clubId: string): Promise<ClassPrompt[]> {
+    return this.request(`/clubs/${clubId}/class/prompts`);
+  }
+
+  async createClassPrompt(clubId: string, data: Partial<ClassPrompt>): Promise<ClassPrompt> {
+    return this.request(`/clubs/${clubId}/class/prompts`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateClassPrompt(clubId: string, id: string, data: Partial<ClassPrompt>): Promise<ClassPrompt> {
+    return this.request(`/clubs/${clubId}/class/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteClassPrompt(clubId: string, id: string): Promise<{ success: boolean }> {
+    return this.request(`/clubs/${clubId}/class/prompts/${id}`, { method: 'DELETE' });
+  }
+
+  async getClassSubmissions(clubId: string, params?: { prompt_id?: string; student_id?: string; status?: string }): Promise<ClassSubmission[]> {
+    const qs = params
+      ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))).toString()
+      : '';
+    return this.request(`/clubs/${clubId}/class/submissions${qs}`);
+  }
+
+  async getClassSubmission(clubId: string, subId: string): Promise<ClassSubmission> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}`);
+  }
+
+  async createClassSubmission(clubId: string, data: { title?: string; body: string; prompt_id?: string; chapter_id?: string; status?: string }): Promise<ClassSubmission> {
+    return this.request(`/clubs/${clubId}/class/submissions`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateClassSubmission(clubId: string, id: string, data: { title?: string; body?: string; status?: string }): Promise<ClassSubmission> {
+    return this.request(`/clubs/${clubId}/class/submissions/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async postSubmissionFeedback(clubId: string, subId: string, data: { grade?: number; feedback_text?: string }): Promise<ClassSubmissionFeedback> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}/feedback`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getClassAnswers(clubId: string, params?: { student_id?: string }): Promise<ClassAnswerFeedback[]> {
+    const qs = params?.student_id ? `?student_id=${params.student_id}` : '';
+    return this.request(`/clubs/${clubId}/class/answers${qs}`);
+  }
+
+  async postAnswerFeedback(clubId: string, responseId: string, data: { grade?: number; feedback_text?: string; student_id: string }): Promise<ClassAnswerFeedback> {
+    return this.request(`/clubs/${clubId}/class/answers/${responseId}/feedback`, { method: 'POST', body: JSON.stringify(data) });
   }
 }
 

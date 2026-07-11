@@ -10,6 +10,7 @@ import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import ClubChatPanel from '../components/chat/ClubChatPanel';
 import { useChatUnread } from '../hooks/useChatUnread';
+import ClassDetailView from '../components/class/ClassDetailView';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ interface Club {
   max_members: number;
   created_at: string;
   created_by?: string;
+  club_type?: 'club' | 'study_group' | 'online_class';
   my_role?: 'owner' | 'admin' | 'member' | null;
   member_count?: number;
   creator?: { id: string; display_name: string };
@@ -815,6 +817,11 @@ export default function ClubDetailPage() {
         <Link to="/clubs" className="text-indigo-400 text-sm mt-2 inline-block">← Back to Clubs</Link>
       </div>
     );
+  }
+
+  // Online Class — delegate to dedicated view
+  if (club.club_type === 'online_class') {
+    return <ClassDetailView club={club} role={myRole} onReload={loadClub} />;
   }
 
   // Server already filters to accepted-only in the members array; pending_invites is a separate field
