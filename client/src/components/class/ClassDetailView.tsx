@@ -4,6 +4,7 @@ import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
   Settings, ArrowLeft, TrendingUp,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import ClubChatPanel from '../chat/ClubChatPanel';
 import ClassRosterPanel from './ClassRosterPanel';
 import ClassSessionsPanel from './ClassSessionsPanel';
@@ -44,6 +45,7 @@ interface Props {
 
 export default function ClassDetailView({ club, role, onReload }: Props) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [tab, setTab] = useState<ClassTab>('overview');
   const isTeacher = role === 'owner' || role === 'admin';
   const currentBook = club.books?.find(b => b.is_current);
@@ -112,7 +114,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
         <ClassOverviewTab isTeacher={isTeacher} currentBook={currentBook} onGoToTab={setTab} />
       )}
       {tab === 'roster' && isTeacher && (
-        <ClassRosterPanel clubId={club.id} />
+        <ClassRosterPanel clubId={club.id} currentUserId={user?.id ?? ''} />
       )}
       {tab === 'progress' && !isTeacher && (
         <ClassProgressPanel clubId={club.id} />

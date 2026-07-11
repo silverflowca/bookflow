@@ -1491,6 +1491,30 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/invite`, { method: 'POST', body: JSON.stringify(data) });
   }
 
+  async getClassStudentDetail(clubId: string, studentId: string): Promise<any> {
+    return this.request(`/clubs/${clubId}/class/students/${studentId}`);
+  }
+
+  async getResponseComments(clubId: string, responseId: string): Promise<{ id: string; author_id: string; body: string; created_at: string; author: { id: string; display_name: string; avatar_url?: string } }[]> {
+    return this.request(`/clubs/${clubId}/class/responses/${responseId}/comments`);
+  }
+
+  async postResponseComment(clubId: string, responseId: string, body: string): Promise<{ id: string; author_id: string; body: string; created_at: string; author: { id: string; display_name: string; avatar_url?: string } }> {
+    return this.request(`/clubs/${clubId}/class/responses/${responseId}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+  }
+
+  async getClassDMs(clubId: string, otherUserId: string): Promise<{ id: string; author_id: string; body: string; read_at?: string; created_at: string; author: { id: string; display_name: string; avatar_url?: string } }[]> {
+    return this.request(`/clubs/${clubId}/class/dm/${otherUserId}`);
+  }
+
+  async sendClassDM(clubId: string, otherUserId: string, body: string): Promise<{ id: string; author_id: string; body: string; created_at: string; author: { id: string; display_name: string; avatar_url?: string } }> {
+    return this.request(`/clubs/${clubId}/class/dm/${otherUserId}`, { method: 'POST', body: JSON.stringify({ body }) });
+  }
+
+  async listClassDMConversations(clubId: string): Promise<{ other_user_id: string; last_message: string; last_at: string; unread_count: number; profile: { id: string; display_name: string; avatar_url?: string } | null }[]> {
+    return this.request(`/clubs/${clubId}/class/dm`);
+  }
+
 }
 
 export const api = new ApiClient();

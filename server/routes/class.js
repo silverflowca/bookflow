@@ -1023,4 +1023,341 @@ router.post('/:clubId/class/answers/:responseId/feedback', authenticate, async (
 });
 
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// STUDENT DETAIL (teacher drills into one student)
+// GET /api/clubs/:clubId/class/students/:studentId
+// ═══════════════════════════════════════════════════════════════════════════════
+router.get('/:clubId/class/students/:studentId', authenticate, async (req, res) => {
+  const { clubId, studentId } = req.params;
+  const role = await requireClassAccess(req, res, 'teacher');
+  if (!role) return;
+
+  try {
+    // Profile
+    const { data: profile } = await supabase
+      .schema('bookflow')
+      .from('profiles')
+      .select('id, display_name, avatar_url, email')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    // Current book
+    const { data: clubBook } = await supabase
+      .schema('bookflow')
+      .from('club_books')
+      .select('book_id, book:books(id, title, cover_image_url)')
+      .eq('club_id', clubId)
+      .eq('is_current', true)
+      .maybeSingle();
+
+    if (!clubBook) return res.json({ profile, book: null, chapters: [], submissions: [], answers: [] });
+    const book = Array.isArray(clubBook.book) ? clubBook.book[0] : clubBook.book;
+
+    // Chapters
+    const { data: chapters } = await supabase
+      .schema('bookflow')
+      .from('chapters')
+      .select('id, title, order_index, content')
+      .eq('book_id', clubBook.book_id)
+      .eq('status', 'published')
+      .order('order_index', { ascending: true });
+
+    const chapterIds = (chapters || []).map(c => c.id);
+
+    // Inline content totals
+    const { data: allInline } = await supabase
+      .schema('bookflow')
+      .from('inline_content')
+      .select('id, chapter_id, content_type, label')
+      .in('chapter_id', chapterIds)
+      .in('content_type', TRACKABLE_TYPES);
+
+    const totalByChapter = {};
+    for (const ch of (chapters || [])) {
+      const formCount = (allInline || []).filter(ic => ic.chapter_id === ch.id).length;
+      const mediaCount = extractMediaKeys(ch.content?.content || [], ch.id).length;
+      totalByChapter[ch.id] = formCount + mediaCount;
+    }
+    const grandTotal = Object.values(totalByChapter).reduce((a, b) => a + b, 0);
+
+    // Student completions
+    const { data: completions } = await supabase
+      .schema('bookflow')
+      .from('chapter_item_completions')
+      .select('chapter_id, item_key, completed_at')
+      .eq('user_id', studentId)
+      .in('chapter_id', chapterIds);
+
+    const chapters_breakdown = (chapters || []).map(ch => ({
+      chapter_id: ch.id,
+      title: ch.title,
+      completed: (completions || []).filter(c => c.chapter_id === ch.id).length,
+      total: totalByChapter[ch.id] || 0,
+    }));
+
+    // Q&A answers with inline_content label + response comments
+    const { data: answers } = await supabase
+      .schema('bookflow')
+      .from('form_responses')
+      .select(`
+        id, chapter_id, content_id, response_data, created_at,
+        comments:class_response_comments(id, author_id, body, created_at, author:profiles!class_response_comments_author_id_fkey(id, display_name, avatar_url))
+      `)
+      .eq('user_id', studentId)
+      .in('chapter_id', chapterIds)
+      .order('created_at', { ascending: true });
+
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+
+    const enrichedAnswers = (answers || []).map(a => {
+      const ic = (allInline || []).find(i => i.id === a.content_id);
+      const comments = (a.comments || []).map(c => ({ ...c, author: norm(c.author) }));
+      return { ...a, question_label: ic?.label || null, chapter_title: (chapters || []).find(c => c.id === a.chapter_id)?.title || null, comments };
+    });
+
+    // Submissions with feedback
+    const { data: submissions } = await supabase
+      .schema('bookflow')
+      .from('class_submissions')
+      .select(`
+        id, title, status, submitted_at, created_at, body,
+        prompt:class_submission_prompts(id, title, prompt_type),
+        feedback:class_submission_feedback(grade, feedback_text, created_at)
+      `)
+      .eq('club_id', clubId)
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    const normalizedSubs = (submissions || []).map(s => ({
+      ...s,
+      prompt: norm(s.prompt),
+      feedback: norm(s.feedback),
+    }));
+
+    const completedCount = (completions || []).length;
+
+    res.json({
+      profile,
+      book,
+      items_completed: completedCount,
+      items_total: grandTotal,
+      completion_pct: grandTotal > 0 ? Math.round((completedCount / grandTotal) * 100) : 0,
+      chapters: chapters_breakdown,
+      answers: enrichedAnswers,
+      submissions: normalizedSubs,
+    });
+  } catch (err) {
+    console.error('Student detail error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESPONSE COMMENTS (teacher ↔ student dialogue on Q&A answers)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/clubs/:clubId/class/responses/:responseId/comments
+router.get('/:clubId/class/responses/:responseId/comments', authenticate, async (req, res) => {
+  const { clubId, responseId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_response_comments')
+      .select('id, author_id, body, created_at, author:profiles!class_response_comments_author_id_fkey(id, display_name, avatar_url)')
+      .eq('club_id', clubId)
+      .eq('response_id', responseId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+    res.json((data || []).map(c => ({ ...c, author: norm(c.author) })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/clubs/:clubId/class/responses/:responseId/comments
+router.post('/:clubId/class/responses/:responseId/comments', authenticate, async (req, res) => {
+  const { clubId, responseId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: 'Body required' });
+
+  try {
+    // Find response owner to notify
+    const { data: response } = await supabase
+      .schema('bookflow')
+      .from('form_responses')
+      .select('user_id')
+      .eq('id', responseId)
+      .maybeSingle();
+
+    const { data: comment, error } = await supabase
+      .schema('bookflow')
+      .from('class_response_comments')
+      .insert({ club_id: clubId, response_id: responseId, author_id: req.user.id, body: body.trim() })
+      .select('id, author_id, body, created_at, author:profiles!class_response_comments_author_id_fkey(id, display_name, avatar_url)')
+      .single();
+    if (error) throw error;
+
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+    const result = { ...comment, author: norm(comment.author) };
+
+    // Notify the other party
+    if (response?.user_id && response.user_id !== req.user.id) {
+      await notify(response.user_id, 'class_response_comment',
+        'New comment on your answer',
+        `Your teacher left a comment on one of your answers.`,
+        { club_id: clubId, response_id: responseId }
+      );
+    } else if (response?.user_id && response.user_id === req.user.id) {
+      // Student replied — notify teachers
+      const teacherIds = await getTeacherIds(clubId);
+      for (const tid of teacherIds) {
+        await notify(tid, 'class_response_comment',
+          'Student replied to answer comment',
+          `A student replied to a comment on their answer.`,
+          { club_id: clubId, response_id: responseId }
+        );
+      }
+    }
+
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1:1 DIRECT MESSAGES (private teacher ↔ student sessions)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function dmPair(a, b) {
+  // Stable ordering: lower UUID first
+  return a < b ? { user_a: a, user_b: b } : { user_a: b, user_b: a };
+}
+
+// GET /api/clubs/:clubId/class/dm/:otherUserId
+router.get('/:clubId/class/dm/:otherUserId', authenticate, async (req, res) => {
+  const { clubId, otherUserId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+
+  const { user_a, user_b } = dmPair(req.user.id, otherUserId);
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_direct_messages')
+      .select('id, author_id, body, read_at, created_at, author:profiles!class_direct_messages_author_id_fkey(id, display_name, avatar_url)')
+      .eq('club_id', clubId)
+      .eq('user_a', user_a)
+      .eq('user_b', user_b)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+
+    // Mark unread messages as read
+    await supabase.schema('bookflow')
+      .from('class_direct_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('club_id', clubId)
+      .eq('user_a', user_a)
+      .eq('user_b', user_b)
+      .neq('author_id', req.user.id)
+      .is('read_at', null);
+
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+    res.json((data || []).map(m => ({ ...m, author: norm(m.author) })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/clubs/:clubId/class/dm/:otherUserId
+router.post('/:clubId/class/dm/:otherUserId', authenticate, async (req, res) => {
+  const { clubId, otherUserId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: 'Body required' });
+
+  const { user_a, user_b } = dmPair(req.user.id, otherUserId);
+  try {
+    const { data: msg, error } = await supabase
+      .schema('bookflow')
+      .from('class_direct_messages')
+      .insert({ club_id: clubId, user_a, user_b, author_id: req.user.id, body: body.trim() })
+      .select('id, author_id, body, read_at, created_at, author:profiles!class_direct_messages_author_id_fkey(id, display_name, avatar_url)')
+      .single();
+    if (error) throw error;
+
+    const norm = v => Array.isArray(v) ? v[0] ?? null : v;
+    const result = { ...msg, author: norm(msg.author) };
+
+    // Notify recipient
+    await notify(otherUserId, 'class_dm',
+      'New private message',
+      `You have a new message in your class.`,
+      { club_id: clubId }
+    );
+
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/clubs/:clubId/class/dm — list all DM conversations for current user
+router.get('/:clubId/class/dm', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+
+  try {
+    // Get all messages where user is a participant, grouped by other party
+    const { data: msgs } = await supabase
+      .schema('bookflow')
+      .from('class_direct_messages')
+      .select('id, user_a, user_b, author_id, body, read_at, created_at')
+      .eq('club_id', clubId)
+      .or(`user_a.eq.${req.user.id},user_b.eq.${req.user.id}`)
+      .order('created_at', { ascending: false });
+
+    // Group by conversation partner
+    const convMap = {};
+    for (const m of (msgs || [])) {
+      const otherId = m.user_a === req.user.id ? m.user_b : m.user_a;
+      if (!convMap[otherId]) {
+        convMap[otherId] = { other_user_id: otherId, last_message: m.body, last_at: m.created_at, unread_count: 0 };
+      }
+      if (!m.read_at && m.author_id !== req.user.id) convMap[otherId].unread_count++;
+    }
+
+    const otherIds = Object.keys(convMap);
+    if (!otherIds.length) return res.json([]);
+
+    const { data: profiles } = await supabase
+      .schema('bookflow')
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', otherIds);
+
+    const result = otherIds.map(id => ({
+      ...convMap[id],
+      profile: (profiles || []).find(p => p.id === id) || null,
+    })).sort((a, b) => b.last_at.localeCompare(a.last_at));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 export default router;
