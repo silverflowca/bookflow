@@ -129,13 +129,16 @@ router.post('/chapters/:chapterId/inline-content', authenticate, async (req, res
     // Get chapter and book info
     const { data: chapter, error: chapterError } = await supabase
       .from('chapters')
-      .select('book_id, book:books(author_id, settings:book_settings(*))')
+      .select('book_id, book:books(author_id, settings:book_settings(*), collaborators:book_collaborators(user_id, invite_accepted_at))')
       .eq('id', req.params.chapterId)
       .single();
 
     if (chapterError) throw chapterError;
 
-    const isAuthor = req.user.id === chapter.book.author_id;
+    const isAuthor = req.user.id === chapter.book.author_id
+      || (chapter.book.collaborators || []).some(
+          c => c.user_id === req.user.id && c.invite_accepted_at !== null
+        );
     const settings = chapter.book.settings;
 
     // Check permissions for reader-created content
