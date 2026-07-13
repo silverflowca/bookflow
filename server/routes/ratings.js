@@ -17,18 +17,23 @@ router.post('/books/:bookId/rating', authenticate, async (req, res) => {
     // Verify book exists and user has access
     const { data: book, error: bookError } = await supabase
       .from('books')
-      .select('id, visibility, author_id')
+      .select('id, visibility, author_id, collaborators:book_collaborators(user_id, invite_accepted_at)')
       .eq('id', bookId)
       .single();
 
     if (bookError) throw bookError;
 
-    // Authors cannot rate their own book
-    if (book.author_id === req.user.id) {
+    const isBookTeam = book.author_id === req.user.id
+      || (book.collaborators || []).some(
+          c => c.user_id === req.user.id && c.invite_accepted_at !== null
+        );
+
+    // Authors and collaborators cannot rate their own book
+    if (isBookTeam) {
       return res.status(403).json({ error: 'Authors cannot rate their own book' });
     }
 
-    if (book.visibility !== 'public' && book.author_id !== req.user.id) {
+    if (book.visibility !== 'public') {
       return res.status(403).json({ error: 'Not authorized' });
     }
 

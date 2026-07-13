@@ -190,7 +190,7 @@ router.delete('/:commentId', authenticate, async (req, res) => {
 
     if (!comment) return res.status(404).json({ error: 'Comment not found' });
 
-    // Allow author of comment OR book owner
+    // Allow author of comment, book owner, or accepted collaborator
     const isAuthor = comment.author_id === req.user.id;
     const { data: book } = await supabase
       .from('books')
@@ -198,8 +198,15 @@ router.delete('/:commentId', authenticate, async (req, res) => {
       .eq('id', comment.book_id)
       .single();
     const isBookOwner = book?.author_id === req.user.id;
+    const { data: collab } = await supabase
+      .from('book_collaborators')
+      .select('id')
+      .eq('book_id', comment.book_id)
+      .eq('user_id', req.user.id)
+      .not('invite_accepted_at', 'is', null)
+      .maybeSingle();
 
-    if (!isAuthor && !isBookOwner) {
+    if (!isAuthor && !isBookOwner && !collab) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 

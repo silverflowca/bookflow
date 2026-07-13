@@ -465,13 +465,16 @@ router.delete('/media-responses/:responseId', authenticate, async (req, res) => 
     const { data: existing, error: existingError } = await supabase
       .schema('bookflow')
       .from('media_responses')
-      .select('id, user_id, book_id, book:books!media_responses_book_id_fkey(author_id)')
+      .select('id, user_id, book_id, book:books!media_responses_book_id_fkey(author_id, collaborators:book_collaborators(user_id, invite_accepted_at))')
       .eq('id', req.params.responseId)
       .single();
 
     if (existingError) throw existingError;
     const isOwner = existing.user_id === req.user.id;
-    const isBookAuthor = existing.book?.author_id === req.user.id;
+    const isBookAuthor = existing.book?.author_id === req.user.id
+      || (existing.book?.collaborators || []).some(
+          c => c.user_id === req.user.id && c.invite_accepted_at !== null
+        );
     if (!isOwner && !isBookAuthor) {
       return res.status(403).json({ error: 'Not authorized' });
     }

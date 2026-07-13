@@ -18,13 +18,16 @@ router.post('/form-responses/:contentId', authenticate, async (req, res) => {
     const { data: content, error: contentError } = await supabase
       .schema('bookflow')
       .from('inline_content')
-      .select('id, book_id, book:books(author_id, visibility)')
+      .select('id, book_id, book:books(author_id, visibility, collaborators:book_collaborators(user_id, invite_accepted_at))')
       .eq('id', contentId)
       .single();
 
     if (contentError) throw contentError;
 
-    const isAuthor = req.user.id === content.book.author_id;
+    const isAuthor = req.user.id === content.book.author_id
+      || (content.book.collaborators || []).some(
+          c => c.user_id === req.user.id && c.invite_accepted_at !== null
+        );
     if (content.book.visibility !== 'public' && !isAuthor) {
       return res.status(403).json({ error: 'Not authorized' });
     }

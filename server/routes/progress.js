@@ -70,7 +70,7 @@ router.post('/complete', authenticate, async (req, res) => {
     const { data: chapter, error: chErr } = await supabase
       .schema('bookflow')
       .from('chapters')
-      .select('id, book_id, book:books(visibility, author_id, settings:book_settings(enable_progress_tracking))')
+      .select('id, book_id, book:books(visibility, author_id, settings:book_settings(enable_progress_tracking), collaborators:book_collaborators(user_id, invite_accepted_at))')
       .eq('id', chapter_id)
       .single();
 
@@ -80,7 +80,10 @@ router.post('/complete', authenticate, async (req, res) => {
     const settings = Array.isArray(book.settings) ? book.settings[0] : book.settings;
 
     // Check progress tracking is enabled at book or club level
-    const isAuthor = book.author_id === req.user.id;
+    const isAuthor = book.author_id === req.user.id
+      || (book.collaborators || []).some(
+          c => c.user_id === req.user.id && c.invite_accepted_at !== null
+        );
     if (!settings?.enable_progress_tracking && !isAuthor) {
       // Check club-level enable: find clubs that have this book AND have progress tracking on
       // AND the user is a member of
