@@ -351,6 +351,7 @@ export default function ChapterEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [inlineContents, setInlineContents] = useState<InlineContent[]>([]);
   const inlineContentsRef = useRef<InlineContent[]>([]);
   const pendingContentRef = useRef<unknown>(null);
@@ -736,8 +737,13 @@ export default function ChapterEditor() {
       updateData.estimated_read_time_minutes = Math.max(1, Math.round(words / 200));
       await api.updateChapter(chapterId, updateData);
       setLastSaved(new Date());
-    } catch (err) {
+      setSaveError(null);
+    } catch (err: any) {
       console.error('Failed to save:', err);
+      const msg = err?.message?.toLowerCase().includes('not authorized') || err?.message?.toLowerCase().includes('unauthorized')
+        ? 'Not authorized to edit this chapter. Check your collaborator permissions.'
+        : 'Save failed. Please try again.';
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
@@ -1232,9 +1238,13 @@ export default function ChapterEditor() {
               />
             </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-              <span className={`text-xs text-muted hidden sm:inline transition-opacity duration-500 ${lastSaved && !saving ? 'opacity-100' : 'opacity-0'}`}>
-                {lastSaved ? `Saved · edited ${fmtRelative(lastSaved)}` : chapter?.updated_at ? `Last edited ${fmtRelative(new Date(chapter.updated_at))}` : 'Saved'}
-              </span>
+              {saveError ? (
+                <span className="text-xs text-red-500 hidden sm:inline">{saveError}</span>
+              ) : (
+                <span className={`text-xs text-muted hidden sm:inline transition-opacity duration-500 ${lastSaved && !saving ? 'opacity-100' : 'opacity-0'}`}>
+                  {lastSaved ? `Saved · edited ${fmtRelative(lastSaved)}` : chapter?.updated_at ? `Last edited ${fmtRelative(new Date(chapter.updated_at))}` : 'Saved'}
+                </span>
+              )}
               <button
                 onClick={() => handleSave()}
                 disabled={saving}

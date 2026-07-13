@@ -260,14 +260,17 @@ export async function getMyRole(req, res) {
 
     const { data: collab } = await supabase
       .from('book_collaborators')
-      .select('role')
+      .select('role, invite_accepted_at')
       .eq('book_id', bookId)
       .eq('user_id', userId)
-      .not('invite_accepted_at', 'is', null)
       .maybeSingle();
 
     if (!collab) {
       return res.status(403).json({ error: 'Not a collaborator on this book' });
+    }
+
+    if (!collab.invite_accepted_at) {
+      return res.status(403).json({ error: 'Invite not yet accepted' });
     }
 
     res.json({ role: collab.role });

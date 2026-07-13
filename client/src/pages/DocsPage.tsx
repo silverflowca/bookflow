@@ -419,7 +419,7 @@ const SECTIONS: Section[] = [
   {
     id: 'clubs-study-groups',
     icon: <Users className="h-5 w-5" />,
-    title: 'Clubs & Study Groups',
+    title: 'Book Clubs, Study Groups & Online Classes',
     color: 'text-orange-700',
     bg: 'bg-orange-50 border-orange-200',
     intro: 'Create communities around your books for group reading, discussion, and progress tracking.',

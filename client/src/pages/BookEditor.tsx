@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
 import CollaboratorBadges from '../components/collaboration/CollaboratorBadges';
+import { useAuth } from '../contexts/AuthContext';
 
 function fmtRelative(date: Date): string {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -818,6 +819,7 @@ const ROLE_BADGE: Record<CollaboratorRole, { label: string; className: string }>
 export default function BookEditor() {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [collaborators, setCollaborators] = useState<BookCollaborator[]>([]);
@@ -927,11 +929,22 @@ export default function BookEditor() {
     try {
       const [bookData, roleResult] = await Promise.all([
         api.getBook(bookId!),
-        api.getMyRole(bookId!).catch(() => ({ role: 'owner' as CollaboratorRole })),
+        api.getMyRole(bookId!).catch(() => null),
       ]);
       setBook(bookData);
       setChapters(bookData.chapters || []);
-      setUserRole(roleResult.role);
+      // Derive role: prefer server result, then fall back to book data
+      let resolvedRole: CollaboratorRole = 'owner';
+      if (roleResult) {
+        resolvedRole = roleResult.role;
+      } else if (user && bookData.author_id !== user.id) {
+        // Not the owner — check collaborators array from the book
+        const collab = (bookData.collaborators || []).find(
+          (c: any) => c.user_id === user.id && c.invite_accepted_at
+        );
+        if (collab) resolvedRole = collab.role as CollaboratorRole;
+      }
+      setUserRole(resolvedRole);
       // Load collaborators list (owner only — silently fail for non-owners)
       api.getCollaborators(bookId!).then(setCollaborators).catch(() => {});
       // Load latest review request
