@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Loader2, Users, CheckCircle, ChevronRight } from 'lucide-react';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { Loader2, Users, CheckCircle, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
 import type { RegistrationField, ClubRegistrationSettings } from '../types';
@@ -114,7 +114,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-type Step = 'join' | 'form' | 'welcome';
+type Step = 'join' | 'login' | 'signup' | 'form' | 'welcome';
 
 interface ClubData {
   id: string;
@@ -131,7 +131,7 @@ export default function RegistrationFlowPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || undefined;
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, login } = useAuth();
 
   const [club, setClub] = useState<ClubData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,6 +141,11 @@ export default function RegistrationFlowPage() {
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [showCheck, setShowCheck] = useState(false);
   const [slideDir, setSlideDir] = useState<'in' | 'out'>('in');
+  // Inline auth state
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   useEffect(() => {
     if (!clubId) return;
@@ -171,14 +176,51 @@ export default function RegistrationFlowPage() {
 
   async function handleJoin() {
     if (!user) {
-      const redirect = encodeURIComponent(`/clubs/${clubId}/register${token ? `?token=${token}` : ''}`);
-      navigate(`/login?redirect=${redirect}`);
+      goToStep('login');
       return;
     }
     if (hasForm) {
       goToStep('form');
     } else {
       await submitAndFinish({});
+    }
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAuthSubmitting(true);
+    try {
+      await login(authEmail, authPassword);
+      // After login the user state updates — proceed straight to next step
+      if (hasForm) {
+        goToStep('form');
+      } else {
+        await submitAndFinish({});
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
+  async function handleSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setAuthSubmitting(true);
+    try {
+      await api.register(authEmail, authPassword, authName);
+      await login(authEmail, authPassword);
+      if (hasForm) {
+        goToStep('form');
+      } else {
+        await submitAndFinish({});
+      }
+    } catch (err: any) {
+      setError(err.message || 'Sign up failed. Please try again.');
+    } finally {
+      setAuthSubmitting(false);
     }
   }
 
@@ -222,7 +264,8 @@ export default function RegistrationFlowPage() {
 
   // ── render ──
 
-  const stepIndex = step === 'join' ? 0 : step === 'form' ? 1 : 2;
+  // auth steps count as step 0 (still "joining")
+  const stepIndex = (step === 'join' || step === 'login' || step === 'signup') ? 0 : step === 'form' ? 1 : 2;
   const visibleStepCount = hasForm ? 3 : 2;
 
   if (loading) {
@@ -357,9 +400,120 @@ export default function RegistrationFlowPage() {
 
               {!user && (
                 <p className="text-center text-xs text-slate-400">
-                  You'll be asked to sign in before joining
+                  You'll need to sign in or create an account to join
                 </p>
               )}
+            </div>
+          )}
+
+          {/* ── Login ─────────────────────────────────────────── */}
+          {step === 'login' && (
+            <div className="space-y-5">
+              <div>
+                <button onClick={() => goToStep('join')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 mb-4 transition-colors">
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                </button>
+                <h2 className="text-2xl font-bold text-slate-800">Sign in</h2>
+                <p className="text-sm text-slate-500 mt-1">Sign in to continue joining <strong>{club.name}</strong>.</p>
+              </div>
+
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">{error}</p>}
+
+              <form onSubmit={handleLogin} className="space-y-3">
+                <input
+                  type="email"
+                  required
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+                />
+                <input
+                  type="password"
+                  required
+                  placeholder="Password"
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={authSubmitting}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md"
+                >
+                  {authSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {authSubmitting ? 'Signing in…' : 'Sign in & Continue'}
+                  {!authSubmitting && <ChevronRight className="h-4 w-4" />}
+                </button>
+              </form>
+
+              <div className="text-center space-y-2">
+                <button onClick={() => { setError(''); goToStep('signup'); }} className="text-sm text-blue-600 hover:underline">
+                  Don't have an account? Sign up
+                </button>
+                <br />
+                <Link to={`/forgot-password`} className="text-xs text-slate-400 hover:text-slate-600">
+                  Forgot password?
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sign up ───────────────────────────────────────── */}
+          {step === 'signup' && (
+            <div className="space-y-5">
+              <div>
+                <button onClick={() => goToStep('login')} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 mb-4 transition-colors">
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back to sign in
+                </button>
+                <h2 className="text-2xl font-bold text-slate-800">Create account</h2>
+                <p className="text-sm text-slate-500 mt-1">Join <strong>{club.name}</strong> — it's free.</p>
+              </div>
+
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">{error}</p>}
+
+              <form onSubmit={handleSignup} className="space-y-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Your name"
+                  value={authName}
+                  onChange={e => setAuthName(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+                />
+                <input
+                  type="email"
+                  required
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+                />
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="Password (min 8 characters)"
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={authSubmitting}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md"
+                >
+                  {authSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {authSubmitting ? 'Creating account…' : 'Create account & Continue'}
+                  {!authSubmitting && <ChevronRight className="h-4 w-4" />}
+                </button>
+              </form>
+
+              <div className="text-center">
+                <button onClick={() => { setError(''); goToStep('login'); }} className="text-sm text-blue-600 hover:underline">
+                  Already have an account? Sign in
+                </button>
+              </div>
             </div>
           )}
 
