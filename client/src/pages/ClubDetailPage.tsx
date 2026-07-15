@@ -43,6 +43,7 @@ interface ClubSettings {
   show_member_media: boolean;
   enable_progress_tracking?: boolean;
   allow_join_requests?: boolean;
+  registration_bg_url?: string;
 }
 
 interface ClubProgressEntry {
@@ -719,8 +720,19 @@ export default function ClubDetailPage() {
   async function loadClub() {
     try {
       const data = await api.getClub(clubId!);
+      // Non-members viewing a public club → send to registration/landing page
+      if (!data.my_role && data.visibility === 'public') {
+        navigate(`/clubs/${clubId}/register`, { replace: true });
+        return;
+      }
       setClub(data);
-    } catch (err) {
+    } catch (err: any) {
+      // Private club they can't access → send to registration page (shows "not found" or join prompt)
+      const status = err?.status ?? err?.response?.status;
+      if (status === 403 || status === 404) {
+        navigate(`/clubs/${clubId}/register`, { replace: true });
+        return;
+      }
       console.error('Failed to load club:', err);
     } finally {
       setLoading(false);
@@ -854,8 +866,12 @@ export default function ClubDetailPage() {
 
       {/* Club Header */}
       <div className="theme-section rounded-xl overflow-hidden mb-6">
-        {club.cover_image_url && (
-          <img src={club.cover_image_url} alt={club.name} className="w-full h-40 object-cover" />
+        {(club.cover_image_url || club.settings?.registration_bg_url) && (
+          <img
+            src={club.cover_image_url || club.settings?.registration_bg_url}
+            alt={club.name}
+            className="w-full h-40 object-cover"
+          />
         )}
         <div className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">

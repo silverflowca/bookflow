@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, BookOpen, Star, Trash2, Plus, Search, Check, Copy, Link, AlertCircle } from 'lucide-react';
+import { Settings, BookOpen, Star, Trash2, Plus, Search, Check, Copy, Link, AlertCircle, ClipboardList, Image, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../../lib/api';
-import type { Book } from '../../types';
+import type { Book, ClubRegistrationSettings } from '../../types';
+import RegistrationFormBuilder from './RegistrationFormBuilder';
 
 interface ClubBook {
   id: string;
@@ -49,6 +50,15 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
   const [generating, setGenerating] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  // Registration form
+  const [regSettings, setRegSettings] = useState<ClubRegistrationSettings>({
+    registration_enabled: false,
+    registration_fields: [],
+  });
+  const [regExpanded, setRegExpanded] = useState(false);
+  const [bgUploading, setBgUploading] = useState(false);
+  const [bgError, setBgError] = useState('');
+
   useEffect(() => {
     setBooks(club.books ?? []);
   }, [club.books]);
@@ -68,6 +78,15 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
     }, 300);
     return () => { if (bookDebounceRef.current) clearTimeout(bookDebounceRef.current); };
   }, [bookQuery, books]);
+
+  // Load registration settings
+  useEffect(() => {
+    api.getClubRegistration(club.id)
+      .then(data => {
+        if (data.settings) setRegSettings(data.settings);
+      })
+      .catch(() => {});
+  }, [club.id]);
 
   async function handleSaveSettings() {
     if (!name.trim()) { setSaveError('Name is required'); return; }
@@ -150,6 +169,21 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
     navigator.clipboard.writeText(inviteLink);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
+  }
+
+  async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBgUploading(true);
+    setBgError('');
+    try {
+      const result = await api.uploadClubRegistrationBg(club.id, file);
+      setRegSettings(prev => ({ ...prev, registration_bg_url: result.registration_bg_url }));
+    } catch (err: any) {
+      setBgError(err.message || 'Upload failed');
+    } finally {
+      setBgUploading(false);
+    }
   }
 
   return (
@@ -361,6 +395,60 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
           >
             {generating ? 'Generating...' : 'Generate Invite Link'}
           </button>
+        )}
+      </div>
+
+      {/* ── Registration Form ─────────────────────────────────── */}
+      <div className="theme-section rounded-xl overflow-hidden">
+        <button
+          onClick={() => setRegExpanded(prev => !prev)}
+          className="w-full flex items-center gap-2 px-5 py-4 text-left hover:bg-strong/5 transition-colors"
+        >
+          <ClipboardList className="h-5 w-5 text-muted flex-shrink-0" />
+          <h2 className="font-semibold text-theme flex-1">Registration Form</h2>
+          {regSettings.registration_enabled && (
+            <span className="text-xs text-emerald-500 font-medium mr-2">Enabled</span>
+          )}
+          {regExpanded ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
+        </button>
+
+        {regExpanded && (
+          <div className="px-5 pb-5 border-t border-theme space-y-5 pt-5">
+            {/* Background image */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Image className="h-4 w-4 text-muted" />
+                <span className="text-sm font-medium text-theme">Background Image</span>
+              </div>
+              {regSettings.registration_bg_url && (
+                <img
+                  src={regSettings.registration_bg_url}
+                  alt="Registration background"
+                  className="w-full h-28 object-cover rounded-lg mb-2"
+                />
+              )}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="theme-button-secondary px-3 py-1.5 rounded-lg text-xs">
+                  {bgUploading ? 'Uploading…' : regSettings.registration_bg_url ? 'Change image' : 'Upload image'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleBgUpload}
+                  disabled={bgUploading}
+                />
+              </label>
+              {bgError && <p className="text-xs text-red-500 mt-1">{bgError}</p>}
+              <p className="text-xs text-muted mt-1">This image appears behind all 3 registration steps. Max 10 MB.</p>
+            </div>
+
+            <RegistrationFormBuilder
+              clubId={club.id}
+              settings={regSettings}
+              onSaved={setRegSettings}
+            />
+          </div>
         )}
       </div>
 

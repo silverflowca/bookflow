@@ -851,3 +851,22 @@ export interface ClassRosterEntry {
   submissions_graded: number;
   last_active?: string;
 }
+
+// Registration form types
+export interface RegistrationField {
+  id: string;
+  type: 'textbox' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'signature';
+  label: string;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+}
+
+export interface ClubRegistrationSettings {
+  registration_enabled: boolean;
+  registration_fields: RegistrationField[];
+  registration_bg_url?: string;
+  welcome_heading?: string;
+  welcome_body?: string;
+  welcome_cta_label?: string;
+}

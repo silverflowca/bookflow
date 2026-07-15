@@ -15,7 +15,7 @@ interface FieldRendererProps {
 }
 
 function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
-  const base = 'w-full rounded-xl px-4 py-3 text-sm bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40 backdrop-blur-sm';
+  const base = 'w-full rounded-xl px-4 py-3 text-sm bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm';
 
   switch (field.type) {
     case 'textbox':
@@ -59,11 +59,11 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
         <div className="space-y-2">
           {(field.options || []).map(opt => (
             <label key={opt} className="flex items-center gap-3 cursor-pointer group">
-              <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${value === opt ? 'border-white bg-white' : 'border-white/40 group-hover:border-white/70'}`}>
-                {value === opt && <div className="h-2 w-2 rounded-full bg-gray-800" />}
+              <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${value === opt ? 'border-blue-600 bg-blue-600' : 'border-slate-300 group-hover:border-blue-400'}`}>
+                {value === opt && <div className="h-2 w-2 rounded-full bg-white" />}
               </div>
               <input type="radio" className="sr-only" checked={value === opt} onChange={() => onChange(field.id, opt)} />
-              <span className="text-sm text-white">{opt}</span>
+              <span className="text-sm text-slate-700">{opt}</span>
             </label>
           ))}
         </div>
@@ -77,8 +77,8 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
             const checked = selected.includes(opt);
             return (
               <label key={opt} className="flex items-center gap-3 cursor-pointer group">
-                <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${checked ? 'border-white bg-white' : 'border-white/40 group-hover:border-white/70'}`}>
-                  {checked && <CheckCircle className="h-3 w-3 text-gray-800" />}
+                <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${checked ? 'border-blue-600 bg-blue-600' : 'border-slate-300 group-hover:border-blue-400'}`}>
+                  {checked && <CheckCircle className="h-3 w-3 text-white" />}
                 </div>
                 <input
                   type="checkbox"
@@ -89,7 +89,7 @@ function FieldRenderer({ field, value, onChange }: FieldRendererProps) {
                     onChange(field.id, next);
                   }}
                 />
-                <span className="text-sm text-white">{opt}</span>
+                <span className="text-sm text-slate-700">{opt}</span>
               </label>
             );
           })}
@@ -282,46 +282,28 @@ export default function RegistrationFlowPage() {
         }
       `}</style>
 
-      {/* ── Left: background image / branding ── */}
+      {/* ── Mobile: image strip at top ── */}
+      <div className="md:hidden relative w-full h-64 shrink-0 bg-gray-900 overflow-hidden rounded-b-3xl">
+        {bgUrl ? (
+          <img src={bgUrl} alt="" className="w-full h-full object-cover rounded-b-3xl" aria-hidden />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 rounded-b-3xl" aria-hidden />
+        )}
+      </div>
+
+      {/* ── Left: background image (desktop only) ── */}
       <div className="relative hidden md:flex md:flex-1 flex-col items-center justify-center overflow-hidden">
         {bgUrl ? (
-          <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
+          <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-contain" aria-hidden />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900" aria-hidden />
         )}
         {/* Subtle gradient on right edge so it blends into the form panel */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/40" aria-hidden />
-
-        {/* Club info overlay */}
-        <div className="relative z-10 text-center px-10 max-w-md">
-          {club.cover_image_url ? (
-            <img src={club.cover_image_url} alt={club.name} className="h-24 w-24 rounded-3xl object-cover mx-auto mb-5 shadow-2xl ring-4 ring-white/20" />
-          ) : (
-            <div className="h-24 w-24 rounded-3xl bg-white/20 flex items-center justify-center mx-auto mb-5 backdrop-blur-sm">
-              <Users className="h-12 w-12 text-white/70" />
-            </div>
-          )}
-          <h1 className="text-3xl font-bold text-white leading-tight drop-shadow-lg">{club.name}</h1>
-          {club.description && (
-            <p className="text-sm text-white/70 mt-3 leading-relaxed drop-shadow">{club.description}</p>
-          )}
-          <p className="text-xs text-white/40 mt-4">
-            {club.member_count} {club.member_count === 1 ? 'member' : 'members'}
-          </p>
-        </div>
       </div>
 
       {/* ── Right: form panel ── */}
-      <div className="relative flex flex-col items-center justify-center w-full md:w-[420px] lg:w-[460px] shrink-0 bg-gray-950 px-8 py-12 min-h-screen">
-        {/* Mobile: show bg behind form on small screens */}
-        <div className="absolute inset-0 md:hidden">
-          {bgUrl ? (
-            <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900" aria-hidden />
-          )}
-          <div className="absolute inset-0 bg-black/70" aria-hidden />
-        </div>
+      <div className="relative flex flex-col items-start justify-start w-full md:w-[420px] lg:w-[460px] shrink-0 bg-slate-50 px-8 pt-10 pb-12 md:min-h-screen">
 
         {/* Card */}
         <div
@@ -330,50 +312,41 @@ export default function RegistrationFlowPage() {
             animation: slideDir === 'in' ? 'regSlideIn 0.25s ease-out forwards' : 'regSlideOut 0.22s ease-in forwards',
           }}
         >
-          {/* Mobile: show club name at top */}
-          <div className="md:hidden text-center mb-6">
-            {club.cover_image_url ? (
-              <img src={club.cover_image_url} alt={club.name} className="h-16 w-16 rounded-2xl object-cover mx-auto mb-3 shadow-lg" />
-            ) : (
-              <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-3">
-                <Users className="h-8 w-8 text-white/70" />
-              </div>
-            )}
-            <h1 className="text-xl font-bold text-white">{club.name}</h1>
-          </div>
-
-          {/* Step dots */}
-          <div className="flex justify-center gap-2 mb-6">
-            {Array.from({ length: visibleStepCount }).map((_, i) => (
-              <div
-                key={i}
-                className={`rounded-full transition-all duration-300 ${i === stepIndex ? 'w-6 h-2 bg-white' : 'w-2 h-2 bg-white/30'}`}
-              />
-            ))}
-          </div>
-
           {/* ── Step 1: Join ──────────────────────────────────── */}
           {step === 'join' && (
             <div className="space-y-5">
+              {/* Header */}
               <div className="text-center">
-                <h2 className="text-xl font-bold text-white">Join this {club.club_type === 'study_group' ? 'Study Group' : club.club_type === 'online_class' ? 'Class' : 'Book Club'}</h2>
-                <p className="text-sm text-white/50 mt-1">Click below to register and get access.</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">
+                  {club.club_type === 'study_group' ? 'Join Study Group' : club.club_type === 'online_class' ? 'Join Class' : 'Join Book Club'}
+                </p>
+                {club.cover_image_url ? (
+                  <img src={club.cover_image_url} alt={club.name} className="h-16 w-16 rounded-2xl object-cover mx-auto mb-3 shadow-lg" />
+                ) : (
+                  <div className="h-16 w-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                    <Users className="h-8 w-8 text-blue-400" />
+                  </div>
+                )}
+                <h1 className="text-2xl font-bold text-slate-800">{club.name}</h1>
+                {club.description && (
+                  <p className="text-sm text-slate-500 mt-2 leading-relaxed">{club.description}</p>
+                )}
               </div>
 
-              {error && <p className="text-sm text-red-300 text-center bg-red-500/10 rounded-xl px-4 py-2">{error}</p>}
+              {error && <p className="text-sm text-red-600 text-center bg-red-50 border border-red-200 rounded-xl px-4 py-2">{error}</p>}
 
               <button
                 onClick={handleJoin}
                 disabled={submitting}
-                className="w-full flex items-center justify-center gap-2 bg-white text-gray-900 rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md"
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Join & Continue
+                {submitting ? 'Joining…' : 'Click to Join'}
                 {!submitting && <ChevronRight className="h-4 w-4" />}
               </button>
 
               {!user && (
-                <p className="text-center text-xs text-white/40">
+                <p className="text-center text-xs text-slate-400">
                   You'll be asked to sign in before joining
                 </p>
               )}
@@ -384,14 +357,14 @@ export default function RegistrationFlowPage() {
           {step === 'form' && (
             <div className="space-y-5">
               <div className="text-center">
-                <h2 className="text-xl font-bold text-white">Registration Form</h2>
-                <p className="text-sm text-white/50 mt-1">Fill out the form to complete your registration.</p>
+                <h2 className="text-xl font-bold text-slate-800">Registration Form</h2>
+                <p className="text-sm text-slate-500 mt-1">Fill out the form to complete your registration.</p>
               </div>
 
               {showCheck && (
                 <div className="flex items-center justify-center py-6">
                   <div style={{ animation: 'regCheckPop 0.4s ease-out forwards' }}>
-                    <CheckCircle className="h-16 w-16 text-emerald-400" />
+                    <CheckCircle className="h-16 w-16 text-emerald-500" />
                   </div>
                 </div>
               )}
@@ -401,21 +374,21 @@ export default function RegistrationFlowPage() {
                   <div className="space-y-4">
                     {fields.map(field => (
                       <div key={field.id}>
-                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                        <label className="block text-xs font-medium text-slate-600 mb-1.5">
                           {field.label}
-                          {field.required && <span className="text-red-400 ml-0.5">*</span>}
+                          {field.required && <span className="text-red-500 ml-0.5">*</span>}
                         </label>
                         <FieldRenderer field={field} value={formValues[field.id]} onChange={updateField} />
                       </div>
                     ))}
                   </div>
 
-                  {error && <p className="text-sm text-red-300 bg-red-500/10 rounded-xl px-4 py-2">{error}</p>}
+                  {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">{error}</p>}
 
                   <button
                     onClick={handleSubmitForm}
                     disabled={submitting}
-                    className="w-full flex items-center justify-center gap-2 bg-white text-gray-900 rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-md"
                   >
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                     Submit
@@ -430,14 +403,14 @@ export default function RegistrationFlowPage() {
           {step === 'welcome' && (
             <div className="space-y-5 text-center">
               <div>
-                <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="h-9 w-9 text-emerald-400" />
+                <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="h-9 w-9 text-emerald-500" />
                 </div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-bold text-slate-800">
                   {settings?.welcome_heading || 'Welcome!'}
                 </h2>
                 {settings?.welcome_body && (
-                  <p className="text-sm text-white/60 mt-3 leading-relaxed whitespace-pre-line">
+                  <p className="text-sm text-slate-500 mt-3 leading-relaxed whitespace-pre-line">
                     {settings.welcome_body}
                   </p>
                 )}
@@ -445,7 +418,7 @@ export default function RegistrationFlowPage() {
 
               <button
                 onClick={handleGoToClub}
-                className="w-full flex items-center justify-center gap-2 bg-white text-gray-900 rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-white/90 active:scale-[0.98] transition-all"
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl px-6 py-3.5 font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition-all shadow-md"
               >
                 {settings?.welcome_cta_label || 'Go to Class'}
                 <ChevronRight className="h-4 w-4" />
@@ -455,7 +428,7 @@ export default function RegistrationFlowPage() {
         </div>
 
         {/* Footer */}
-        <p className="relative z-10 text-center text-xs text-white/20 mt-8">{club.name}</p>
+        <p className="relative z-10 text-center text-xs text-slate-300 mt-8 w-full">{club.name}</p>
       </div>
     </div>
   );

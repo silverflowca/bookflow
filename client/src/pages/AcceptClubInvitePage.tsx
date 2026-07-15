@@ -27,8 +27,21 @@ export default function AcceptClubInvitePage() {
   useEffect(() => {
     if (!token) return;
     api.getClubInvitePreview(token)
-      .then(data => {
+      .then(async (data) => {
         setPreview(data);
+        // Check if registration form is enabled for this club
+        if (data.club_id) {
+          try {
+            const regData = await api.getClubRegistration(data.club_id);
+            if (regData.settings?.registration_enabled) {
+              // Redirect to registration flow, passing the invite token
+              navigate(`/clubs/${data.club_id}/register?token=${token}`, { replace: true });
+              return;
+            }
+          } catch (_) {
+            // If registration check fails, fall through to normal accept flow
+          }
+        }
         setState('preview');
       })
       .catch(err => {

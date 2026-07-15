@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookFlow Online Classes</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0f1d3b;
+    width: 1200px;
+    height: 720px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Background ── */
+  .bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, #0a1628 0%, #0f2147 40%, #0a1e45 70%, #0d1f3c 100%);
+  }
+  .bg-glow-1 {
+    position: absolute; top: -80px; left: -80px;
+    width: 400px; height: 400px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%);
+  }
+  .bg-glow-2 {
+    position: absolute; bottom: -60px; right: -60px;
+    width: 350px; height: 350px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%);
+  }
+  .bg-glow-3 {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 500px; height: 500px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+  }
+
+  /* ── Network lines (SVG overlay) ── */
+  .network-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  .content {
+    position: relative; z-index: 10;
+    width: 100%; height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 28px 40px 0;
+    gap: 0;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    padding-bottom: 12px;
+  }
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(59,130,246,0.15);
+    border: 1px solid rgba(59,130,246,0.35);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    color: #93c5fd; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 38px; font-weight: 900;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .header h1 span { color: #3b82f6; }
+  .header p {
+    font-size: 14px; color: #94a3b8; margin-top: 4px;
+    font-weight: 400; letter-spacing: 0.05em;
+    font-style: italic;
+  }
+
+  /* ── Middle row ── */
+  .middle {
+    display: grid;
+    grid-template-columns: 1fr 260px 1fr;
+    gap: 20px;
+    align-items: center;
+  }
+
+  /* ── People panels ── */
+  .people-col {
+    display: flex; flex-direction: column; gap: 16px;
+    height: 100%;
+    justify-content: center;
+  }
+  .person-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 14px;
+    display: flex; align-items: flex-start; gap: 12px;
+    backdrop-filter: blur(8px);
+    position: relative;
+    overflow: hidden;
+  }
+  .person-card::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+  }
+  .person-card.teacher::before { background: #f59e0b; }
+  .person-card.student::before { background: #3b82f6; }
+  .person-card.journal::before { background: #8b5cf6; }
+  .person-card.group::before { background: #10b981; }
+
+  .person-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .person-avatar.teacher { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .person-avatar.student { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+  .person-avatar.journal { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+  .person-avatar.group   { background: linear-gradient(135deg, #10b981, #059669); }
+
+  .person-info h4 { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+  .person-info p  { font-size: 10.5px; color: #94a3b8; margin-top: 2px; line-height: 1.4; }
+
+  .notification-bubble {
+    margin-top: 8px;
+    background: rgba(245,158,11,0.12);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 10px; color: #fcd34d;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .notification-bubble.blue {
+    background: rgba(59,130,246,0.12);
+    border-color: rgba(59,130,246,0.3);
+    color: #93c5fd;
+  }
+  .notification-bubble.green {
+    background: rgba(16,185,129,0.12);
+    border-color: rgba(16,185,129,0.3);
+    color: #6ee7b7;
+  }
+  .notification-bubble.purple {
+    background: rgba(139,92,246,0.12);
+    border-color: rgba(139,92,246,0.3);
+    color: #c4b5fd;
+  }
+
+  /* ── Phone Mockup ── */
+  .phone-wrap {
+    display: flex; justify-content: center; align-items: center;
+  }
+  .phone {
+    width: 248px;
+    background: #0a0f1e;
+    border-radius: 40px;
+    border: 2px solid rgba(59,130,246,0.5);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 30px 80px rgba(0,0,0,0.6),
+      0 0 40px rgba(59,130,246,0.25);
+    overflow: hidden;
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 70px; height: 22px;
+    background: #0a0f1e;
+    border-radius: 0 0 16px 16px;
+    z-index: 20;
+  }
+
+  /* Phone screen */
+  .phone-screen {
+    background: #111827;
+    min-height: 500px;
+    padding-top: 24px;
+  }
+
+  /* Phone header */
+  .phone-header {
+    background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+    padding: 10px 14px 12px;
+    text-align: center;
+  }
+  .phone-header .app-name {
+    font-size: 10px; font-weight: 800; color: #fff;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .phone-header .class-name {
+    font-size: 12px; font-weight: 700; color: #93c5fd;
+    margin-top: 2px;
+  }
+
+  /* Instructor row */
+  .instructor-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: rgba(59,130,246,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .instructor-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+    border: 2px solid #f59e0b;
+  }
+  .instructor-info .name { font-size: 10px; font-weight: 700; color: #f1f5f9; }
+  .instructor-info .role { font-size: 9px; color: #64748b; }
+  .live-badge {
+    margin-left: auto;
+    background: #dc2626;
+    color: #fff;
+    font-size: 8px; font-weight: 800;
+    padding: 2px 6px; border-radius: 4px;
+    letter-spacing: 0.05em;
+    animation: pulse-red 2s infinite;
+  }
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Video player */
+  .video-player {
+    margin: 10px 10px 0;
+    border-radius: 10px; overflow: hidden;
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f2340 100%);
+    height: 90px;
+    position: relative;
+    border: 1px solid rgba(59,130,246,0.2);
+  }
+  .video-thumbnail-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.3);
+  }
+  .play-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .play-btn::after {
+    content: '';
+    border-left: 11px solid #1e3a8a;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    margin-left: 3px;
+  }
+  .video-label {
+    position: absolute; bottom: 6px; left: 8px;
+    font-size: 8px; font-weight: 600; color: rgba(255,255,255,0.8);
+  }
+  .video-duration {
+    position: absolute; bottom: 6px; right: 8px;
+    font-size: 8px; color: rgba(255,255,255,0.6);
+  }
+  .video-progress-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: rgba(255,255,255,0.15);
+  }
+  .video-progress-fill {
+    height: 100%; width: 65%;
+    background: linear-gradient(90deg, #3b82f6, #f59e0b);
+  }
+
+  /* Tabs */
+  .phone-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-top: 10px;
+  }
+  .phone-tab {
+    flex: 1; text-align: center;
+    font-size: 8px; font-weight: 600; letter-spacing: 0.06em;
+    padding: 6px 2px;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+  .phone-tab.active {
+    color: #f59e0b;
+    border-bottom: 2px solid #f59e0b;
+  }
+
+  /* Lesson list */
+  .lesson-list { padding: 8px 10px; }
+  .lesson-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px; border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .lesson-item.completed { background: rgba(16,185,129,0.08); }
+  .lesson-item.active    { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.25); }
+  .lesson-item.locked    { background: rgba(255,255,255,0.03); opacity: 0.6; }
+
+  .lesson-icon {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; flex-shrink: 0;
+  }
+  .lesson-icon.completed { background: #059669; color: #fff; }
+  .lesson-icon.active    { background: #1d4ed8; color: #fff; }
+  .lesson-icon.locked    { background: #1e293b; color: #475569; }
+
+  .lesson-text { flex: 1; }
+  .lesson-text .title   { font-size: 9.5px; font-weight: 600; color: #e2e8f0; }
+  .lesson-text .subtitle { font-size: 8px; color: #64748b; margin-top: 1px; }
+
+  .lesson-duration {
+    font-size: 8px; color: #475569; flex-shrink: 0;
+  }
+
+  /* Progress footer */
+  .phone-progress-footer {
+    margin: 4px 10px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .progress-label {
+    display: flex; justify-content: space-between;
+    font-size: 8px; color: #94a3b8; margin-bottom: 5px;
+    font-weight: 500;
+  }
+  .progress-label span:last-child { color: #f59e0b; font-weight: 700; }
+  .progress-bar-track {
+    height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px;
+  }
+  .progress-bar-fill {
+    height: 100%; width: 38%; border-radius: 3px;
+    background: linear-gradient(90deg, #3b82f6, #f59e0b);
+  }
+  .progress-sublabel {
+    font-size: 7.5px; color: #475569; margin-top: 4px;
+  }
+
+  /* ── Bottom features ── */
+  .features-row {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    padding: 18px 0 22px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    margin-top: 8px;
+  }
+  .feature-tile {
+    text-align: center;
+    padding: 12px 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    transition: all 0.2s;
+  }
+  .feature-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .feature-tile h4 { font-size: 10px; font-weight: 700; color: #e2e8f0; margin-bottom: 3px; }
+  .feature-tile p  { font-size: 8.5px; color: #64748b; line-height: 1.4; }
+
+  /* dot decorations */
+  .dots-grid {
+    position: absolute; pointer-events: none;
+    opacity: 0.15;
+  }
+  .dots-grid-tl { top: 60px; left: 20px; }
+  .dots-grid-br { bottom: 60px; right: 20px; }
+
+</style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg"></div>
+<div class="bg-glow-1"></div>
+<div class="bg-glow-2"></div>
+<div class="bg-glow-3"></div>
+
+<!-- Network lines -->
+<svg class="network-svg" viewBox="0 0 1200 720" xmlns="http://www.w3.org/2000/svg">
+  <!-- Lines from people to phone -->
+  <!-- Teacher (top-left) → phone -->
+  <line x1="250" y1="220" x2="490" y2="360" stroke="#3b82f6" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="4,6"/>
+  <!-- Student (top-right) → phone -->
+  <line x1="960" y1="220" x2="710" y2="360" stroke="#3b82f6" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="4,6"/>
+  <!-- Journal (bottom-left) → phone -->
+  <line x1="250" y1="490" x2="490" y2="420" stroke="#8b5cf6" stroke-width="1" stroke-opacity="0.2" stroke-dasharray="4,6"/>
+  <!-- Group (bottom-right) → phone -->
+  <line x1="960" y1="490" x2="710" y2="420" stroke="#10b981" stroke-width="1" stroke-opacity="0.2" stroke-dasharray="4,6"/>
+
+  <!-- Node dots -->
+  <circle cx="250" cy="220" r="3" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="960" cy="220" r="3" fill="#3b82f6" opacity="0.5"/>
+  <circle cx="250" cy="490" r="3" fill="#8b5cf6" opacity="0.4"/>
+  <circle cx="960" cy="490" r="3" fill="#10b981" opacity="0.4"/>
+  <circle cx="490" cy="360" r="4" fill="#3b82f6" opacity="0.4"/>
+  <circle cx="710" cy="360" r="4" fill="#3b82f6" opacity="0.4"/>
+
+  <!-- Mid-line dots -->
+  <circle cx="370" cy="290" r="2" fill="#f59e0b" opacity="0.5"/>
+  <circle cx="835" cy="290" r="2" fill="#f59e0b" opacity="0.5"/>
+  <circle cx="370" cy="455" r="2" fill="#8b5cf6" opacity="0.4"/>
+  <circle cx="835" cy="455" r="2" fill="#10b981" opacity="0.4"/>
+
+  <!-- Cross-student lines (community) -->
+  <line x1="250" y1="220" x2="960" y2="490" stroke="#3b82f6" stroke-width="0.5" stroke-opacity="0.1" stroke-dasharray="3,8"/>
+  <line x1="960" y1="220" x2="250" y2="490" stroke="#3b82f6" stroke-width="0.5" stroke-opacity="0.1" stroke-dasharray="3,8"/>
+</svg>
+
+<!-- Dot grids -->
+<svg class="dots-grid dots-grid-tl" width="80" height="80" viewBox="0 0 80 80">
+  <pattern id="dots1" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+    <circle cx="2" cy="2" r="1.5" fill="#3b82f6"/>
+  </pattern>
+  <rect width="80" height="80" fill="url(#dots1)"/>
+</svg>
+<svg class="dots-grid dots-grid-br" width="80" height="80" viewBox="0 0 80 80">
+  <pattern id="dots2" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+    <circle cx="2" cy="2" r="1.5" fill="#f59e0b"/>
+  </pattern>
+  <rect width="80" height="80" fill="url(#dots2)"/>
+</svg>
+
+<!-- Main content -->
+<div class="content">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-badge">
+      <span>🎓</span> New Feature
+    </div>
+    <h1>BookFlow <span>Online Classes</span></h1>
+    <p>Teach. Learn. Transform. — Teacher-led courses with live sessions, progress tracking & certification</p>
+  </div>
+
+  <!-- MIDDLE: People + Phone -->
+  <div class="middle">
+
+    <!-- LEFT PEOPLE -->
+    <div class="people-col">
+      <!-- Teacher card -->
+      <div class="person-card teacher">
+        <div class="person-avatar teacher">👩🏽‍🏫</div>
+        <div class="person-info">
+          <h4>Pastor / Teacher</h4>
+          <p>Record lessons, give feedback, grade assignments & see every student's progress at a glance.</p>
+          <div class="notification-bubble">
+            🔔 Bobby Joe completed Lesson 2!
+          </div>
+        </div>
+      </div>
+
+      <!-- Student card -->
+      <div class="person-card student">
+        <div class="person-avatar student">📖</div>
+        <div class="person-info">
+          <h4>Enrolled Student</h4>
+          <p>Watch video lessons, complete quizzes, submit journals & join live class sessions.</p>
+          <div class="notification-bubble blue">
+            ✅ Lesson 1 complete — 3 pts earned
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER PHONE -->
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-screen">
+
+          <!-- App header -->
+          <div class="phone-header">
+            <div class="app-name">📚 BookFlow Classes</div>
+            <div class="class-name">Grow Class — Season 1</div>
+          </div>
+
+          <!-- Instructor row -->
+          <div class="instructor-row">
+            <div class="instructor-avatar">👩🏽‍🏫</div>
+            <div class="instructor-info">
+              <div class="name">Pastor Nate Johnson</div>
+              <div class="role">Lead Instructor · 8 Lessons</div>
+            </div>
+            <div class="live-badge">● LIVE</div>
+          </div>
+
+          <!-- Video player -->
+          <div class="video-player">
+            <div class="video-thumbnail-overlay">
+              <div class="play-btn"></div>
+            </div>
+            <div class="video-label">Lesson 2: Finding Your Focus</div>
+            <div class="video-duration">18:34</div>
+            <div class="video-progress-bar">
+              <div class="video-progress-fill"></div>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div class="phone-tabs">
+            <div class="phone-tab active">Lessons</div>
+            <div class="phone-tab">Progress</div>
+            <div class="phone-tab">Journal</div>
+            <div class="phone-tab">Chat</div>
+          </div>
+
+          <!-- Lesson list -->
+          <div class="lesson-list">
+            <div class="lesson-item completed">
+              <div class="lesson-icon completed">✓</div>
+              <div class="lesson-text">
+                <div class="title">Feelers &amp; Discerners</div>
+                <div class="subtitle">Completed · Teacher marked ✓</div>
+              </div>
+              <div class="lesson-duration">22min</div>
+            </div>
+            <div class="lesson-item active">
+              <div class="lesson-icon active">▶</div>
+              <div class="lesson-text">
+                <div class="title" style="color:#93c5fd">Finding Your Focus</div>
+                <div class="subtitle" style="color:#3b82f6">In Progress · 65% watched</div>
+              </div>
+              <div class="lesson-duration" style="color:#3b82f6">18min</div>
+            </div>
+            <div class="lesson-item locked">
+              <div class="lesson-icon locked">🔒</div>
+              <div class="lesson-text">
+                <div class="title">Identity in Christ</div>
+                <div class="subtitle">Complete Lesson 2 to unlock</div>
+              </div>
+              <div class="lesson-duration">31min</div>
+            </div>
+          </div>
+
+          <!-- Progress footer -->
+          <div class="phone-progress-footer">
+            <div class="progress-label">
+              <span>Course Progress</span>
+              <span>38% Complete</span>
+            </div>
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill"></div>
+            </div>
+            <div class="progress-sublabel">Chapter 2 of 8 · 🏆 Certificate on completion</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PEOPLE -->
+    <div class="people-col">
+      <!-- Journal / spiritual writing card -->
+      <div class="person-card journal">
+        <div class="person-avatar journal">✍️</div>
+        <div class="person-info">
+          <h4>Spiritual Journal</h4>
+          <p>Students write essays, reflections & destiny assignments. Teachers read & respond inline.</p>
+          <div class="notification-bubble purple">
+            📝 "What is God showing you this week?"
+          </div>
+        </div>
+      </div>
+
+      <!-- Community / group card -->
+      <div class="person-card group">
+        <div class="person-avatar group">👥</div>
+        <div class="person-info">
+          <h4>Class Community</h4>
+          <p>1-on-1 &amp; group chat, class updates, discussions — fostering connection &amp; growth.</p>
+          <div class="notification-bubble green">
+            🏆 Sarah earned her certificate!
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /middle -->
+
+  <!-- BOTTOM FEATURES ROW -->
+  <div class="features-row">
+    <div class="feature-tile">
+      <div class="feature-icon" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(245,158,11,0.05))">🎓</div>
+      <h4>Teacher-Led Lessons</h4>
+      <p>Video, audio &amp; live sessions with real instructor presence</p>
+    </div>
+    <div class="feature-tile">
+      <div class="feature-icon" style="background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(59,130,246,0.05))">📊</div>
+      <h4>Full Progress Tracking</h4>
+      <p>Per-student &amp; class-wide dashboards with individual drill-down</p>
+    </div>
+    <div class="feature-tile">
+      <div class="feature-icon" style="background:linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.05))">📡</div>
+      <h4>Live Streaming</h4>
+      <p>Broadcast to YouTube, Facebook &amp; more via Restream</p>
+    </div>
+    <div class="feature-tile">
+      <div class="feature-icon" style="background:linear-gradient(135deg,rgba(139,92,246,0.2),rgba(139,92,246,0.05))">✍️</div>
+      <h4>Spiritual Journalling</h4>
+      <p>Identity, destiny &amp; scribe-writing prompts per lesson</p>
+    </div>
+    <div class="feature-tile">
+      <div class="feature-icon" style="background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.05))">🏆</div>
+      <h4>Certification</h4>
+      <p>Auto-issue certificates on course completion</p>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+</body>
+</html>

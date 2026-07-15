@@ -1541,7 +1541,7 @@ export default function BookEditor() {
                           <Edit className="h-4 w-4" />
                         </Link>
                       )}
-                      {userRole === 'owner' && (
+                      {(userRole === 'owner' || userRole === 'author') && (
                         <button
                           onClick={() => handleDeleteChapter(chapter.id)}
                           className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
