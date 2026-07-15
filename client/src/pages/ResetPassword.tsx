@@ -18,7 +18,6 @@ export default function ResetPassword() {
   // Supabase appends the recovery token as a hash fragment: #access_token=...&type=recovery
   const [accessToken, setAccessToken] = useState('');
   const [refreshToken, setRefreshToken] = useState('');
-  const [tokenType, setTokenType] = useState('');
 
   useEffect(() => {
     // Parse hash fragment (Supabase auth callback format)
@@ -26,14 +25,11 @@ export default function ResetPassword() {
     const params = new URLSearchParams(hash);
     const at = params.get('access_token') || searchParams.get('access_token') || '';
     const rt = params.get('refresh_token') || searchParams.get('refresh_token') || '';
-    const type = params.get('type') || searchParams.get('type') || '';
     setAccessToken(at);
     setRefreshToken(rt);
-    setTokenType(type);
   }, [searchParams]);
 
   const tokenMissing = !accessToken;
-  const isRecovery = tokenType === 'recovery' || !!accessToken;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

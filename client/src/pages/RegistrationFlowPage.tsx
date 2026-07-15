@@ -305,6 +305,16 @@ export default function RegistrationFlowPage() {
       {/* ── Right: form panel ── */}
       <div className="relative flex flex-col items-start justify-start w-full md:w-[420px] lg:w-[460px] shrink-0 bg-slate-50 px-8 pt-10 pb-12 md:min-h-screen">
 
+        {/* Step dots */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {Array.from({ length: visibleStepCount }).map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all duration-300 ${i === stepIndex ? 'w-5 h-2 bg-slate-800' : 'w-2 h-2 bg-slate-300'}`}
+            />
+          ))}
+        </div>
+
         {/* Card */}
         <div
           className="relative z-10 w-full"
