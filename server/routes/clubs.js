@@ -1,8 +1,14 @@
 import express from 'express';
 import crypto from 'crypto';
+import multer from 'multer';
 import { supabase } from '../config/supabase.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, optionalAuth } from '../middleware/auth.js';
 import { createNotification } from '../services/notifications.js';
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost:55321';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const STORAGE_BUCKET = 'bookflow-covers';
+const uploadRegBg = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = express.Router();
 
@@ -33,10 +39,13 @@ async function notify(userId, type, title, body, extra = {}) {
   } catch (_) {}
 }
 
-// ── GET /api/clubs  — list clubs for current user ─────────────────────────────
-router.get('/', authenticate, async (req, res) => {
+// ── GET /api/clubs  — list clubs for current user (guests get empty array) ────
+router.get('/', optionalAuth, async (req, res) => {
   const { type } = req.query; // optional: 'club' | 'study_group'
   try {
+    // Guests have no clubs
+    if (!req.user) return res.json([]);
+
     // Step 1: get club IDs where user is an accepted member
     const { data: myMemberships } = await supabase
       .from('club_members')
@@ -95,7 +104,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // ── GET /api/clubs/public — discover public clubs ─────────────────────────────
-router.get('/public', authenticate, async (req, res) => {
+router.get('/public', optionalAuth, async (req, res) => {
   const { search, type } = req.query;
   try {
     let query = supabase
@@ -173,9 +182,9 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // ── GET /api/clubs/:clubId — get club detail ──────────────────────────────────
-router.get('/:clubId', authenticate, async (req, res) => {
+router.get('/:clubId', optionalAuth, async (req, res) => {
   try {
-    const role = await getClubRole(req.params.clubId, req.user.id);
+    const role = req.user ? await getClubRole(req.params.clubId, req.user.id) : null;
 
     const { data: club, error } = await supabase
       .from('book_clubs')
@@ -1263,6 +1272,163 @@ router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (re
     });
   } catch (err) {
     console.error('Member submissions error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/clubs/:clubId/registration — public club registration info ───────
+router.get('/:clubId/registration', async (req, res) => {
+  try {
+    const { data: club, error: clubErr } = await supabase
+      .from('book_clubs')
+      .select(`
+        id, name, description, cover_image_url, visibility, club_type,
+        settings:club_settings(registration_enabled, registration_fields, registration_bg_url, welcome_heading, welcome_body, welcome_cta_label)
+      `)
+      .eq('id', req.params.clubId)
+      .single();
+    if (clubErr || !club) return res.status(404).json({ error: 'Club not found' });
+
+    const { count: memberCount } = await supabase
+      .from('club_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', req.params.clubId)
+      .not('invite_accepted_at', 'is', null);
+
+    const settings = Array.isArray(club.settings) ? club.settings[0] : club.settings;
+    res.json({ ...club, settings, member_count: memberCount || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/clubs/:clubId/registration-response — submit registration ────────
+router.post('/:clubId/registration-response', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const { token, responses = {} } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // 1. If invite token provided, accept it
+    if (token) {
+      await supabase
+        .from('club_members')
+        .update({ invite_accepted_at: new Date().toISOString() })
+        .eq('club_id', clubId)
+        .eq('invite_token', token)
+        .is('invite_accepted_at', null);
+    }
+
+    // 2. Ensure member record exists (upsert)
+    const { data: existing } = await supabase
+      .from('club_members')
+      .select('id, invite_accepted_at')
+      .eq('club_id', clubId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase.from('club_members').insert({
+        club_id: clubId,
+        user_id: userId,
+        role: 'member',
+        invite_accepted_at: new Date().toISOString(),
+      });
+    } else if (!existing.invite_accepted_at) {
+      await supabase.from('club_members')
+        .update({ invite_accepted_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    }
+
+    // 3. Save form responses (upsert — one response per user per club)
+    await supabase.from('club_member_responses').upsert({
+      club_id: clubId,
+      user_id: userId,
+      responses,
+      submitted_at: new Date().toISOString(),
+    }, { onConflict: 'club_id,user_id' });
+
+    res.json({ success: true, club_id: clubId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /api/clubs/:clubId/settings/registration — update registration config ──
+router.put('/:clubId/settings/registration', authenticate, async (req, res) => {
+  const role = await getClubRole(req.params.clubId, req.user.id);
+  if (!role || !['owner', 'admin', 'teacher'].includes(role)) {
+    return res.status(403).json({ error: 'Only owners/admins can change registration settings' });
+  }
+
+  const { registration_enabled, registration_fields, welcome_heading, welcome_body, welcome_cta_label } = req.body;
+  try {
+    const { data, error } = await supabase
+      .from('club_settings')
+      .upsert({
+        club_id: req.params.clubId,
+        ...(registration_enabled !== undefined && { registration_enabled }),
+        ...(registration_fields !== undefined && { registration_fields }),
+        ...(welcome_heading !== undefined && { welcome_heading }),
+        ...(welcome_body !== undefined && { welcome_body }),
+        ...(welcome_cta_label !== undefined && { welcome_cta_label }),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'club_id' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/clubs/:clubId/registration-bg — upload registration background ──
+router.post('/:clubId/registration-bg', authenticate, uploadRegBg.single('bg'), async (req, res) => {
+  const role = await getClubRole(req.params.clubId, req.user.id);
+  if (!role || !['owner', 'admin', 'teacher'].includes(role)) {
+    return res.status(403).json({ error: 'Only owners/admins can upload background images' });
+  }
+
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    if (!req.file.mimetype.startsWith('image/')) return res.status(400).json({ error: 'File must be an image' });
+
+    const ext = req.file.originalname.split('.').pop() || 'jpg';
+    const storagePath = `club-reg-bg/${req.params.clubId}.${ext}`;
+
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${storagePath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Content-Type': req.file.mimetype,
+          'x-upsert': 'true',
+        },
+        body: req.file.buffer,
+      }
+    );
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || `Storage upload failed (${uploadRes.status})`);
+    }
+
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`;
+
+    const { error: updateErr } = await supabase
+      .from('club_settings')
+      .upsert({
+        club_id: req.params.clubId,
+        registration_bg_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'club_id' });
+    if (updateErr) throw updateErr;
+
+    res.json({ registration_bg_url: publicUrl });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { Plus, Users, Globe, Lock, Search, BookOpen, Loader2, UserPlus, Check, X, Expand, LayoutGrid, LayoutList, GraduationCap, Video, MessageSquare } from 'lucide-react';
 import api from '../lib/api';
 
@@ -338,6 +339,7 @@ export default function ClubsPage() {
     (localStorage.getItem('bookflow-club-view') as 'card' | 'list') || 'card'
   );
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   function toggleClubView(v: 'card' | 'list') {
     setClubView(v);
@@ -399,6 +401,7 @@ export default function ClubsPage() {
   }
 
   function openCreate(type: 'club' | 'study_group' | 'online_class') {
+    if (!user) { navigate('/login'); return; }
     setCreateType(type);
     setShowCreate(true);
   }

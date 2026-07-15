@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles, HelpCircle, Inbox } from 'lucide-react';
+import { BookOpen, User, LogOut, LogIn, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles, HelpCircle, Inbox } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 import FeedbackButton from '../feedback/FeedbackButton';
@@ -467,8 +467,30 @@ export default function Layout() {
                 </>
               ) : (
                 <>
-                  <Link to="/login" className="text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">Login</Link>
-                  <Link to="/register" className="theme-button-primary px-4 py-2 rounded-md text-sm font-medium">Sign Up</Link>
+                  <Link to="/#books" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <BookOpen className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Books</span>
+                  </Link>
+                  <Link to="/clubs" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <Users className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Clubs</span>
+                  </Link>
+                  <Link to="/clubs?tab=bookstudy" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <BookOpen className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Study Groups</span>
+                  </Link>
+                  <Link to="/clubs?tab=onlineclasses" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <GraduationCap className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Online Classes</span>
+                  </Link>
+                  <Link to="/docs" className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <HelpCircle className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Help</span>
+                  </Link>
+                  <div className="ml-2 pl-3 border-l-2 border-strong flex items-center gap-1">
+                    <Link to="/login" className="text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">Login</Link>
+                    <Link to="/register" className="theme-button-primary px-4 py-2 rounded-md text-sm font-medium">Sign Up</Link>
+                  </div>
                 </>
               )}
             </nav>
@@ -570,13 +592,24 @@ export default function Layout() {
                 </div>
               </>
             ) : (
-              <div className="px-4 py-4 flex flex-col gap-3">
-                <Link to="/login" className="flex items-center justify-center py-3 text-sm font-medium text-theme border-2 border-theme rounded-xl hover:bg-surface-hover transition-colors">
-                  Login
+              <div className="flex flex-col">
+                <Link to="/clubs" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors border-b border-theme">
+                  <Users className="h-5 w-5 flex-shrink-0 text-muted" /> Clubs
                 </Link>
-                <Link to="/register" className="flex items-center justify-center py-3 text-sm font-medium theme-button-primary rounded-xl">
-                  Sign Up
+                <Link to="/clubs?tab=bookstudy" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors border-b border-theme">
+                  <BookOpen className="h-5 w-5 flex-shrink-0 text-muted" /> Study Groups
                 </Link>
+                <Link to="/clubs?tab=onlineclasses" onClick={() => setShowMobileMenu(false)} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-theme hover:bg-surface-hover transition-colors border-b border-theme">
+                  <GraduationCap className="h-5 w-5 flex-shrink-0 text-muted" /> Online Classes
+                </Link>
+                <div className="px-4 py-4 flex flex-col gap-3">
+                  <Link to="/login" className="flex items-center justify-center py-3 text-sm font-medium text-theme border-2 border-theme rounded-xl hover:bg-surface-hover transition-colors">
+                    Login
+                  </Link>
+                  <Link to="/register" className="flex items-center justify-center py-3 text-sm font-medium theme-button-primary rounded-xl">
+                    Sign Up
+                  </Link>
+                </div>
               </div>
             )}
           </div>
@@ -584,7 +617,7 @@ export default function Layout() {
       </header>
 
       {/* Main Content — flex-1 so it fills remaining height; overflow-auto for normal pages */}
-      <main id="bf-main" className={`flex-1 overflow-auto${user ? ' pb-20 md:pb-0' : ''}`}>
+      <main id="bf-main" className="flex-1 overflow-auto pb-20 md:pb-0">
         <Outlet />
       </main>
 
@@ -609,6 +642,38 @@ export default function Layout() {
       {user && <FeedbackPanel />}
 
       {/* Mobile bottom navigation — hidden on md+ */}
+      {!user && (
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t-2 border-strong flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <Link
+            to="/clubs"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/clubs' && !location.search ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
+          >
+            <Users className="h-5 w-5" />
+            <span>Clubs</span>
+          </Link>
+          <Link
+            to="/clubs?tab=bookstudy"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.search === '?tab=bookstudy' ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
+          >
+            <BookOpen className="h-5 w-5" />
+            <span>Study</span>
+          </Link>
+          <Link
+            to="/clubs?tab=onlineclasses"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.search === '?tab=onlineclasses' ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>Classes</span>
+          </Link>
+          <Link
+            to="/login"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname === '/login' ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
+          >
+            <LogIn className="h-5 w-5" />
+            <span>Login</span>
+          </Link>
+        </nav>
+      )}
       {user && (
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t-2 border-strong flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Link

@@ -38,6 +38,8 @@ import MyFeedbackPage from './pages/MyFeedbackPage';
 import BookChatPage from './pages/BookChatPage';
 import BookSignaturesPage from './pages/BookSignaturesPage';
 import BookPrintPage from './pages/BookPrintPage';
+import RegistrationFlowPage from './pages/RegistrationFlowPage';
+import ResetPassword from './pages/ResetPassword';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -64,6 +66,7 @@ function AppRoutes() {
         <Route index element={<Home />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="reset-password" element={<ResetPassword />} />
 
         <Route path="dashboard" element={
           <ProtectedRoute>
@@ -91,6 +94,9 @@ function AppRoutes() {
         {/* Invite acceptance — works with or without auth */}
         <Route path="invite/:token" element={<AcceptInvitePage />} />
         <Route path="clubs/accept/:token" element={<AcceptClubInvitePage />} />
+
+        {/* Club registration flow — public, no auth gate */}
+        <Route path="clubs/:clubId/register" element={<RegistrationFlowPage />} />
 
         {/* Protected editing routes */}
         <Route path="edit/book/:bookId" element={
@@ -166,28 +172,12 @@ function AppRoutes() {
         } />
 
         {/* Book Clubs */}
-        <Route path="clubs" element={
-          <ProtectedRoute>
-            <ClubsPage />
-          </ProtectedRoute>
-        } />
+        <Route path="clubs" element={<ClubsPage />} />
 
-        <Route path="clubs/:clubId" element={
-          <ProtectedRoute>
-            <ClubDetailPage />
-          </ProtectedRoute>
-        } />
+        <Route path="clubs/:clubId" element={<ClubDetailPage />} />
 
-        <Route path="clubs/:clubId/read/:bookId" element={
-          <ProtectedRoute>
-            <ClubReadPage />
-          </ProtectedRoute>
-        } />
-        <Route path="clubs/:clubId/read" element={
-          <ProtectedRoute>
-            <ClubReadPage />
-          </ProtectedRoute>
-        } />
+        <Route path="clubs/:clubId/read/:bookId" element={<ClubReadPage />} />
+        <Route path="clubs/:clubId/read" element={<ClubReadPage />} />
         <Route path="clubs/:clubId/members/:memberId/progress" element={
           <ProtectedRoute>
             <ClubMemberProgressPage />

@@ -2,6 +2,8 @@ import express from 'express';
 import { supabase, supabasePublic } from '../config/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 
+const CLIENT_URL = () => process.env.CLIENT_URL?.split(',')[0]?.trim() || 'http://localhost:5178';
+
 const router = express.Router();
 
 // Register new user — uses anon key so Supabase issues a real session
@@ -114,6 +116,55 @@ router.put('/profile', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Forgot password — sends reset email via Supabase Auth
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const { error } = await supabasePublic.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${CLIENT_URL()}/reset-password`,
+    });
+
+    if (error) throw error;
+
+    // Always return success to prevent email enumeration
+    res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    // Still return success to prevent enumeration
+    res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+  }
+});
+
+// Reset password — called after user clicks the email link (Supabase token exchange)
+router.post('/reset-password', async (req, res) => {
+  const { access_token, new_password } = req.body;
+  if (!access_token || !new_password) {
+    return res.status(400).json({ error: 'access_token and new_password are required' });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    // Set the session from the recovery token so we can update the password
+    const { data: sessionData, error: sessionErr } = await supabasePublic.auth.setSession({
+      access_token,
+      refresh_token: req.body.refresh_token || '',
+    });
+    if (sessionErr) throw sessionErr;
+
+    const { error } = await supabasePublic.auth.updateUser({ password: new_password });
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(400).json({ error: err.message || 'Failed to reset password. The link may have expired.' });
   }
 });
 

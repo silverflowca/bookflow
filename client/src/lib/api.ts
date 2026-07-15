@@ -29,6 +29,7 @@ import type {
   ClassSubmissionFeedback,
   ClassAnswerFeedback,
   ClassRosterEntry,
+  ClubRegistrationSettings,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -119,6 +120,20 @@ class ApiClient {
     } finally {
       this.setToken(null);
     }
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    await this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(accessToken: string, refreshToken: string, newPassword: string): Promise<void> {
+    await this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, new_password: newPassword }),
+    });
   }
 
   async getMe(): Promise<{ user: any; profile: Profile }> {
@@ -1513,6 +1528,40 @@ class ApiClient {
 
   async listClassDMConversations(clubId: string): Promise<{ other_user_id: string; last_message: string; last_at: string; unread_count: number; profile: { id: string; display_name: string; avatar_url?: string } | null }[]> {
     return this.request(`/clubs/${clubId}/class/dm`);
+  }
+
+  // ── Registration Form ────────────────────────────────────────────────────────
+
+  async getClubRegistration(clubId: string): Promise<{
+    id: string; name: string; description?: string; cover_image_url?: string;
+    club_type?: string; member_count: number;
+    settings?: ClubRegistrationSettings;
+  }> {
+    return this.request(`/clubs/${clubId}/registration`);
+  }
+
+  async submitClubRegistration(clubId: string, data: { token?: string; responses: Record<string, any> }): Promise<{ success: boolean; club_id: string }> {
+    return this.request(`/clubs/${clubId}/registration-response`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateClubRegistrationSettings(clubId: string, settings: Partial<ClubRegistrationSettings>): Promise<ClubRegistrationSettings> {
+    return this.request(`/clubs/${clubId}/settings/registration`, { method: 'PUT', body: JSON.stringify(settings) });
+  }
+
+  async uploadClubRegistrationBg(clubId: string, file: File): Promise<{ registration_bg_url: string }> {
+    const formData = new FormData();
+    formData.append('bg', file);
+    const token = this.getToken();
+    const res = await fetch(`${API_URL}/clubs/${clubId}/registration-bg`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return res.json();
   }
 
 }
