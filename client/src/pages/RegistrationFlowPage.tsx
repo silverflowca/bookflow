@@ -265,7 +265,7 @@ export default function RegistrationFlowPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
+    <div className="h-full min-h-[calc(100vh-4rem)] flex flex-col md:flex-row overflow-hidden">
       <style>{`
         @keyframes regSlideIn {
           from { opacity: 0; transform: translateY(16px); }
@@ -292,9 +292,9 @@ export default function RegistrationFlowPage() {
       </div>
 
       {/* ── Left: background image (desktop only) ── */}
-      <div className="relative hidden md:flex md:flex-1 flex-col items-center justify-center overflow-hidden">
+      <div className="relative hidden md:flex md:flex-1 flex-col items-center justify-center overflow-hidden self-stretch">
         {bgUrl ? (
-          <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-contain" aria-hidden />
+          <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900" aria-hidden />
         )}
@@ -303,7 +303,7 @@ export default function RegistrationFlowPage() {
       </div>
 
       {/* ── Right: form panel ── */}
-      <div className="relative flex flex-col items-start justify-start w-full md:w-[420px] lg:w-[460px] shrink-0 bg-slate-50 px-8 pt-10 pb-12 md:min-h-screen">
+      <div className="relative flex flex-col items-start justify-start w-full md:w-[420px] lg:w-[460px] shrink-0 bg-slate-50 px-8 pt-10 pb-12">
 
         {/* Step dots */}
         <div className="flex items-center justify-center gap-2 mb-6">
