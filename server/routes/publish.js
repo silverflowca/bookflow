@@ -95,6 +95,24 @@ router.post('/unpublish', authenticate, requireRole(['owner', 'author']), async 
   }
 });
 
+// Helper: attach inline_content items to chapters for public reader
+async function attachInlineContent(chapters, supabaseClient) {
+  const chapterIds = (chapters || []).map(c => c.id);
+  if (!chapterIds.length) return chapters || [];
+  const { data: inline } = await supabaseClient
+    .schema('bookflow')
+    .from('inline_content')
+    .select('id, chapter_id, content_type, content_data, order_index')
+    .in('chapter_id', chapterIds)
+    .order('order_index', { ascending: true });
+  const byChapter = {};
+  for (const ic of (inline || [])) {
+    if (!byChapter[ic.chapter_id]) byChapter[ic.chapter_id] = [];
+    byChapter[ic.chapter_id].push(ic);
+  }
+  return (chapters || []).map(ch => ({ ...ch, inline_items: byChapter[ch.id] || [] }));
+}
+
 // GET /api/public/books/:slug — public reader (no auth)
 // Mounted at /api/public, so path is /books/:slug
 router.get('/books/:slug', async (req, res) => {
@@ -112,13 +130,15 @@ router.get('/books/:slug', async (req, res) => {
     if (error || !book) return res.status(404).json({ error: 'Book not found' });
 
     const { data: chapters } = await supabase
+      .schema('bookflow')
       .from('chapters')
       .select('id, title, content, order_index, word_count, estimated_read_time_minutes')
       .eq('book_id', book.id)
       .eq('status', 'published')
       .order('order_index');
 
-    res.json({ ...book, chapters: chapters || [] });
+    const chaptersWithInline = await attachInlineContent(chapters, supabase);
+    res.json({ ...book, chapters: chaptersWithInline });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -140,12 +160,14 @@ router.get('/books/share/:token', async (req, res) => {
     if (error || !book) return res.status(404).json({ error: 'Book not found' });
 
     const { data: chapters } = await supabase
+      .schema('bookflow')
       .from('chapters')
       .select('id, title, content, order_index, word_count, estimated_read_time_minutes')
       .eq('book_id', book.id)
       .order('order_index');
 
-    res.json({ ...book, chapters: chapters || [] });
+    const chaptersWithInline = await attachInlineContent(chapters, supabase);
+    res.json({ ...book, chapters: chaptersWithInline });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

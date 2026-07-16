@@ -324,7 +324,7 @@ export default function PublicBookPage() {
                 {selectedChapter.content ? (
                   <div
                     className="prose prose-lg max-w-none text-theme"
-                    dangerouslySetInnerHTML={{ __html: jsonContentToHtml(selectedChapter.content) }}
+                    dangerouslySetInnerHTML={{ __html: jsonContentToHtml(selectedChapter.content, selectedChapter.inline_items) }}
                   />
                 ) : (
                   <p className="text-muted italic">This chapter has no content yet.</p>
@@ -374,70 +374,168 @@ function styleAttr(css: string): string {
   return css ? ` style="${css}"` : '';
 }
 
-function jsonContentToHtml(content: unknown): string {
-  if (!content || typeof content !== 'object') return '';
-  const node = content as { type?: string; text?: string; content?: unknown[]; marks?: { type: string; attrs?: Record<string, unknown> }[]; attrs?: Record<string, unknown> };
+type InlineItem = { id: string; content_type: string; content_data: any };
 
-  if (node.type === 'doc') {
-    return (node.content || []).map(n => jsonContentToHtml(n)).join('');
+function renderInlineItem(ic: InlineItem): string {
+  const data = ic.content_data || {};
+  const type = ic.content_type;
+
+  if (type === 'image') {
+    const src = data.url || data.src || '';
+    const alt = data.alt || '';
+    const caption = data.caption || '';
+    if (!src) return '';
+    const img = `<img src="${src}" alt="${alt}" style="max-width:100%;border-radius:8px;margin:1rem 0;" />`;
+    return caption ? `<figure style="margin:1rem 0">${img}<figcaption style="text-align:center;font-size:0.85em;color:#888;margin-top:0.25rem">${caption}</figcaption></figure>` : img;
   }
-  if (node.type === 'paragraph') {
-    const inner = (node.content || []).map(n => jsonContentToHtml(n)).join('');
-    return `<p${styleAttr(getTextAlignCss(node.attrs))}>${inner || '<br>'}</p>`;
-  }
-  if (node.type === 'heading') {
-    const level = (node as { attrs?: { level?: number } }).attrs?.level || 2;
-    const inner = (node.content || []).map(n => jsonContentToHtml(n)).join('');
-    return `<h${level}${styleAttr(getTextAlignCss(node.attrs))}>${inner}</h${level}>`;
-  }
-  if (node.type === 'text') {
-    let text = node.text || '';
-    const marks = node.marks || [];
-    for (const mark of marks) {
-      if (mark.type === 'bold') text = `<strong>${text}</strong>`;
-      if (mark.type === 'italic') text = `<em>${text}</em>`;
-      if (mark.type === 'underline') text = `<u>${text}</u>`;
-      if (mark.type === 'highlight') {
-        const c = (mark as any).attrs?.color;
-        const theme = getHighlightTheme(c);
-        text = c ? `<mark style="background-color:${theme.bg};padding:0 2px;border-radius:2px">${text}</mark>` : `<mark>${text}</mark>`;
-      }
-      if (mark.type === 'textStyle') {
-        const css = getTextStyleCss(mark.attrs);
-        if (css) text = `<span style="${css}">${text}</span>`;
-      }
+
+  if (type === 'video') {
+    const src = data.url || data.src || '';
+    if (!src) return '';
+    // YouTube / Vimeo embed
+    const ytMatch = src.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) {
+      return `<div style="position:relative;padding-bottom:56.25%;height:0;margin:1rem 0;border-radius:8px;overflow:hidden"><iframe src="https://www.youtube.com/embed/${ytMatch[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`;
     }
-    return text;
+    const vimeoMatch = src.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) {
+      return `<div style="position:relative;padding-bottom:56.25%;height:0;margin:1rem 0;border-radius:8px;overflow:hidden"><iframe src="https://player.vimeo.com/video/${vimeoMatch[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`;
+    }
+    // Native video file
+    return `<video controls style="max-width:100%;border-radius:8px;margin:1rem 0"><source src="${src}" /><p>Your browser does not support video playback.</p></video>`;
   }
-  if (node.type === 'bulletList') {
-    return `<ul>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</ul>`;
+
+  if (type === 'audio') {
+    const src = data.url || data.src || '';
+    if (!src) return '';
+    return `<audio controls style="width:100%;margin:0.75rem 0"><source src="${src}" /><p>Your browser does not support audio playback.</p></audio>`;
   }
-  if (node.type === 'orderedList') {
-    return `<ol>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</ol>`;
+
+  if (type === 'drawing') {
+    const src = data.url || data.imageUrl || '';
+    if (!src) return '';
+    return `<img src="${src}" alt="Drawing" style="max-width:100%;border-radius:8px;margin:1rem 0;" />`;
   }
-  if (node.type === 'listItem') {
-    return `<li>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</li>`;
+
+  // Interactive elements (questions, polls, forms) — show as a read-only placeholder
+  const labelMap: Record<string, string> = {
+    question: '❓ Question',
+    poll: '📊 Poll',
+    textbox: '📝 Text response',
+    textarea: '📝 Text response',
+    select: '🔽 Selection',
+    radio: '⭕ Multiple choice',
+    checkbox: '☑️ Checkboxes',
+    signature: '✍️ Signature',
+    media_response: '🎙️ Media response',
+  };
+  const label = labelMap[type];
+  if (label) {
+    const title = data.label || data.question || '';
+    return `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:0.75rem 1rem;margin:1rem 0;background:#f9fafb;color:#6b7280;font-size:0.9em">${label}${title ? `: <em>${title}</em>` : ''}</div>`;
   }
-  if (node.type === 'blockquote') {
-    return `<blockquote>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</blockquote>`;
-  }
-  if (node.type === 'table') {
-    return `<div class="table-scroll"><table style="table-layout:fixed"><tbody>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tbody></table></div>`;
-  }
-  if (node.type === 'tableRow') {
-    return `<tr>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</tr>`;
-  }
-  if (node.type === 'tableHeader') {
-    const thStyle = [node.attrs?.width ? `width:${node.attrs.width}` : '', node.attrs?.height ? `height:${node.attrs.height}` : ''].filter(Boolean).join(';');
-    return `<th${thStyle ? ` style="${thStyle}"` : ''}>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</th>`;
-  }
-  if (node.type === 'tableCell') {
-    const tdStyle = [node.attrs?.width ? `width:${node.attrs.width}` : '', node.attrs?.height ? `height:${node.attrs.height}` : ''].filter(Boolean).join(';');
-    return `<td${tdStyle ? ` style="${tdStyle}"` : ''}>${(node.content || []).map(n => jsonContentToHtml(n)).join('')}</td>`;
-  }
-  if (node.type === 'hardBreak') return '<br>';
-  if (node.content) {
-    return (node.content as unknown[]).map(n => jsonContentToHtml(n)).join('');
-  }
+
   return '';
+}
+
+function jsonContentToHtml(content: unknown, inlineItems?: InlineItem[]): string {
+  if (!content || typeof content !== 'object') return '';
+  const inlineMap = new Map((inlineItems || []).map(ic => [ic.id, ic]));
+
+  function render(node: unknown): string {
+    if (!node || typeof node !== 'object') return '';
+    const n = node as { type?: string; text?: string; content?: unknown[]; marks?: { type: string; attrs?: Record<string, unknown> }[]; attrs?: Record<string, unknown> };
+
+    if (n.type === 'doc') {
+      return (n.content || []).map(render).join('');
+    }
+    if (n.type === 'paragraph') {
+      const inner = (n.content || []).map(render).join('');
+      return `<p${styleAttr(getTextAlignCss(n.attrs))}>${inner || '<br>'}</p>`;
+    }
+    if (n.type === 'heading') {
+      const level = (n as { attrs?: { level?: number } }).attrs?.level || 2;
+      const inner = (n.content || []).map(render).join('');
+      return `<h${level}${styleAttr(getTextAlignCss(n.attrs))}>${inner}</h${level}>`;
+    }
+    if (n.type === 'text') {
+      let text = n.text || '';
+      const marks = n.marks || [];
+      for (const mark of marks) {
+        if (mark.type === 'bold') text = `<strong>${text}</strong>`;
+        if (mark.type === 'italic') text = `<em>${text}</em>`;
+        if (mark.type === 'underline') text = `<u>${text}</u>`;
+        if (mark.type === 'strike') text = `<s>${text}</s>`;
+        if (mark.type === 'code') text = `<code style="background:#f3f4f6;border-radius:3px;padding:0 3px;font-size:0.875em">${text}</code>`;
+        if (mark.type === 'link') {
+          const href = (mark.attrs?.href as string) || '#';
+          text = `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:#6366f1;text-decoration:underline">${text}</a>`;
+        }
+        if (mark.type === 'highlight') {
+          const c = (mark as any).attrs?.color;
+          const theme = getHighlightTheme(c);
+          text = c ? `<mark style="background-color:${theme.bg};padding:0 2px;border-radius:2px">${text}</mark>` : `<mark>${text}</mark>`;
+        }
+        if (mark.type === 'textStyle') {
+          const css = getTextStyleCss(mark.attrs);
+          if (css) text = `<span style="${css}">${text}</span>`;
+        }
+      }
+      return text;
+    }
+    if (n.type === 'inlineFormWidget') {
+      const contentId = (n.attrs as any)?.contentId as string | undefined;
+      if (!contentId) return '';
+      const ic = inlineMap.get(contentId);
+      if (!ic) return '';
+      return renderInlineItem(ic);
+    }
+    if (n.type === 'image') {
+      const src = (n.attrs as any)?.src || '';
+      const alt = (n.attrs as any)?.alt || '';
+      if (!src) return '';
+      return `<img src="${src}" alt="${alt}" style="max-width:100%;border-radius:8px;margin:1rem 0;" />`;
+    }
+    if (n.type === 'bulletList') {
+      return `<ul>${(n.content || []).map(render).join('')}</ul>`;
+    }
+    if (n.type === 'orderedList') {
+      return `<ol>${(n.content || []).map(render).join('')}</ol>`;
+    }
+    if (n.type === 'listItem') {
+      return `<li>${(n.content || []).map(render).join('')}</li>`;
+    }
+    if (n.type === 'blockquote') {
+      return `<blockquote style="border-left:3px solid #e5e7eb;padding-left:1rem;color:#6b7280;margin:1rem 0">${(n.content || []).map(render).join('')}</blockquote>`;
+    }
+    if (n.type === 'codeBlock') {
+      const lang = (n.attrs as any)?.language || '';
+      const inner = (n.content || []).map(render).join('');
+      return `<pre style="background:#1e1e2e;color:#cdd6f4;border-radius:8px;padding:1rem;overflow-x:auto;font-size:0.875em;margin:1rem 0"><code${lang ? ` class="language-${lang}"` : ''}>${inner}</code></pre>`;
+    }
+    if (n.type === 'horizontalRule') {
+      return '<hr style="margin:2rem 0;border:none;border-top:1px solid #e5e7eb" />';
+    }
+    if (n.type === 'table') {
+      return `<div style="overflow-x:auto;margin:1rem 0"><table style="table-layout:fixed;border-collapse:collapse;width:100%"><tbody>${(n.content || []).map(render).join('')}</tbody></table></div>`;
+    }
+    if (n.type === 'tableRow') {
+      return `<tr>${(n.content || []).map(render).join('')}</tr>`;
+    }
+    if (n.type === 'tableHeader') {
+      const thStyle = [n.attrs?.width ? `width:${n.attrs.width}` : '', 'font-weight:600;background:#f9fafb;padding:0.5rem;border:1px solid #e5e7eb;text-align:left'].filter(Boolean).join(';');
+      return `<th style="${thStyle}">${(n.content || []).map(render).join('')}</th>`;
+    }
+    if (n.type === 'tableCell') {
+      const tdStyle = [n.attrs?.width ? `width:${n.attrs.width}` : '', 'padding:0.5rem;border:1px solid #e5e7eb;vertical-align:top'].filter(Boolean).join(';');
+      return `<td style="${tdStyle}">${(n.content || []).map(render).join('')}</td>`;
+    }
+    if (n.type === 'hardBreak') return '<br>';
+    if (n.content) {
+      return (n.content as unknown[]).map(render).join('');
+    }
+    return '';
+  }
+
+  return render(content);
 }

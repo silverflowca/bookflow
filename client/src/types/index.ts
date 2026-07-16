@@ -135,6 +135,7 @@ export interface Chapter {
   last_edited_by?: string;
   created_at: string;
   updated_at: string;
+  inline_items?: { id: string; content_type: string; content_data: any }[];
 }
 
 // Collaboration types
