@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import api from '../../lib/api';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
-  Settings, ArrowLeft, TrendingUp,
+  Settings, ArrowLeft, TrendingUp, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ClubChatPanel from '../chat/ClubChatPanel';
@@ -49,6 +50,24 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   const [tab, setTab] = useState<ClassTab>('overview');
   const isTeacher = role === 'owner' || role === 'admin';
   const currentBook = club.books?.find(b => b.is_current);
+  const [myReadPct, setMyReadPct] = useState<number>(0);
+  const [myCurrentChapterId, setMyCurrentChapterId] = useState<string | undefined>(undefined);
+  const [myItemProgress, setMyItemProgress] = useState<{ completed: number; total: number } | null>(null);
+
+  useEffect(() => {
+    const bookId = currentBook?.book?.id;
+    if (!bookId || !user) return;
+    api.getReadingProgress(bookId)
+      .then(p => { if (p) { setMyReadPct(p.percent_complete); setMyCurrentChapterId(p.current_chapter_id); } })
+      .catch(() => {});
+    api.getBookProgress(bookId)
+      .then(breakdown => {
+        const completed = breakdown.reduce((s, b) => s + b.completed, 0);
+        const total = breakdown.reduce((s, b) => s + b.total, 0);
+        setMyItemProgress({ completed, total });
+      })
+      .catch(() => {});
+  }, [currentBook?.book?.id, user]);
   const memberCount = club.member_count ?? (club.members?.filter(m => m.invite_accepted_at).length ?? 0);
 
   const tabs: { key: ClassTab; label: string; icon: React.ReactNode; teacherOnly?: boolean; studentOnly?: boolean }[] = [
@@ -111,7 +130,15 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
 
       {/* Tab content */}
       {tab === 'overview' && (
-        <ClassOverviewTab isTeacher={isTeacher} currentBook={currentBook} onGoToTab={setTab} />
+        <ClassOverviewTab
+          isTeacher={isTeacher}
+          currentBook={currentBook}
+          clubId={club.id}
+          readPct={myReadPct}
+          currentChapterId={myCurrentChapterId}
+          itemProgress={myItemProgress}
+          onGoToTab={setTab}
+        />
       )}
       {tab === 'roster' && isTeacher && (
         <ClassRosterPanel clubId={club.id} currentUserId={user?.id ?? ''} />
@@ -141,35 +168,91 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
 function ClassOverviewTab({
   isTeacher,
   currentBook,
+  clubId,
+  readPct,
+  currentChapterId,
+  itemProgress,
   onGoToTab,
 }: {
   isTeacher: boolean;
   currentBook?: ClubBook;
+  clubId: string;
+  readPct: number;
+  currentChapterId?: string;
+  itemProgress: { completed: number; total: number } | null;
   onGoToTab: (t: ClassTab) => void;
 }) {
+  const hasStarted = readPct > 0;
+  const itemPct = itemProgress && itemProgress.total > 0
+    ? Math.round((itemProgress.completed / itemProgress.total) * 100)
+    : 0;
+  const readTo = currentBook?.book
+    ? `/clubs/${clubId}/read/${currentBook.book.id}${currentChapterId ? `?chapter=${currentChapterId}` : ''}`
+    : '#';
+
   return (
     <div className="space-y-6">
       {/* Current book */}
       <div className="theme-section rounded-xl p-5">
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Current Book</h2>
         {currentBook?.book ? (
-          <div className="flex items-center gap-4">
-            {currentBook.book.cover_image_url ? (
-              <img src={currentBook.book.cover_image_url} alt={currentBook.book.title} className="w-14 h-20 object-cover rounded-lg flex-shrink-0" />
-            ) : (
-              <div className="w-14 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <BookOpen className="h-6 w-6 text-white" />
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              {currentBook.book.cover_image_url ? (
+                <img src={currentBook.book.cover_image_url} alt={currentBook.book.title} className="w-14 h-20 object-cover rounded-lg flex-shrink-0" />
+              ) : (
+                <div className="w-14 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="h-6 w-6 text-white" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-theme">{currentBook.book.title}</p>
+                <p className="text-xs text-muted mt-1">Currently reading</p>
+                {isTeacher && (
+                  <button onClick={() => onGoToTab('settings')} className="text-xs text-violet-500 hover:text-violet-600 mt-1 transition-colors">
+                    Change book →
+                  </button>
+                )}
+                <Link
+                  to={readTo}
+                  className="mt-3 inline-flex items-center gap-1.5 theme-button-primary px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  {hasStarted ? 'Continue Reading' : 'Start Reading'}
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+            {/* Progress bars */}
+            {!isTeacher && (
+              <div className="space-y-2 pt-1">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted">Reading progress</span>
+                    <span className="text-xs font-medium text-theme">{Math.round(readPct)}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all duration-500"
+                      style={{ width: `${Math.round(readPct)}%` }}
+                    />
+                  </div>
+                </div>
+                {itemProgress && itemProgress.total > 0 && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-muted">Components completed</span>
+                      <span className="text-xs font-medium text-theme">{itemPct}% · {itemProgress.completed}/{itemProgress.total}</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${itemPct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-theme">{currentBook.book.title}</p>
-              <p className="text-xs text-muted mt-1">Currently reading</p>
-              {isTeacher && (
-                <button onClick={() => onGoToTab('settings')} className="text-xs text-violet-500 hover:text-violet-600 mt-1 transition-colors">
-                  Change book →
-                </button>
-              )}
-            </div>
           </div>
         ) : (
           <div className="flex items-center gap-3">
