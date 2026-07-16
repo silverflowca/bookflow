@@ -380,8 +380,9 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
     return res.status(403).json({ error: 'Only owners/admins can invite members' });
   }
 
-  const { email, userId } = req.body;
+  const { email, userId, role: inviteRole } = req.body;
   if (!email?.trim() && !userId) return res.status(400).json({ error: 'Email or userId is required' });
+  const memberRole = ['admin', 'member'].includes(inviteRole) ? inviteRole : 'member';
 
   const clubId = req.params.clubId;
 
@@ -401,14 +402,15 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
 
       const { data: member, error } = await supabase.schema('bookflow')
         .from('club_members')
-        .insert({ club_id: clubId, user_id: userId, invited_by: req.user.id, role: 'member', invite_accepted_at: new Date().toISOString() })
+        .insert({ club_id: clubId, user_id: userId, invited_by: req.user.id, role: memberRole, invite_accepted_at: new Date().toISOString() })
         .select()
         .single();
       if (error) throw error;
 
+      const roleLabel = memberRole === 'admin' ? 'teacher/facilitator' : 'member';
       await notify(userId, 'club_invite',
         `You've been added to "${club.name}"`,
-        `You've been added to the class "${club.name}" by a teacher.`,
+        `You've been added to the class "${club.name}" as a ${roleLabel}.`,
         { club_id: clubId }
       );
       return res.status(201).json(member);
@@ -439,7 +441,7 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
       invited_by: req.user.id,
       invited_email: email.trim().toLowerCase(),
       invite_token: inviteToken,
-      role: 'member',
+      role: memberRole,
     };
 
     const { data: member, error } = await supabase.schema('bookflow')

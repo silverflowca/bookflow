@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, Calendar, ExternalLink, Edit2, Trash2, Eye, EyeOff, X, Check } from 'lucide-react';
+import { Plus, Calendar, ExternalLink, Edit2, Trash2, Eye, EyeOff, X, Check, BookOpen, Link2, Unlink } from 'lucide-react';
 import api from '../../lib/api';
-import type { ClassSession } from '../../types';
+import type { ClassSession, ClassPrompt } from '../../types';
 
 function formatDate(str: string) {
   return new Date(str).toLocaleString(undefined, {
@@ -129,16 +129,83 @@ function SessionForm({
   );
 }
 
+/** Inline picker to link an unlinked prompt to this session */
+function LinkAssignmentPicker({
+  sessionId,
+  clubId,
+  unlinkedPrompts,
+  onLinked,
+  onCancel,
+}: {
+  sessionId: string;
+  clubId: string;
+  unlinkedPrompts: ClassPrompt[];
+  onLinked: (prompt: ClassPrompt) => void;
+  onCancel: () => void;
+}) {
+  const [selected, setSelected] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleLink() {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const updated = await api.updateClassPrompt(clubId, selected, { session_id: sessionId });
+      onLinked(updated);
+    } catch { /* silent */ }
+    finally { setSaving(false); }
+  }
+
+  if (unlinkedPrompts.length === 0) {
+    return (
+      <div className="flex items-center gap-2 mt-2">
+        <p className="text-xs text-muted">No unlinked assignments. Create one in the Assignments tab first.</p>
+        <button onClick={onCancel} className="text-xs text-muted hover:text-theme"><X className="h-3.5 w-3.5" /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2 flex-wrap">
+      <select
+        className="theme-input rounded-lg px-2 py-1.5 text-sm flex-1 min-w-0"
+        value={selected}
+        onChange={e => setSelected(e.target.value)}
+      >
+        <option value="">Select assignment…</option>
+        {unlinkedPrompts.map(p => (
+          <option key={p.id} value={p.id}>{p.title}</option>
+        ))}
+      </select>
+      <button
+        onClick={handleLink}
+        disabled={!selected || saving}
+        className="theme-button-primary px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 flex items-center gap-1"
+      >
+        <Link2 className="h-3 w-3" /> {saving ? 'Linking…' : 'Link'}
+      </button>
+      <button onClick={onCancel} className="text-muted hover:text-theme">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 export default function ClassSessionsPanel({ clubId, isTeacher }: { clubId: string; isTeacher: boolean }) {
   const [sessions, setSessions] = useState<ClassSession[]>([]);
+  const [prompts, setPrompts] = useState<ClassPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [linkingSessionId, setLinkingSessionId] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getClassSessions(clubId)
-      .then(setSessions)
+    Promise.all([
+      api.getClassSessions(clubId),
+      api.getClassPrompts(clubId),
+    ])
+      .then(([s, p]) => { setSessions(s); setPrompts(p); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [clubId]);
@@ -180,6 +247,18 @@ export default function ClassSessionsPanel({ clubId, isTeacher }: { clubId: stri
     setSessions(prev => prev.map(s => s.id === session.id ? updated : s));
   }
 
+  async function handleUnlinkPrompt(prompt: ClassPrompt) {
+    try {
+      const updated = await api.updateClassPrompt(clubId, prompt.id, { session_id: undefined });
+      setPrompts(prev => prev.map(p => p.id === prompt.id ? updated : p));
+    } catch { /* silent */ }
+  }
+
+  function handleLinked(updated: ClassPrompt) {
+    setPrompts(prev => prev.map(p => p.id === updated.id ? updated : p));
+    setLinkingSessionId(null);
+  }
+
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-strong" /></div>;
 
   return (
@@ -214,8 +293,11 @@ export default function ClassSessionsPanel({ clubId, isTeacher }: { clubId: stri
         </div>
       ) : (
         <div className="space-y-3">
-          {sessions.map(session => (
-            editingId === session.id ? (
+          {sessions.map(session => {
+            const linkedPrompts = prompts.filter(p => p.session_id === session.id);
+            const unlinkedPrompts = prompts.filter(p => !p.session_id);
+
+            return editingId === session.id ? (
               <SessionForm
                 key={session.id}
                 initial={{
@@ -232,59 +314,115 @@ export default function ClassSessionsPanel({ clubId, isTeacher }: { clubId: stri
                 saving={saving}
               />
             ) : (
-              <div key={session.id} className="theme-section rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-theme text-sm">{session.title}</h3>
-                      {session.is_published ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">Published</span>
-                      ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">Draft</span>
+              <div key={session.id} className="theme-section rounded-xl overflow-hidden">
+                {/* Session header */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-theme text-sm">{session.title}</h3>
+                        {session.is_published ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">Published</span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">Draft</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted mt-1">{formatDate(session.session_date)} · {session.duration_minutes} min</p>
+                      {session.description && <p className="text-sm text-theme mt-2">{session.description}</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {session.meeting_url && (
+                        <a
+                          href={session.meeting_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs theme-button-primary"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Join
+                        </a>
+                      )}
+                      {isTeacher && (
+                        <>
+                          <button
+                            onClick={() => togglePublish(session)}
+                            title={session.is_published ? 'Unpublish' : 'Publish'}
+                            className="p-1.5 rounded-lg text-muted hover:text-theme transition-colors"
+                          >
+                            {session.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => setEditingId(session.id)}
+                            className="p-1.5 rounded-lg text-muted hover:text-theme transition-colors"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(session.id)}
+                            className="p-1.5 rounded-lg text-red-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
                       )}
                     </div>
-                    <p className="text-xs text-muted mt-1">{formatDate(session.session_date)} · {session.duration_minutes} min</p>
-                    {session.description && <p className="text-sm text-theme mt-2">{session.description}</p>}
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {session.meeting_url && (
-                      <a
-                        href={session.meeting_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs theme-button-primary"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" /> Join
-                      </a>
-                    )}
-                    {isTeacher && (
-                      <>
-                        <button
-                          onClick={() => togglePublish(session)}
-                          title={session.is_published ? 'Unpublish' : 'Publish'}
-                          className="p-1.5 rounded-lg text-muted hover:text-theme transition-colors"
-                        >
-                          {session.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                        <button
-                          onClick={() => setEditingId(session.id)}
-                          className="p-1.5 rounded-lg text-muted hover:text-theme transition-colors"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(session.id)}
-                          className="p-1.5 rounded-lg text-red-400 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
+
+                  {/* Linked assignments */}
+                  {(linkedPrompts.length > 0 || isTeacher) && (
+                    <div className="mt-3 pt-3 border-t border-strong/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-muted flex items-center gap-1">
+                          <BookOpen className="h-3.5 w-3.5" /> Assignments ({linkedPrompts.length})
+                        </span>
+                        {isTeacher && linkingSessionId !== session.id && (
+                          <button
+                            onClick={() => setLinkingSessionId(session.id)}
+                            className="text-xs text-accent hover:underline flex items-center gap-1"
+                          >
+                            <Link2 className="h-3 w-3" /> Link assignment
+                          </button>
+                        )}
+                      </div>
+
+                      {linkedPrompts.length === 0 && linkingSessionId !== session.id && (
+                        <p className="text-xs text-muted italic">No assignments linked to this session.</p>
+                      )}
+
+                      {linkedPrompts.map(p => (
+                        <div key={p.id} className="flex items-center gap-2 py-1.5 group">
+                          <BookOpen className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
+                          <span className="text-sm text-theme flex-1 truncate">{p.title}</span>
+                          <span className="text-xs text-muted capitalize">{p.prompt_type}</span>
+                          {p.is_required && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">Required</span>
+                          )}
+                          {isTeacher && (
+                            <button
+                              onClick={() => handleUnlinkPrompt(p)}
+                              title="Unlink from session"
+                              className="opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 transition-all p-0.5"
+                            >
+                              <Unlink className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {isTeacher && linkingSessionId === session.id && (
+                        <LinkAssignmentPicker
+                          sessionId={session.id}
+                          clubId={clubId}
+                          unlinkedPrompts={unlinkedPrompts}
+                          onLinked={handleLinked}
+                          onCancel={() => setLinkingSessionId(null)}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-            )
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

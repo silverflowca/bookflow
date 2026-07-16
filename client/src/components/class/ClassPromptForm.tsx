@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 import api from '../../lib/api';
-import type { ClassPrompt, ClassPromptType } from '../../types';
+import type { ClassPrompt, ClassPromptType, ClassSession } from '../../types';
 
 interface Props {
   clubId: string;
@@ -17,21 +17,30 @@ export default function ClassPromptForm({ clubId, initial, onSaved, onCancel }: 
   const [isRequired, setIsRequired] = useState(initial?.is_required ?? false);
   const [dueDate, setDueDate] = useState(initial?.due_date ? initial.due_date.slice(0, 16) : '');
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
+  const [sessionId, setSessionId] = useState(initial?.session_id ?? '');
+  const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.getClassSessions(clubId)
+      .then(setSessions)
+      .catch(() => {});
+  }, [clubId]);
 
   async function handleSave() {
     if (!title.trim()) { setError('Title is required'); return; }
     setSaving(true);
     setError('');
     try {
-      const payload = {
+      const payload: Partial<ClassPrompt> = {
         title: title.trim(),
         body: body.trim() || undefined,
         prompt_type: promptType,
         is_required: isRequired,
         due_date: dueDate ? new Date(dueDate).toISOString() : undefined,
         sort_order: sortOrder,
+        session_id: sessionId || undefined,
       };
       let saved: ClassPrompt;
       if (initial) {
@@ -119,6 +128,23 @@ export default function ClassPromptForm({ clubId, initial, onSaved, onCancel }: 
             Required
           </label>
         </div>
+        {sessions.length > 0 && (
+          <div className="col-span-2">
+            <label className="block text-xs text-muted mb-1">Link to Session (optional)</label>
+            <select
+              className="w-full theme-input rounded-lg px-3 py-2 text-sm"
+              value={sessionId}
+              onChange={e => setSessionId(e.target.value)}
+            >
+              <option value="">— No session —</option>
+              {sessions.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.title} ({new Date(s.session_date).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 justify-end">

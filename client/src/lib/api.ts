@@ -1502,7 +1502,7 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/search-users?q=${encodeURIComponent(q)}`);
   }
 
-  async inviteClubMember(clubId: string, data: { email?: string; userId?: string }): Promise<{ id: string; invite_token?: string }> {
+  async inviteClubMember(clubId: string, data: { email?: string; userId?: string; role?: 'admin' | 'member' }): Promise<{ id: string; invite_token?: string }> {
     return this.request(`/clubs/${clubId}/invite`, { method: 'POST', body: JSON.stringify(data) });
   }
 

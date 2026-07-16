@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Mail, Search, UserPlus, Check, Copy, Link } from 'lucide-react';
+import { X, Mail, Search, UserPlus, Check, Copy, Link, Shield } from 'lucide-react';
 import api from '../../lib/api';
 
 interface SearchUser {
@@ -12,13 +12,15 @@ interface SearchUser {
 interface Props {
   clubId: string;
   clubName: string;
+  inviteRole?: 'admin' | 'member';
   onClose: () => void;
   onAdded: () => void;
 }
 
 type InviteTab = 'email' | 'existing';
 
-export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }: Props) {
+export default function ClassInviteModal({ clubId, clubName, inviteRole = 'member', onClose, onAdded }: Props) {
+  const isTeacherInvite = inviteRole === 'admin';
   const [tab, setTab] = useState<InviteTab>('email');
 
   // Email tab
@@ -57,7 +59,7 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
     setEmailError('');
     setInviteLink('');
     try {
-      const result = await api.inviteClubMember(clubId, { email: email.trim() });
+      const result = await api.inviteClubMember(clubId, { email: email.trim(), role: inviteRole });
       if (result.invite_token) {
         const link = `${window.location.origin}/clubs/accept/${result.invite_token}`;
         setInviteLink(link);
@@ -81,7 +83,7 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
     setAdding(user.id);
     setAddError('');
     try {
-      await api.inviteClubMember(clubId, { userId: user.id });
+      await api.inviteClubMember(clubId, { userId: user.id, role: inviteRole });
       setAddedIds(prev => new Set([...prev, user.id]));
       onAdded();
     } catch (err: any) {
@@ -91,14 +93,23 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
     }
   }
 
+  const title = isTeacherInvite ? 'Add Teacher / Facilitator' : 'Add Student';
+  const Icon = isTeacherInvite ? Shield : UserPlus;
+  const iconColor = isTeacherInvite ? 'text-blue-500' : 'text-violet-500';
+  const btnClass = isTeacherInvite ? 'theme-button-secondary' : 'theme-button-primary';
+  const placeholder = isTeacherInvite ? 'teacher@example.com' : 'student@example.com';
+  const description = isTeacherInvite
+    ? `Invite a teacher or facilitator to <span class="text-theme font-medium">${clubName}</span>. They will have full admin access to the class.`
+    : `Send an invite link to a student's email address. They'll receive a notification to join <span class="text-theme font-medium">${clubName}</span>.`;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="theme-section rounded-xl w-full max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-strong/20">
           <div className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-violet-500" />
-            <h2 className="font-semibold text-theme">Add Student</h2>
+            <Icon className={`h-5 w-5 ${iconColor}`} />
+            <h2 className="font-semibold text-theme">{title}</h2>
           </div>
           <button onClick={onClose} className="text-muted hover:text-theme transition-colors">
             <X className="h-5 w-5" />
@@ -128,14 +139,12 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
         {/* Email Tab */}
         {tab === 'email' && (
           <div className="p-5 space-y-4">
-            <p className="text-sm text-muted">
-              Send an invite link to a student's email address. They'll receive a notification to join <span className="text-theme font-medium">{clubName}</span>.
-            </p>
+            <p className="text-sm text-muted" dangerouslySetInnerHTML={{ __html: description }} />
             <div className="flex gap-2">
               <input
                 type="email"
                 className="flex-1 theme-input rounded-lg px-3 py-2 text-sm"
-                placeholder="student@example.com"
+                placeholder={placeholder}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleEmailInvite()}
@@ -144,7 +153,7 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
               <button
                 onClick={handleEmailInvite}
                 disabled={emailSending || !email.trim()}
-                className="theme-button-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 whitespace-nowrap"
+                className={`${btnClass} px-4 py-2 rounded-lg text-sm disabled:opacity-50 whitespace-nowrap`}
               >
                 {emailSending ? 'Sending...' : 'Send Invite'}
               </button>
@@ -177,7 +186,8 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
         {tab === 'existing' && (
           <div className="p-5 space-y-4">
             <p className="text-sm text-muted">
-              Search for existing BookFlow users to add directly to <span className="text-theme font-medium">{clubName}</span>.
+              Search for existing BookFlow users to add directly to <span className="text-theme font-medium">{clubName}</span>
+              {isTeacherInvite ? ' as a teacher/facilitator.' : '.'}
             </p>
             <input
               type="text"
@@ -219,7 +229,7 @@ export default function ClassInviteModal({ clubId, clubName, onClose, onAdded }:
                       className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors ${
                         isAdded
                           ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-                          : 'theme-button-primary disabled:opacity-50'
+                          : `${btnClass} disabled:opacity-50`
                       }`}
                     >
                       {isAdded ? <><Check className="h-3.5 w-3.5" /> Added</> : isAdding ? 'Adding...' : <><UserPlus className="h-3.5 w-3.5" /> Add</>}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Crown, Shield, UserPlus, Copy, Check, MailX } from 'lucide-react';
+import { Crown, Shield, UserPlus, GraduationCap, Copy, Check, MailX, ChevronDown } from 'lucide-react';
 import api from '../../lib/api';
 import ClassInviteModal from './ClassInviteModal';
 
@@ -28,7 +28,7 @@ interface Props {
 
 function RoleBadge({ role }: { role: string }) {
   if (role === 'owner') return <span title="Owner"><Crown className="h-3.5 w-3.5 text-yellow-500" /></span>;
-  if (role === 'admin') return <span title="Admin"><Shield className="h-3.5 w-3.5 text-blue-500" /></span>;
+  if (role === 'admin') return <span title="Teacher/Facilitator"><Shield className="h-3.5 w-3.5 text-blue-500" /></span>;
   return null;
 }
 
@@ -62,7 +62,9 @@ function PendingRow({ member, clubId }: { member: Member; clubId: string; onRemo
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-theme truncate">{member.invited_email ?? 'Invited user'}</p>
-        <p className="text-xs text-amber-500">Pending acceptance</p>
+        <p className="text-xs text-amber-500">
+          Pending acceptance {member.role === 'admin' ? '· Teacher' : ''}
+        </p>
       </div>
       <div className="flex items-center gap-2">
         {link && (
@@ -79,8 +81,88 @@ function PendingRow({ member, clubId }: { member: Member; clubId: string; onRemo
   );
 }
 
+function MemberRow({
+  member,
+  clubId,
+  canChangeRole,
+  onRoleChanged,
+}: {
+  member: Member;
+  clubId: string;
+  canChangeRole: boolean;
+  onRoleChanged: () => void;
+}) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const profile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
+
+  async function setRole(role: 'admin' | 'member') {
+    setChanging(true);
+    setShowMenu(false);
+    try {
+      await api.updateClubMemberRole(clubId, member.id, role);
+      onRoleChanged();
+    } catch { /* silent */ }
+    finally { setChanging(false); }
+  }
+
+  return (
+    <div className="theme-section rounded-xl flex items-center gap-3 p-3">
+      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
+        {profile?.avatar_url
+          ? <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
+          : (profile?.display_name ?? '?').charAt(0).toUpperCase()
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-theme truncate">{profile?.display_name ?? 'Member'}</p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <RoleBadge role={member.role} />
+        {canChangeRole && member.role !== 'owner' ? (
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(v => !v)}
+              disabled={changing}
+              className="flex items-center gap-1 text-xs text-muted hover:text-theme transition-colors disabled:opacity-50 px-2 py-1 rounded-lg hover:bg-strong/10"
+            >
+              <span className="capitalize">{member.role === 'admin' ? 'Teacher' : 'Student'}</span>
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-1 w-40 theme-section rounded-xl shadow-lg border border-strong/20 z-10 overflow-hidden">
+                <button
+                  onClick={() => setRole('admin')}
+                  disabled={member.role === 'admin'}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-strong/10 transition-colors flex items-center gap-2 disabled:opacity-40"
+                >
+                  <Shield className="h-3.5 w-3.5 text-blue-500" />
+                  Make Teacher
+                </button>
+                <button
+                  onClick={() => setRole('member')}
+                  disabled={member.role === 'member'}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-strong/10 transition-colors flex items-center gap-2 disabled:opacity-40"
+                >
+                  <GraduationCap className="h-3.5 w-3.5 text-muted" />
+                  Make Student
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted capitalize">
+            {member.role === 'admin' ? 'Teacher' : member.role === 'owner' ? 'Owner' : 'Student'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ClassMembersPanel({ club, isTeacher, onReload }: Props) {
-  const [showInvite, setShowInvite] = useState(false);
+  const [showInviteStudent, setShowInviteStudent] = useState(false);
+  const [showInviteTeacher, setShowInviteTeacher] = useState(false);
 
   const allMembers = club.members ?? [];
   const members = allMembers.filter(m => m.invite_accepted_at);
@@ -89,50 +171,47 @@ export default function ClassMembersPanel({ club, isTeacher, onReload }: Props) 
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
           Class Members ({members.length})
         </h2>
         {isTeacher && (
-          <button
-            onClick={() => setShowInvite(true)}
-            className="flex items-center gap-1.5 theme-button-primary px-3 py-2 rounded-lg text-sm"
-          >
-            <UserPlus className="h-4 w-4" /> Add Student
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowInviteTeacher(true)}
+              className="flex items-center gap-1.5 theme-button-secondary px-3 py-2 rounded-lg text-sm"
+            >
+              <Shield className="h-4 w-4 text-blue-500" /> Add Teacher
+            </button>
+            <button
+              onClick={() => setShowInviteStudent(true)}
+              className="flex items-center gap-1.5 theme-button-primary px-3 py-2 rounded-lg text-sm"
+            >
+              <UserPlus className="h-4 w-4" /> Add Student
+            </button>
+          </div>
         )}
       </div>
 
       {/* Members list */}
       {members.length === 0 ? (
         <div className="text-center py-8 text-muted">
-          <p className="text-sm">No students enrolled yet.</p>
+          <p className="text-sm">No members enrolled yet.</p>
           {isTeacher && (
-            <p className="text-xs mt-1">Use "Add Student" to invite students to this class.</p>
+            <p className="text-xs mt-1">Use the buttons above to invite students or teachers.</p>
           )}
         </div>
       ) : (
         <div className="space-y-2">
-          {members.map(m => {
-            const profile = Array.isArray(m.profile) ? m.profile[0] : m.profile;
-            return (
-              <div key={m.id} className="theme-section rounded-xl flex items-center gap-3 p-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
-                  {profile?.avatar_url
-                    ? <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
-                    : (profile?.display_name ?? '?').charAt(0).toUpperCase()
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-theme truncate">{profile?.display_name ?? 'Member'}</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <RoleBadge role={m.role} />
-                  <span className="text-xs text-muted capitalize">{m.role}</span>
-                </div>
-              </div>
-            );
-          })}
+          {members.map(m => (
+            <MemberRow
+              key={m.id}
+              member={m}
+              clubId={club.id}
+              canChangeRole={isTeacher}
+              onRoleChanged={onReload}
+            />
+          ))}
         </div>
       )}
 
@@ -150,11 +229,24 @@ export default function ClassMembersPanel({ club, isTeacher, onReload }: Props) 
         </div>
       )}
 
-      {showInvite && (
+      {/* Add Student modal */}
+      {showInviteStudent && (
         <ClassInviteModal
           clubId={club.id}
           clubName={club.name}
-          onClose={() => setShowInvite(false)}
+          inviteRole="member"
+          onClose={() => setShowInviteStudent(false)}
+          onAdded={() => { onReload(); }}
+        />
+      )}
+
+      {/* Add Teacher modal */}
+      {showInviteTeacher && (
+        <ClassInviteModal
+          clubId={club.id}
+          clubName={club.name}
+          inviteRole="admin"
+          onClose={() => setShowInviteTeacher(false)}
           onAdded={() => { onReload(); }}
         />
       )}

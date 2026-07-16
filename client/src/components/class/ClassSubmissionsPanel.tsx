@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, BookOpen, Check, Clock, Star, Edit2, Trash2 } from 'lucide-react';
+import { Plus, BookOpen, Check, Clock, Star, Edit2, Trash2, Calendar } from 'lucide-react';
 import api from '../../lib/api';
-import type { ClassPrompt, ClassSubmission } from '../../types';
+import type { ClassPrompt, ClassSession, ClassSubmission } from '../../types';
 import ClassSubmissionEditor from './ClassSubmissionEditor';
 import ClassFeedbackModal from './ClassFeedbackModal';
 import ClassPromptForm from './ClassPromptForm';
@@ -14,6 +14,7 @@ function StatusBadge({ status }: { status: ClassSubmission['status'] }) {
 
 export default function ClassSubmissionsPanel({ clubId, isTeacher }: { clubId: string; isTeacher: boolean }) {
   const [prompts, setPrompts] = useState<ClassPrompt[]>([]);
+  const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [submissions, setSubmissions] = useState<ClassSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPromptForm, setShowPromptForm] = useState(false);
@@ -28,8 +29,9 @@ export default function ClassSubmissionsPanel({ clubId, isTeacher }: { clubId: s
     Promise.all([
       api.getClassPrompts(clubId),
       api.getClassSubmissions(clubId),
+      api.getClassSessions(clubId),
     ])
-      .then(([p, s]) => { setPrompts(p); setSubmissions(s); })
+      .then(([p, s, sess]) => { setPrompts(p); setSubmissions(s); setSessions(sess); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [clubId]);
@@ -117,6 +119,7 @@ export default function ClassSubmissionsPanel({ clubId, isTeacher }: { clubId: s
           {prompts.map(prompt => {
             const promptSubs = submissions.filter(s => s.prompt_id === prompt.id);
             const mySub = !isTeacher ? promptSubs[0] : undefined;
+            const linkedSession = prompt.session_id ? sessions.find(s => s.id === prompt.session_id) : null;
 
             return (
               <div key={prompt.id} className="theme-section rounded-xl overflow-hidden">
@@ -131,6 +134,11 @@ export default function ClassSubmissionsPanel({ clubId, isTeacher }: { clubId: s
                         </span>
                         {prompt.is_required && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400">Required</span>
+                        )}
+                        {linkedSession && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />{linkedSession.title}
+                          </span>
                         )}
                       </div>
                       {prompt.body && <p className="text-sm text-muted mt-1 line-clamp-2">{prompt.body}</p>}

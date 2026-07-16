@@ -468,7 +468,7 @@ router.post('/:clubId/class/prompts', authenticate, async (req, res) => {
   const role = await requireClassAccess(req, res, 'teacher');
   if (!role) return;
 
-  const { title, body, prompt_type, chapter_id, is_required, due_date, sort_order } = req.body;
+  const { title, body, prompt_type, chapter_id, session_id, is_required, due_date, sort_order } = req.body;
   if (!title) return res.status(400).json({ error: 'title is required' });
 
   const VALID_TYPES = ['journal', 'essay', 'assignment', 'scribe'];
@@ -481,6 +481,7 @@ router.post('/:clubId/class/prompts', authenticate, async (req, res) => {
       .insert({
         club_id: clubId,
         chapter_id: chapter_id || null,
+        session_id: session_id || null,
         title,
         body: body || null,
         prompt_type: pType,
@@ -509,7 +510,7 @@ router.put('/:clubId/class/prompts/:id', authenticate, async (req, res) => {
   const role = await requireClassAccess(req, res, 'teacher');
   if (!role) return;
 
-  const allowed = ['title', 'body', 'prompt_type', 'chapter_id', 'is_required', 'due_date', 'sort_order'];
+  const allowed = ['title', 'body', 'prompt_type', 'chapter_id', 'session_id', 'is_required', 'due_date', 'sort_order'];
   const updates = {};
   for (const k of allowed) {
     if (k in req.body) updates[k] = req.body[k];

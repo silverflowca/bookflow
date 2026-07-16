@@ -786,6 +786,7 @@ export interface ClassPrompt {
   id: string;
   club_id: string;
   chapter_id?: string;
+  session_id?: string;
   title: string;
   body?: string;
   prompt_type: ClassPromptType;
