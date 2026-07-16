@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../lib/api';
+import type { BookResponseItem } from '../../types';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
-  Settings, ArrowLeft, TrendingUp, ChevronRight,
+  Settings, ArrowLeft, TrendingUp, ChevronRight, ClipboardList, Loader2, ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ClubChatPanel from '../chat/ClubChatPanel';
@@ -14,7 +15,7 @@ import ClassMembersPanel from './ClassMembersPanel';
 import ClassSettingsPanel from './ClassSettingsPanel';
 import ClassProgressPanel from './ClassProgressPanel';
 
-type ClassTab = 'overview' | 'roster' | 'progress' | 'schedule' | 'assignments' | 'chat' | 'members' | 'settings';
+type ClassTab = 'overview' | 'roster' | 'progress' | 'schedule' | 'assignments' | 'responses' | 'chat' | 'members' | 'settings';
 
 interface ClubBook {
   id: string;
@@ -76,6 +77,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
     { key: 'progress', label: 'My Progress', icon: <TrendingUp className="h-4 w-4" />, studentOnly: true },
     { key: 'schedule', label: 'Schedule', icon: <Calendar className="h-4 w-4" /> },
     { key: 'assignments', label: 'Assignments', icon: <BookOpen className="h-4 w-4" /> },
+    { key: 'responses', label: 'Responses', icon: <ClipboardList className="h-4 w-4" />, teacherOnly: true },
     { key: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
     { key: 'members', label: `Members (${memberCount})`, icon: <Users className="h-4 w-4" /> },
     { key: 'settings', label: 'Settings', icon: <Settings className="h-4 w-4" />, teacherOnly: true },
@@ -157,6 +159,9 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       )}
       {tab === 'members' && (
         <ClassMembersPanel club={club} isTeacher={isTeacher} onReload={onReload} />
+      )}
+      {tab === 'responses' && isTeacher && currentBook?.book && (
+        <ClassResponsesPanel bookId={currentBook.book.id} clubId={club.id} />
       )}
       {tab === 'settings' && isTeacher && (
         <ClassSettingsPanel club={club} onReload={onReload} />
@@ -306,6 +311,16 @@ function ClassOverviewTab({
           <p className="font-semibold text-theme text-sm">Assignments</p>
           <p className="text-xs text-muted mt-0.5">Journals & essays</p>
         </button>
+        {isTeacher && (
+          <button
+            onClick={() => onGoToTab('responses')}
+            className="theme-section rounded-xl p-4 text-left hover:shadow-md transition-shadow"
+          >
+            <ClipboardList className="h-5 w-5 text-orange-500 mb-2" />
+            <p className="font-semibold text-theme text-sm">Responses</p>
+            <p className="text-xs text-muted mt-0.5">All student answers</p>
+          </button>
+        )}
         <button
           onClick={() => onGoToTab('chat')}
           className="theme-section rounded-xl p-4 text-left hover:shadow-md transition-shadow"
@@ -315,6 +330,121 @@ function ClassOverviewTab({
           <p className="text-xs text-muted mt-0.5">Group discussion</p>
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── ClassResponsesPanel ──────────────────────────────────────────────────────
+
+function ClassResponsesPanel({ bookId }: { bookId: string; clubId: string }) {
+  const [items, setItems] = useState<BookResponseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    api.getBookResponses(bookId)
+      .then(data => {
+        setItems(data);
+        if (data.length > 0) setExpanded({ [data[0].chapter_id]: true });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [bookId]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="h-6 w-6 animate-spin text-muted" />
+    </div>
+  );
+
+  if (!items.length) return (
+    <div className="text-center py-16 text-muted">
+      <ClipboardList className="h-10 w-10 mx-auto mb-3 opacity-30" />
+      <p className="text-sm">No responses yet for this book.</p>
+    </div>
+  );
+
+  const byChapter = items.reduce<Record<string, { title: string; order: number; items: BookResponseItem[] }>>((acc, item) => {
+    if (!acc[item.chapter_id]) acc[item.chapter_id] = { title: item.chapter_title, order: item.chapter_order, items: [] };
+    acc[item.chapter_id].items.push(item);
+    return acc;
+  }, {});
+  const chapters = Object.entries(byChapter).sort((a, b) => a[1].order - b[1].order);
+
+  function toggle(chapterId: string) {
+    setExpanded(prev => ({ ...prev, [chapterId]: !prev[chapterId] }));
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-lg font-bold text-theme">Book Responses</h2>
+        <span className="text-xs text-muted">
+          {items.length} question{items.length !== 1 ? 's' : ''} · {items.reduce((s, i) => s + i.responses.length, 0)} responses
+        </span>
+      </div>
+
+      {chapters.map(([chapterId, chapter]) => (
+        <div key={chapterId} className="theme-section rounded-xl overflow-hidden">
+          <button
+            onClick={() => toggle(chapterId)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-hover transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="h-4 w-4 text-muted flex-shrink-0" />
+              <span className="font-semibold text-theme text-sm truncate">{chapter.title}</span>
+              <span className="text-xs text-muted flex-shrink-0">({chapter.items.length} question{chapter.items.length !== 1 ? 's' : ''})</span>
+            </div>
+            <ChevronDown className={`h-4 w-4 text-muted flex-shrink-0 transition-transform ${expanded[chapterId] ? 'rotate-180' : ''}`} />
+          </button>
+
+          {expanded[chapterId] && (
+            <div className="border-t border-theme divide-y divide-theme">
+              {chapter.items.map(item => (
+                <div key={item.id} className="px-4 py-4">
+                  <div className="mb-3">
+                    {item.content_data?.question
+                      ? <p className="text-sm font-medium text-theme">{item.content_data.question}</p>
+                      : item.anchor_text
+                        ? <p className="text-sm font-medium text-theme">{item.anchor_text}</p>
+                        : null
+                    }
+                    <p className="text-xs text-muted mt-0.5 capitalize">
+                      {item.content_type.replace(/_/g, ' ')} · {item.responses.length} response{item.responses.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+
+                  {item.responses.length === 0 ? (
+                    <p className="text-xs text-muted italic">No responses yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {item.responses.map((r, i) => (
+                        <div key={r.id ?? i} className="flex items-start gap-2.5 bg-surface rounded-lg px-3 py-2.5">
+                          <div className="h-7 w-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
+                            {r.user?.avatar_url
+                              ? <img src={r.user.avatar_url} alt="" className="h-7 w-7 object-cover" />
+                              : <span className="text-xs font-bold text-accent">{(r.user?.display_name || '?')[0].toUpperCase()}</span>
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-theme">{r.user?.display_name || 'Student'}</p>
+                            <p className="text-sm text-muted mt-0.5 break-words">
+                              {r.answer_text
+                                || r.selected_option
+                                || (Array.isArray(r.selected_options) ? r.selected_options.join(', ') : null)
+                                || '—'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
