@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Edit, Trash2, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2, Star, Share2, QrCode, ExternalLink, BookOpen } from 'lucide-react';
+import { Plus, GripVertical, Edit, Archive, Eye, Settings, ChevronLeft, Save, Users, History, MessageSquare, ChevronDown, ChevronUp, Loader2, Download, Send, Globe, Lock, Copy, Check, X, Mail, BarChart2, Star, Share2, QrCode, ExternalLink, BookOpen } from 'lucide-react';
 import QRCode from 'qrcode';
 import api from '../lib/api';
 import type { Book, Chapter, BookCollaborator, CollaboratorRole, ReviewRequest, BookComment } from '../types';
@@ -985,12 +985,12 @@ export default function BookEditor() {
   }
 
   async function handleDeleteChapter(id: string) {
-    if (!confirm('Delete this chapter?')) return;
+    if (!confirm('Archive this chapter? It will be hidden from the book but not permanently deleted.')) return;
     try {
       await api.deleteChapter(id);
       setChapters(chapters.filter(c => c.id !== id));
     } catch (err) {
-      console.error('Failed to delete chapter:', err);
+      console.error('Failed to archive chapter:', err);
     }
   }
 
@@ -1544,9 +1544,10 @@ export default function BookEditor() {
                       {(userRole === 'owner' || userRole === 'author') && (
                         <button
                           onClick={() => handleDeleteChapter(chapter.id)}
-                          className="p-2 text-muted hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Archive chapter"
+                          className="p-2 text-muted hover:text-amber-600 hover:bg-amber-50 rounded"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Archive className="h-4 w-4" />
                         </button>
                       )}
                       </div>

@@ -38,6 +38,7 @@ router.get('/books/:bookId/chapters', optionalAuth, async (req, res) => {
       .from('chapters')
       .select('*')
       .eq('book_id', req.params.bookId)
+      .neq('status', 'archived')
       .order('order_index', { ascending: true });
 
     if (error) throw error;
@@ -242,7 +243,7 @@ router.put('/books/:bookId/chapters/reorder', authenticate, async (req, res) => 
   }
 });
 
-// Delete chapter
+// Archive chapter (soft-delete — sets status to 'archived', never physically deleted)
 router.delete('/chapters/:id', authenticate, async (req, res) => {
   try {
     const { data: chapter, error: chapterError } = await supabase
@@ -259,14 +260,14 @@ router.delete('/chapters/:id', authenticate, async (req, res) => {
 
     const { error } = await supabase
       .from('chapters')
-      .delete()
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
       .eq('id', req.params.id);
 
     if (error) throw error;
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Delete chapter error:', err);
+    console.error('Archive chapter error:', err);
     res.status(500).json({ error: err.message });
   }
 });
