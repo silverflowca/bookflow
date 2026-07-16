@@ -343,6 +343,15 @@ export default function ClubsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Default to Discover tab for logged-out users
+  useEffect(() => {
+    if (!user) {
+      setTab('discover');
+      setSgTab('discover');
+      setOcTab('discover');
+    }
+  }, [user]);
+
   function toggleClubView(v: 'card' | 'list') {
     setClubView(v);
     localStorage.setItem('bookflow-club-view', v);
