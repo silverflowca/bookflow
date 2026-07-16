@@ -112,7 +112,7 @@ router.get('/public', optionalAuth, async (req, res) => {
       .select(`
         id, name, description, cover_image_url, max_members, created_at, club_type,
         creator:profiles!book_clubs_created_by_fkey(id, display_name, avatar_url),
-        settings:club_settings(allow_join_requests)
+        settings:club_settings(allow_join_requests, registration_bg_url)
       `)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })

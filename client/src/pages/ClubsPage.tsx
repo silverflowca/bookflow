@@ -58,14 +58,15 @@ interface Club {
 function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }) {
   const memberCount = club.member_count ?? club.members?.filter(m => m.invite_accepted_at).length ?? 0;
   const currentBook = club.books?.find(b => b.is_current)?.book;
+  const imageUrl = club.cover_image_url || (club as any).settings?.registration_bg_url;
 
   return (
     <div
       className="theme-section rounded-xl overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
       onClick={() => onOpen(club.id)}
     >
-      {club.cover_image_url ? (
-        <img src={club.cover_image_url} alt={club.name} className="w-full h-28 object-cover" />
+      {imageUrl ? (
+        <img src={imageUrl} alt={club.name} className="w-full h-28 object-cover" />
       ) : (
         <div className="w-full h-28 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
           <Users className="h-10 w-10 text-white opacity-60" />
@@ -102,6 +103,7 @@ function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }
 function ClubRow({ club, onOpen }: { club: Club; onOpen: (id: string) => void }) {
   const memberCount = club.member_count ?? club.members?.filter(m => m.invite_accepted_at).length ?? 0;
   const currentBook = club.books?.find(b => b.is_current)?.book;
+  const imageUrl = club.cover_image_url || (club as any).settings?.registration_bg_url;
 
   return (
     <div
@@ -109,8 +111,8 @@ function ClubRow({ club, onOpen }: { club: Club; onOpen: (id: string) => void })
       onClick={() => onOpen(club.id)}
     >
       <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-        {club.cover_image_url
-          ? <img src={club.cover_image_url} alt={club.name} className="w-full h-full object-cover" />
+        {imageUrl
+          ? <img src={imageUrl} alt={club.name} className="w-full h-full object-cover" />
           : <Users className="h-5 w-5 text-white opacity-60" />
         }
       </div>
