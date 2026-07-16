@@ -693,6 +693,8 @@ export default function ClubDetailPage() {
   const [progressData, setProgressData] = useState<ClubProgressEntry[] | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressClubId, setProgressClubId] = useState<string | null>(null);
+  const [myReadingProgress, setMyReadingProgress] = useState<{ percent_complete: number; current_chapter_id?: string } | null>(null);
+  const [myItemProgress, setMyItemProgress] = useState<{ completed: number; total: number } | null>(null);
 
   const myRole = club?.my_role ?? null;
   const currentUserId = user?.id ?? '';
@@ -705,6 +707,17 @@ export default function ClubDetailPage() {
   useEffect(() => {
     if (tab === 'progress' && clubId && !progressData) loadProgress();
   }, [tab]);
+
+  useEffect(() => {
+    const bookId = club?.books?.find(b => b.is_current)?.book?.id;
+    if (!bookId || !user) return;
+    api.getReadingProgress(bookId).then(p => setMyReadingProgress(p ? { percent_complete: p.percent_complete, current_chapter_id: p.current_chapter_id } : null)).catch(() => {});
+    api.getBookProgress(bookId).then(breakdown => {
+      const completed = breakdown.reduce((s, b) => s + b.completed, 0);
+      const total = breakdown.reduce((s, b) => s + b.total, 0);
+      setMyItemProgress({ completed, total });
+    }).catch(() => {});
+  }, [club, user]);
 
   async function loadProgress() {
     if (!clubId) return;
@@ -897,21 +910,65 @@ export default function ClubDetailPage() {
               </button>
             )}
           </div>
-          {currentBook && (
-            <div className="mt-4 flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10">
-              <Star className="h-4 w-4 text-yellow-500" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted">Currently reading</p>
-                <p className="text-sm font-medium text-theme truncate">{currentBook.book?.title}</p>
+          {currentBook && (() => {
+            const readPct = myReadingProgress?.percent_complete ?? 0;
+            const hasStarted = readPct > 0;
+            const itemPct = myItemProgress && myItemProgress.total > 0
+              ? Math.round((myItemProgress.completed / myItemProgress.total) * 100)
+              : 0;
+            const readTo = myReadingProgress?.current_chapter_id
+              ? `/clubs/${clubId}/read/${currentBook.book?.id}?chapter=${myReadingProgress.current_chapter_id}`
+              : `/clubs/${clubId}/read/${currentBook.book?.id}`;
+            return (
+              <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                {/* Title row */}
+                <div className="flex items-center gap-3">
+                  <Star className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted">Currently reading</p>
+                    <p className="text-sm font-semibold text-theme truncate">{currentBook.book?.title}</p>
+                  </div>
+                  <Link
+                    to={readTo}
+                    className="flex items-center gap-1 text-xs theme-button-primary px-3 py-1.5 rounded-lg flex-shrink-0"
+                  >
+                    {hasStarted ? 'Continue Reading' : 'Start Reading'} <ChevronRight className="h-3 w-3" />
+                  </Link>
+                </div>
+                {/* Progress bars */}
+                <div className="space-y-2">
+                  {/* Reading progress */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-muted">Reading progress</span>
+                      <span className="text-xs font-medium text-theme">{Math.round(readPct)}%</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-accent transition-all duration-500"
+                        style={{ width: `${Math.round(readPct)}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Component completion */}
+                  {myItemProgress && myItemProgress.total > 0 && (
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs text-muted">Components completed</span>
+                        <span className="text-xs font-medium text-theme">{itemPct}% · {myItemProgress.completed}/{myItemProgress.total}</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                          style={{ width: `${itemPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <Link
-                to={`/clubs/${clubId}/read/${currentBook.book?.id}`}
-                className="flex items-center gap-1 text-xs theme-button-primary px-3 py-1.5 rounded-lg"
-              >
-                Read Together <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
