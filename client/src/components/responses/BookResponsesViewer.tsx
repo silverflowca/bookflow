@@ -30,6 +30,7 @@ interface Props {
   compact?: boolean;
   mode?: 'author' | 'accessible';
   viewerUserId?: string | null;
+  memberFilter?: { id: string; display_name: string; avatar_url?: string | null }[];
 }
 
 type ResponseVisibility = 'private' | 'shared' | 'public';
@@ -669,6 +670,7 @@ export default function BookResponsesViewer({
   chapterId: initialChapterId,
   compact = false,
   mode = 'author',
+  memberFilter,
 }: Props) {
   const [responseItems, setResponseItems] = useState<BookResponseItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -680,6 +682,7 @@ export default function BookResponsesViewer({
   const [activeVisibilities, setActiveVisibilities] = useState<ResponseVisibility[]>([]);
   const [activeClubIds, setActiveClubIds] = useState<string[]>([]);
   const [activeSharedUserIds, setActiveSharedUserIds] = useState<string[]>([]);
+  const [activeMemberIds, setActiveMemberIds] = useState<string[]>([]);
 
   useEffect(() => {
     setActiveChapterId(initialChapterId || null);
@@ -774,6 +777,7 @@ export default function BookResponsesViewer({
           if (activeVisibilities.length > 0 && !activeVisibilities.includes(visibility)) return false;
           if (activeClubIds.length > 0 && !(response.club_contexts || []).some(club => activeClubIds.includes(club.id))) return false;
           if (activeSharedUserIds.length > 0 && !(response.shared_with_users || []).some(sharedUser => activeSharedUserIds.includes(sharedUser.id))) return false;
+          if (activeMemberIds.length > 0 && !activeMemberIds.includes(response.user_id || '')) return false;
 
           if (!q) return true;
 
@@ -785,7 +789,7 @@ export default function BookResponsesViewer({
           return labelMatches || name.includes(q) || value.includes(q) || clubNames.includes(q) || sharedNames.includes(q);
         });
 
-        const includeZeroResponseItem = activeVisibilities.length === 0 && activeClubIds.length === 0 && activeSharedUserIds.length === 0 && labelMatches;
+        const includeZeroResponseItem = activeVisibilities.length === 0 && activeClubIds.length === 0 && activeSharedUserIds.length === 0 && activeMemberIds.length === 0 && labelMatches;
         if (responses.length === 0 && !includeZeroResponseItem) return null;
 
         return {
@@ -796,7 +800,7 @@ export default function BookResponsesViewer({
         };
       })
       .filter((item): item is BookResponseItem => !!item);
-  }, [responseItems, activeChapterId, activeTypes, activeVisibilities, activeClubIds, activeSharedUserIds, search]);
+  }, [responseItems, activeChapterId, activeTypes, activeVisibilities, activeClubIds, activeSharedUserIds, activeMemberIds, search]);
 
   const totalResponses = useMemo(() => filtered.reduce((sum, item) => sum + item.total, 0), [filtered]);
   const totalRespondents = useMemo(() => {
@@ -836,7 +840,7 @@ export default function BookResponsesViewer({
     return sections.filter(section => section.items.length > 0);
   }, [filtered, mode]);
 
-  const hasActiveFilters = !!activeChapterId || activeTypes.length > 0 || activeVisibilities.length > 0 || activeClubIds.length > 0 || activeSharedUserIds.length > 0 || !!search.trim();
+  const hasActiveFilters = !!activeChapterId || activeTypes.length > 0 || activeVisibilities.length > 0 || activeClubIds.length > 0 || activeSharedUserIds.length > 0 || activeMemberIds.length > 0 || !!search.trim();
 
   if (loading) {
     return (
@@ -875,6 +879,49 @@ export default function BookResponsesViewer({
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex flex-col gap-3 px-5 py-4 bg-white border-b border-gray-200">
+
+        {/* Member filter chips — only shown when memberFilter is provided */}
+        {memberFilter && memberFilter.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Filter by member</p>
+            <div className="flex flex-wrap gap-1.5">
+              {memberFilter.map(member => {
+                const active = activeMemberIds.includes(member.id);
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => setActiveMemberIds(current =>
+                      active ? current.filter(id => id !== member.id) : [...current, member.id]
+                    )}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700'
+                    }`}
+                  >
+                    <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0 bg-purple-200 flex items-center justify-center">
+                      {member.avatar_url
+                        ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                        : <span className="text-[8px] font-bold text-purple-700">{(member.display_name || '?')[0].toUpperCase()}</span>
+                      }
+                    </div>
+                    {member.display_name}
+                    {active && <X className="h-2.5 w-2.5 ml-0.5" />}
+                  </button>
+                );
+              })}
+              {activeMemberIds.length > 0 && (
+                <button
+                  onClick={() => setActiveMemberIds([])}
+                  className="text-xs text-gray-400 hover:text-gray-600 px-1.5 py-1"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -899,7 +946,7 @@ export default function BookResponsesViewer({
             Filter
             {hasActiveFilters && (
               <span className="ml-0.5 bg-purple-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                {(activeChapterId ? 1 : 0) + activeTypes.length + activeVisibilities.length + activeClubIds.length + activeSharedUserIds.length}
+                {(activeChapterId ? 1 : 0) + activeTypes.length + activeVisibilities.length + activeClubIds.length + activeSharedUserIds.length + activeMemberIds.length}
               </span>
             )}
           </button>
@@ -1045,6 +1092,15 @@ export default function BookResponsesViewer({
                 <button onClick={() => setActiveSharedUserIds(current => current.filter(entry => entry !== sharedUserId))} className="hover:text-purple-900"><X className="h-3 w-3" /></button>
               </span>
             ))}
+            {activeMemberIds.map(memberId => {
+              const member = memberFilter?.find(m => m.id === memberId);
+              return (
+                <span key={memberId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-600 text-white font-medium">
+                  {member?.display_name || 'Member'}
+                  <button onClick={() => setActiveMemberIds(current => current.filter(id => id !== memberId))} className="hover:text-purple-200"><X className="h-3 w-3" /></button>
+                </span>
+              );
+            })}
             <button
               onClick={() => {
                 setActiveChapterId(null);
@@ -1052,6 +1108,7 @@ export default function BookResponsesViewer({
                 setActiveVisibilities([]);
                 setActiveClubIds([]);
                 setActiveSharedUserIds([]);
+                setActiveMemberIds([]);
                 setSearch('');
               }}
               className="text-xs text-gray-500 hover:text-gray-700 underline"

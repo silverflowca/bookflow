@@ -188,7 +188,11 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
         <ClassMembersPanel club={club} isTeacher={isTeacher} onReload={onReload} />
       )}
       {tab === 'responses' && isTeacher && currentBook?.book && (
-        <ClassResponsesPanel bookId={currentBook.book.id} clubId={club.id} />
+        <ClassResponsesPanel
+          bookId={currentBook.book.id}
+          clubId={club.id}
+          members={club.members}
+        />
       )}
       {tab === 'settings' && isTeacher && (
         <ClassSettingsPanel club={club} onReload={onReload} />
@@ -671,6 +675,22 @@ function ClassOverviewTab({
 
 // ── ClassResponsesPanel ──────────────────────────────────────────────────────
 
-function ClassResponsesPanel({ bookId }: { bookId: string; clubId: string }) {
-  return <BookResponsesViewer bookId={bookId} mode="author" />;
+function ClassResponsesPanel({
+  bookId,
+  members,
+}: {
+  bookId: string;
+  clubId: string;
+  members?: Club['members'];
+}) {
+  const memberFilter = (members || [])
+    .filter(m => m.invite_accepted_at && m.profile)
+    .map(m => ({
+      id: m.user_id ?? m.id,
+      display_name: m.profile!.display_name,
+      avatar_url: m.profile!.avatar_url ?? null,
+    }))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+
+  return <BookResponsesViewer bookId={bookId} mode="author" memberFilter={memberFilter} />;
 }
