@@ -674,6 +674,9 @@ function ClassResponsesPanel({ bookId }: { bookId: string; clubId: string }) {
   const [items, setItems] = useState<BookResponseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [filterChapter, setFilterChapter] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterStudent, setFilterStudent] = useState('');
 
   useEffect(() => {
     api.getBookResponses(bookId)
@@ -698,12 +701,31 @@ function ClassResponsesPanel({ bookId }: { bookId: string; clubId: string }) {
     </div>
   );
 
-  const byChapter = items.reduce<Record<string, { title: string; order: number; items: BookResponseItem[] }>>((acc, item) => {
+  // Build filter options
+  const allChapters = Array.from(new Map(items.map(i => [i.chapter_id, i.chapter_title])).entries());
+  const allTypes = Array.from(new Set(items.map(i => i.content_type)));
+  // Apply filters
+  const studentLower = filterStudent.toLowerCase();
+  const filtered = items
+    .filter(i => !filterChapter || i.chapter_id === filterChapter)
+    .filter(i => !filterType || i.content_type === filterType)
+    .map(i => ({
+      ...i,
+      responses: filterStudent
+        ? i.responses.filter(r => (r.user?.display_name ?? '').toLowerCase().includes(studentLower))
+        : i.responses,
+    }))
+    .filter(i => !filterStudent || i.responses.length > 0);
+
+  const byChapter = filtered.reduce<Record<string, { title: string; order: number; items: BookResponseItem[] }>>((acc, item) => {
     if (!acc[item.chapter_id]) acc[item.chapter_id] = { title: item.chapter_title, order: item.chapter_order, items: [] };
     acc[item.chapter_id].items.push(item);
     return acc;
   }, {});
   const chapters = Object.entries(byChapter).sort((a, b) => a[1].order - b[1].order);
+
+  const hasFilters = filterChapter || filterType || filterStudent;
+  const totalResponses = filtered.reduce((s, i) => s + i.responses.length, 0);
 
   function toggle(chapterId: string) {
     setExpanded(prev => ({ ...prev, [chapterId]: !prev[chapterId] }));
@@ -714,11 +736,54 @@ function ClassResponsesPanel({ bookId }: { bookId: string; clubId: string }) {
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-bold text-theme">Book Responses</h2>
         <span className="text-xs text-muted">
-          {items.length} question{items.length !== 1 ? 's' : ''} · {items.reduce((s, i) => s + i.responses.length, 0)} responses
+          {filtered.length} question{filtered.length !== 1 ? 's' : ''} · {totalResponses} responses
         </span>
       </div>
 
-      {chapters.map(([chapterId, chapter]) => (
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        <select
+          className="theme-input text-xs rounded-lg px-2.5 py-1.5"
+          value={filterChapter}
+          onChange={e => setFilterChapter(e.target.value)}
+        >
+          <option value="">All chapters</option>
+          {allChapters.map(([id, title]) => (
+            <option key={id} value={id}>{title}</option>
+          ))}
+        </select>
+        <select
+          className="theme-input text-xs rounded-lg px-2.5 py-1.5"
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+        >
+          <option value="">All types</option>
+          {allTypes.map(t => (
+            <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
+          ))}
+        </select>
+        <input
+          className="theme-input text-xs rounded-lg px-2.5 py-1.5 w-36"
+          placeholder="Filter by student…"
+          value={filterStudent}
+          onChange={e => setFilterStudent(e.target.value)}
+        />
+        {hasFilters && (
+          <button
+            onClick={() => { setFilterChapter(''); setFilterType(''); setFilterStudent(''); }}
+            className="text-xs text-muted hover:text-theme px-2 py-1.5 rounded-lg hover:bg-surface-hover transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {chapters.length === 0 ? (
+        <div className="text-center py-12 text-muted">
+          <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No results match your filters.</p>
+        </div>
+      ) : chapters.map(([chapterId, chapter]) => (
         <div key={chapterId} className="theme-section rounded-xl overflow-hidden">
           <button
             onClick={() => toggle(chapterId)}
