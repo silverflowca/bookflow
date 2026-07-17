@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../lib/api';
-import type { BookResponseItem } from '../../types';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
   Settings, ArrowLeft, TrendingUp, ChevronRight, ClipboardList, Loader2, ChevronDown,
   X, ZoomIn, BarChart2, BookMarked, CheckCircle2, Activity,
 } from 'lucide-react';
+
+import BookResponsesViewer from '../responses/BookResponsesViewer';
 import { useAuth } from '../../contexts/AuthContext';
 import ClubChatPanel from '../chat/ClubChatPanel';
 import ClassRosterPanel from './ClassRosterPanel';
@@ -671,179 +672,5 @@ function ClassOverviewTab({
 // ── ClassResponsesPanel ──────────────────────────────────────────────────────
 
 function ClassResponsesPanel({ bookId }: { bookId: string; clubId: string }) {
-  const [items, setItems] = useState<BookResponseItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [filterChapter, setFilterChapter] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterStudent, setFilterStudent] = useState('');
-
-  useEffect(() => {
-    api.getBookResponses(bookId)
-      .then(data => {
-        setItems(data);
-        if (data.length > 0) setExpanded({ [data[0].chapter_id]: true });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [bookId]);
-
-  if (loading) return (
-    <div className="flex items-center justify-center py-16">
-      <Loader2 className="h-6 w-6 animate-spin text-muted" />
-    </div>
-  );
-
-  if (!items.length) return (
-    <div className="text-center py-16 text-muted">
-      <ClipboardList className="h-10 w-10 mx-auto mb-3 opacity-30" />
-      <p className="text-sm">No responses yet for this book.</p>
-    </div>
-  );
-
-  // Build filter options
-  const allChapters = Array.from(new Map(items.map(i => [i.chapter_id, i.chapter_title])).entries());
-  const allTypes = Array.from(new Set(items.map(i => i.content_type)));
-  // Apply filters
-  const studentLower = filterStudent.toLowerCase();
-  const filtered = items
-    .filter(i => !filterChapter || i.chapter_id === filterChapter)
-    .filter(i => !filterType || i.content_type === filterType)
-    .map(i => ({
-      ...i,
-      responses: filterStudent
-        ? i.responses.filter(r => (r.user?.display_name ?? '').toLowerCase().includes(studentLower))
-        : i.responses,
-    }))
-    .filter(i => !filterStudent || i.responses.length > 0);
-
-  const byChapter = filtered.reduce<Record<string, { title: string; order: number; items: BookResponseItem[] }>>((acc, item) => {
-    if (!acc[item.chapter_id]) acc[item.chapter_id] = { title: item.chapter_title, order: item.chapter_order, items: [] };
-    acc[item.chapter_id].items.push(item);
-    return acc;
-  }, {});
-  const chapters = Object.entries(byChapter).sort((a, b) => a[1].order - b[1].order);
-
-  const hasFilters = filterChapter || filterType || filterStudent;
-  const totalResponses = filtered.reduce((s, i) => s + i.responses.length, 0);
-
-  function toggle(chapterId: string) {
-    setExpanded(prev => ({ ...prev, [chapterId]: !prev[chapterId] }));
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-bold text-theme">Book Responses</h2>
-        <span className="text-xs text-muted">
-          {filtered.length} question{filtered.length !== 1 ? 's' : ''} · {totalResponses} responses
-        </span>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <select
-          className="theme-input text-xs rounded-lg px-2.5 py-1.5"
-          value={filterChapter}
-          onChange={e => setFilterChapter(e.target.value)}
-        >
-          <option value="">All chapters</option>
-          {allChapters.map(([id, title]) => (
-            <option key={id} value={id}>{title}</option>
-          ))}
-        </select>
-        <select
-          className="theme-input text-xs rounded-lg px-2.5 py-1.5"
-          value={filterType}
-          onChange={e => setFilterType(e.target.value)}
-        >
-          <option value="">All types</option>
-          {allTypes.map(t => (
-            <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
-          ))}
-        </select>
-        <input
-          className="theme-input text-xs rounded-lg px-2.5 py-1.5 w-36"
-          placeholder="Filter by student…"
-          value={filterStudent}
-          onChange={e => setFilterStudent(e.target.value)}
-        />
-        {hasFilters && (
-          <button
-            onClick={() => { setFilterChapter(''); setFilterType(''); setFilterStudent(''); }}
-            className="text-xs text-muted hover:text-theme px-2 py-1.5 rounded-lg hover:bg-surface-hover transition-colors"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      {chapters.length === 0 ? (
-        <div className="text-center py-12 text-muted">
-          <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No results match your filters.</p>
-        </div>
-      ) : chapters.map(([chapterId, chapter]) => (
-        <div key={chapterId} className="theme-section rounded-xl overflow-hidden">
-          <button
-            onClick={() => toggle(chapterId)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-hover transition-colors"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <BookOpen className="h-4 w-4 text-muted flex-shrink-0" />
-              <span className="font-semibold text-theme text-sm truncate">{chapter.title}</span>
-              <span className="text-xs text-muted flex-shrink-0">({chapter.items.length} question{chapter.items.length !== 1 ? 's' : ''})</span>
-            </div>
-            <ChevronDown className={`h-4 w-4 text-muted flex-shrink-0 transition-transform ${expanded[chapterId] ? 'rotate-180' : ''}`} />
-          </button>
-
-          {expanded[chapterId] && (
-            <div className="border-t border-theme divide-y divide-theme">
-              {chapter.items.map(item => (
-                <div key={item.id} className="px-4 py-4">
-                  <div className="mb-3">
-                    {item.content_data?.question
-                      ? <p className="text-sm font-medium text-theme">{item.content_data.question}</p>
-                      : item.anchor_text
-                        ? <p className="text-sm font-medium text-theme">{item.anchor_text}</p>
-                        : null
-                    }
-                    <p className="text-xs text-muted mt-0.5 capitalize">
-                      {item.content_type.replace(/_/g, ' ')} · {item.responses.length} response{item.responses.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-
-                  {item.responses.length === 0 ? (
-                    <p className="text-xs text-muted italic">No responses yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {item.responses.map((r, i) => (
-                        <div key={r.id ?? i} className="flex items-start gap-2.5 bg-surface rounded-lg px-3 py-2.5">
-                          <div className="h-7 w-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
-                            {r.user?.avatar_url
-                              ? <img src={r.user.avatar_url} alt="" className="h-7 w-7 object-cover" />
-                              : <span className="text-xs font-bold text-accent">{(r.user?.display_name || '?')[0].toUpperCase()}</span>
-                            }
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-theme">{r.user?.display_name || 'Student'}</p>
-                            <p className="text-sm text-muted mt-0.5 break-words">
-                              {r.answer_text
-                                || r.selected_option
-                                || (Array.isArray(r.selected_options) ? r.selected_options.join(', ') : null)
-                                || '—'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  return <BookResponsesViewer bookId={bookId} mode="author" />;
 }
