@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MoreVertical, Check, Trash2, Reply, Loader2, Share2 } from 'lucide-react';
+import UserAvatar from '../profile/UserAvatar';
 import api from '../../lib/api';
 import type { BookComment } from '../../types';
 import ShareToClubModal from '../chat/ShareToClubModal';
@@ -108,13 +109,24 @@ export default function CommentThread({
       {/* Comment header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="h-7 w-7 rounded-full bg-surface-hover flex items-center justify-center text-xs font-semibold text-muted flex-shrink-0">
-            {comment.author?.display_name?.[0]?.toUpperCase() || '?'}
-          </div>
-          <div className="min-w-0">
-            <span className="text-sm font-medium text-theme">{comment.author?.display_name || 'Unknown'}</span>
-            <span className="text-xs text-muted ml-2">{timeAgo(comment.created_at)}</span>
-          </div>
+          {comment.author?.id ? (
+            <UserAvatar
+              userId={comment.author.id}
+              displayName={comment.author.display_name || 'Unknown'}
+              avatarUrl={comment.author.avatar_url}
+              size="sm"
+              showName
+              nameClassName="text-sm font-medium text-theme"
+            />
+          ) : (
+            <>
+              <div className="h-7 w-7 rounded-full bg-surface-hover flex items-center justify-center text-xs font-semibold text-muted flex-shrink-0">
+                {comment.author?.display_name?.[0]?.toUpperCase() || '?'}
+              </div>
+              <span className="text-sm font-medium text-theme">{comment.author?.display_name || 'Unknown'}</span>
+            </>
+          )}
+          <span className="text-xs text-muted">{timeAgo(comment.created_at)}</span>
         </div>
 
         <div className="relative flex-shrink-0">

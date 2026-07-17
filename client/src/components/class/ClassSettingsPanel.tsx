@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Settings, BookOpen, Star, Trash2, Plus, Search, Check, Copy, Link, AlertCircle, ClipboardList, Image, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Settings, BookOpen, Star, Trash2, Plus, Search, Check, Copy, Link, AlertCircle, ClipboardList, Image, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../../lib/api';
 import type { Book, ClubRegistrationSettings } from '../../types';
 import RegistrationFormBuilder from './RegistrationFormBuilder';
@@ -38,12 +38,18 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
 
   // Book management
   const [books, setBooks] = useState<ClubBook[]>(club.books ?? []);
-  const [bookQuery, setBookQuery] = useState('');
-  const [bookResults, setBookResults] = useState<Book[]>([]);
-  const [bookSearching, setBookSearching] = useState(false);
   const [bookAdding, setBookAdding] = useState<string | null>(null);
   const [bookError, setBookError] = useState('');
-  const bookDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Paginated book picker
+  const PAGE_SIZE = 24;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerPage, setPickerPage] = useState(0);
+  const [pickerResults, setPickerResults] = useState<Book[]>([]);
+  const [pickerCount, setPickerCount] = useState(0);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const pickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Invite link
   const [inviteLink, setInviteLink] = useState('');
@@ -60,24 +66,37 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
   const [bgError, setBgError] = useState('');
 
   useEffect(() => {
-    setBooks(club.books ?? []);
-  }, [club.books]);
+    // Only sync from parent when the picker is closed, to avoid wiping optimistic updates
+    if (!pickerOpen) {
+      setBooks(club.books ?? []);
+    }
+  }, [club.books, pickerOpen]);
+
+  const loadPickerPage = useCallback((query: string, page: number) => {
+    if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current);
+    pickerDebounceRef.current = setTimeout(async () => {
+      setPickerLoading(true);
+      try {
+        const result = await api.searchBooksPaged(query, page * PAGE_SIZE, PAGE_SIZE);
+        setPickerResults(result.data);
+        setPickerCount(result.count);
+      } catch { setPickerResults([]); setPickerCount(0); }
+      finally { setPickerLoading(false); }
+    }, 300);
+  }, []);
 
   useEffect(() => {
-    if (bookQuery.trim().length < 2) { setBookResults([]); return; }
-    if (bookDebounceRef.current) clearTimeout(bookDebounceRef.current);
-    bookDebounceRef.current = setTimeout(async () => {
-      setBookSearching(true);
-      try {
-        const results = await api.searchBooks(bookQuery.trim());
-        // Filter out already-added books
-        const addedIds = new Set(books.map(b => b.book_id));
-        setBookResults(results.filter(b => !addedIds.has(b.id)));
-      } catch { setBookResults([]); }
-      finally { setBookSearching(false); }
-    }, 300);
-    return () => { if (bookDebounceRef.current) clearTimeout(bookDebounceRef.current); };
-  }, [bookQuery, books]);
+    if (!pickerOpen) return;
+    setPickerPage(0);
+    loadPickerPage(pickerQuery, 0);
+    return () => { if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current); };
+  }, [pickerQuery, pickerOpen, loadPickerPage]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    loadPickerPage(pickerQuery, pickerPage);
+    return () => { if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current); };
+  }, [pickerPage]);
 
   // Load registration settings
   useEffect(() => {
@@ -119,8 +138,6 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
         book: { id: book.id, title: book.title, cover_image_url: book.cover_image_url },
       };
       setBooks(prev => [newEntry, ...prev]);
-      setBookQuery('');
-      setBookResults([]);
       onReload();
     } catch (err: any) {
       setBookError(err.message);
@@ -263,15 +280,28 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
 
       {/* ── Book management ───────────────────────────────────── */}
       <div className="theme-section rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2 mb-1">
-          <BookOpen className="h-5 w-5 text-muted" />
-          <h2 className="font-semibold text-theme">Books</h2>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-muted" />
+            <h2 className="font-semibold text-theme">Books</h2>
+            {books.length > 0 && (
+              <span className="text-xs font-medium text-muted bg-strong/10 px-2 py-0.5 rounded-full">{books.length}</span>
+            )}
+          </div>
+          <button
+            onClick={() => { setPickerOpen(true); setPickerQuery(''); setPickerPage(0); }}
+            className="flex items-center gap-1.5 text-xs theme-button-primary px-3 py-1.5 rounded-lg"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Books
+          </button>
         </div>
 
         {bookError && <p className="text-xs text-red-500">{bookError}</p>}
 
-        {/* Current books list */}
-        {books.length > 0 && (
+        {/* Selected books list */}
+        {books.length === 0 ? (
+          <p className="text-sm text-muted text-center py-4">No books added yet. Click "Add Books" to get started.</p>
+        ) : (
           <div className="space-y-2">
             {books.map(cb => {
               const book = Array.isArray(cb.book) ? (cb.book as any)[0] : cb.book;
@@ -313,49 +343,150 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
             })}
           </div>
         )}
+      </div>
 
-        {/* Book search */}
-        <div>
-          <label className="block text-xs text-muted mb-1.5">Add a book</label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
-            <input
-              type="text"
-              className="w-full theme-input rounded-lg pl-8 pr-3 py-2 text-sm"
-              placeholder="Search for a book by title..."
-              value={bookQuery}
-              onChange={e => setBookQuery(e.target.value)}
-            />
-          </div>
-          {bookSearching && <p className="text-xs text-muted mt-2">Searching...</p>}
-          {bookResults.length > 0 && (
-            <div className="mt-2 border border-strong/20 rounded-lg overflow-hidden">
-              {bookResults.slice(0, 6).map(book => (
-                <div key={book.id} className="flex items-center gap-3 p-2.5 hover:bg-strong/5 transition-colors">
-                  {book.cover_image_url ? (
-                    <img src={book.cover_image_url} alt={book.title} className="w-7 h-9 object-cover rounded flex-shrink-0" />
-                  ) : (
-                    <div className="w-7 h-9 bg-gradient-to-br from-indigo-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0">
-                      <BookOpen className="h-3 w-3 text-white" />
-                    </div>
+      {/* ── Book Picker Modal ─────────────────────────────────── */}
+      {pickerOpen && (() => {
+        const addedIds = new Set(books.map(b => b.book_id));
+        const totalPages = Math.ceil(pickerCount / PAGE_SIZE);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-strong/10 flex-shrink-0">
+                <div>
+                  <h3 className="font-semibold text-theme text-lg">Add Books</h3>
+                  {pickerCount > 0 && (
+                    <p className="text-xs text-muted mt-0.5">{pickerCount.toLocaleString()} book{pickerCount !== 1 ? 's' : ''} found</p>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-theme truncate">{book.title}</p>
+                </div>
+                <button onClick={() => setPickerOpen(false)} className="text-muted hover:text-theme transition-colors p-1 rounded-lg hover:bg-strong/10">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="px-5 py-3 border-b border-strong/10 flex-shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+                  <input
+                    type="text"
+                    autoFocus
+                    className="w-full theme-input rounded-xl pl-9 pr-9 py-2.5 text-sm"
+                    placeholder="Search books by title..."
+                    value={pickerQuery}
+                    onChange={e => setPickerQuery(e.target.value)}
+                  />
+                  {pickerQuery && (
+                    <button onClick={() => setPickerQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-theme">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid */}
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                {pickerLoading ? (
+                  <div className="flex items-center justify-center h-48 text-muted text-sm">Loading...</div>
+                ) : pickerResults.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 gap-2 text-muted">
+                    <BookOpen className="h-8 w-8 opacity-30" />
+                    <p className="text-sm">{pickerQuery ? 'No books match your search' : 'No books available'}</p>
                   </div>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {pickerResults.map(book => {
+                      const isAdded = addedIds.has(book.id);
+                      const isAdding = bookAdding === book.id;
+                      return (
+                        <button
+                          key={book.id}
+                          disabled={isAdded || isAdding}
+                          onClick={async () => {
+                            if (isAdded) return;
+                            await handleAddBook(book);
+                          }}
+                          className={`relative group flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all text-left ${
+                            isAdded
+                              ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 cursor-default'
+                              : 'border-transparent hover:border-violet-300 hover:bg-strong/5 cursor-pointer'
+                          }`}
+                        >
+                          {/* Cover */}
+                          <div className="relative w-full aspect-[2/3] rounded-lg overflow-hidden flex-shrink-0">
+                            {book.cover_image_url ? (
+                              <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+                                <BookOpen className="h-5 w-5 text-white" />
+                              </div>
+                            )}
+                            {/* Added overlay */}
+                            {isAdded && (
+                              <div className="absolute inset-0 bg-emerald-600/50 flex items-center justify-center">
+                                <div className="bg-white rounded-full p-1 shadow-lg">
+                                  <Check className="h-5 w-5 text-emerald-600" />
+                                </div>
+                              </div>
+                            )}
+                            {/* Adding spinner */}
+                            {isAdding && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              </div>
+                            )}
+                            {/* Hover add badge */}
+                            {!isAdded && !isAdding && (
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <div className="bg-white rounded-full p-1">
+                                  <Plus className="h-4 w-4 text-violet-600" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {/* Title */}
+                          <p className={`text-[11px] font-medium text-center leading-tight line-clamp-2 w-full ${isAdded ? 'text-emerald-600 dark:text-emerald-400' : 'text-theme'}`}>
+                            {book.title}
+                          </p>
+                          {isAdded && (
+                            <span className="text-[10px] font-semibold text-emerald-500 flex items-center gap-0.5">
+                              <Check className="h-2.5 w-2.5" /> Added
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination footer */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-strong/10 flex-shrink-0">
                   <button
-                    onClick={() => handleAddBook(book)}
-                    disabled={bookAdding === book.id}
-                    className="flex items-center gap-1 text-xs theme-button-primary px-2.5 py-1.5 rounded-lg disabled:opacity-50 flex-shrink-0"
+                    disabled={pickerPage === 0}
+                    onClick={() => setPickerPage(p => p - 1)}
+                    className="flex items-center gap-1 text-sm text-muted hover:text-theme disabled:opacity-30 transition-colors px-2 py-1 rounded-lg hover:bg-strong/10 disabled:hover:bg-transparent"
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    {bookAdding === book.id ? 'Adding...' : 'Add'}
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </button>
+                  <span className="text-xs text-muted">
+                    Page {pickerPage + 1} of {totalPages}
+                  </span>
+                  <button
+                    disabled={pickerPage >= totalPages - 1}
+                    onClick={() => setPickerPage(p => p + 1)}
+                    className="flex items-center gap-1 text-sm text-muted hover:text-theme disabled:opacity-30 transition-colors px-2 py-1 rounded-lg hover:bg-strong/10 disabled:hover:bg-transparent"
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        );
+      })()}
 
       {/* ── Enrollment / Invite link ─────────────────────────── */}
       <div className="theme-section rounded-xl p-5 space-y-4">

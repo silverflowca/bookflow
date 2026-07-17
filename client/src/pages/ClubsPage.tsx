@@ -48,11 +48,43 @@ interface Club {
   max_members: number;
   created_at: string;
   club_type: 'club' | 'study_group' | 'online_class';
+  my_role?: 'owner' | 'admin' | 'member' | null;
   member_count?: number;
   allow_join_requests?: boolean;
   creator?: { id: string; display_name: string; avatar_url?: string };
   members?: { id: string; role: string; user_id: string; invite_accepted_at?: string }[];
   books?: { id: string; is_current: boolean; book?: { id: string; title: string; cover_image_url?: string } }[];
+}
+
+const TYPE_META: Record<string, { label: string; className: string }> = {
+  online_class: { label: 'Class',       className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+  study_group:  { label: 'Study Group', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+  club:         { label: 'Book Club',   className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+};
+
+const ROLE_META: Record<string, { label: string; className: string }> = {
+  owner:  { label: 'Owner',   className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  admin:  { label: 'Teacher', className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+  member: { label: 'Member',  className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+};
+
+function TypePill({ clubType }: { clubType: string }) {
+  const meta = TYPE_META[clubType] ?? TYPE_META.club;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${meta.className}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+function RolePill({ role }: { role?: string | null }) {
+  if (!role) return null;
+  const meta = ROLE_META[role] ?? ROLE_META.member;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${meta.className}`}>
+      {meta.label}
+    </span>
+  );
 }
 
 function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }) {
@@ -65,13 +97,20 @@ function ClubCard({ club, onOpen }: { club: Club; onOpen: (id: string) => void }
       className="theme-section rounded-xl overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
       onClick={() => onOpen(club.id)}
     >
-      {imageUrl ? (
-        <img src={imageUrl} alt={club.name} className="w-full h-28 object-cover" />
-      ) : (
-        <div className="w-full h-28 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-          <Users className="h-10 w-10 text-white opacity-60" />
+      <div className="relative">
+        {imageUrl ? (
+          <img src={imageUrl} alt={club.name} className="w-full h-28 object-cover" />
+        ) : (
+          <div className="w-full h-28 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <Users className="h-10 w-10 text-white opacity-60" />
+          </div>
+        )}
+        {/* Overlay pills */}
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+          <TypePill clubType={club.club_type} />
+          <RolePill role={club.my_role} />
         </div>
-      )}
+      </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-theme text-sm leading-tight">{club.name}</h3>
@@ -117,8 +156,10 @@ function ClubRow({ club, onOpen }: { club: Club; onOpen: (id: string) => void })
         }
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <h3 className="font-semibold text-theme text-sm truncate">{club.name}</h3>
+          <TypePill clubType={club.club_type} />
+          <RolePill role={club.my_role} />
           {club.visibility === 'public'
             ? <Globe className="h-3.5 w-3.5 text-muted flex-shrink-0" />
             : <Lock className="h-3.5 w-3.5 text-muted flex-shrink-0" />

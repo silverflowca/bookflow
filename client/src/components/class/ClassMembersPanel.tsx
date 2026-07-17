@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Crown, Shield, UserPlus, GraduationCap, Copy, Check, MailX, ChevronDown } from 'lucide-react';
 import api from '../../lib/api';
 import ClassInviteModal from './ClassInviteModal';
+import UserAvatar from '../profile/UserAvatar';
 
 interface Member {
   id: string;
@@ -108,15 +109,26 @@ function MemberRow({
 
   return (
     <div className="theme-section rounded-xl flex items-center gap-3 p-3">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
-        {profile?.avatar_url
-          ? <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
-          : (profile?.display_name ?? '?').charAt(0).toUpperCase()
-        }
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-theme truncate">{profile?.display_name ?? 'Member'}</p>
-      </div>
+      {profile?.id ? (
+        <UserAvatar
+          userId={profile.id}
+          displayName={profile.display_name}
+          avatarUrl={profile.avatar_url}
+          size="lg"
+          showName
+          nameClassName="text-sm font-medium text-theme truncate"
+          className="flex-1 min-w-0"
+        />
+      ) : (
+        <>
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
+            {(profile?.display_name ?? '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-theme truncate">{profile?.display_name ?? 'Member'}</p>
+          </div>
+        </>
+      )}
       <div className="flex items-center gap-1.5">
         <RoleBadge role={member.role} />
         {canChangeRole && member.role !== 'owner' ? (

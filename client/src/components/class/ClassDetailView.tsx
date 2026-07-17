@@ -60,7 +60,12 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   const { user } = useAuth();
   const [tab, setTab] = useState<ClassTab>('overview');
   const isTeacher = role === 'owner' || role === 'admin';
-  const currentBook = club.books?.find(b => b.is_current);
+  // Normalize book nested object (Supabase may return as array in some paths)
+  const normalizedBooks = (club.books ?? []).map(cb => ({
+    ...cb,
+    book: Array.isArray(cb.book) ? (cb.book[0] ?? null) : cb.book,
+  }));
+  const currentBook = normalizedBooks.find(b => b.is_current) ?? normalizedBooks.find(b => b.book);
 
   // Per-book progress map: bookId → BookProgress
   const [bookProgress, setBookProgress] = useState<Record<string, BookProgress>>({});
@@ -163,7 +168,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       {tab === 'overview' && (
         <ClassOverviewTab
           isTeacher={isTeacher}
-          books={club.books ?? []}
+          books={normalizedBooks}
           clubId={club.id}
           bookProgress={bookProgress}
           onGoToTab={setTab}
@@ -187,13 +192,26 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       {tab === 'members' && (
         <ClassMembersPanel club={club} isTeacher={isTeacher} onReload={onReload} />
       )}
-      {tab === 'responses' && isTeacher && currentBook?.book && (
-        <ClassResponsesPanel
-          bookId={currentBook.book.id}
-          clubId={club.id}
-          members={club.members}
-        />
-      )}
+      {tab === 'responses' && isTeacher && (() => {
+        // Use current book, fall back to first book if none marked current
+        const responseBook = (currentBook?.book ? currentBook : club.books?.find(b => b.book))?.book;
+        if (!responseBook) {
+          return (
+            <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted">
+              <BookOpen className="h-10 w-10 opacity-30" />
+              <p className="text-sm font-medium">No book added to this class yet.</p>
+              <p className="text-xs">Add a book in Settings → Books to start tracking responses.</p>
+            </div>
+          );
+        }
+        return (
+          <ClassResponsesPanel
+            bookId={responseBook.id}
+            clubId={club.id}
+            members={club.members}
+          />
+        );
+      })()}
       {tab === 'settings' && isTeacher && (
         <ClassSettingsPanel club={club} onReload={onReload} />
       )}

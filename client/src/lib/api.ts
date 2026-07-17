@@ -168,6 +168,13 @@ class ApiClient {
     return result.data ?? [];
   }
 
+  async searchBooksPaged(search: string, offset: number, limit: number): Promise<{ data: Book[]; count: number }> {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (search.trim()) params.set('search', search.trim());
+    const result = await this.request<{ data: Book[]; count: number }>(`/books?${params}`);
+    return { data: result.data ?? [], count: result.count ?? 0 };
+  }
+
   async getBook(id: string): Promise<Book> {
     return this.request(`/books/${id}`);
   }

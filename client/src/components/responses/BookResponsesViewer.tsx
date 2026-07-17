@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import UserAvatar from '../profile/UserAvatar';
 import {
   BarChart2,
   CheckCircle,
@@ -465,10 +466,21 @@ function ResponseRow({ response, type }: { response: ResponseRowData; type: stri
 
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-0">
-      <Avatar name={name} url={user?.avatar_url} />
+      {!response.user_id && <Avatar name={name} url={user?.avatar_url} />}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-sm font-semibold text-gray-800">{name}</span>
+          {response.user_id ? (
+            <UserAvatar
+              userId={response.user_id}
+              displayName={name}
+              avatarUrl={user?.avatar_url}
+              size="sm"
+              showName
+              nameClassName="text-sm font-semibold text-gray-800"
+            />
+          ) : (
+            <span className="text-sm font-semibold text-gray-800">{name}</span>
+          )}
           {response.is_correct === true && (
             <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
               <CheckCircle className="h-2.5 w-2.5" />
@@ -898,7 +910,7 @@ export default function BookResponsesViewer({
           </div>
           <button
             onClick={() => setShowFilters(value => !value)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0 ${showFilters || hasActiveFilters ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors shrink-0 ${showFilters ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : hasActiveFilters ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
           >
             <SlidersHorizontal className="h-4 w-4" />
             Filter
@@ -912,8 +924,8 @@ export default function BookResponsesViewer({
 
         {showFilters && (
           <div className="flex flex-wrap gap-3 pt-1">
-            <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Chapter</p>
+            <div className="flex flex-col gap-1.5 min-w-0 border-2 border-purple-300 rounded-md px-3 py-2.5 bg-purple-50/40">
+              <p className="text-[11px] font-extrabold text-purple-700 uppercase tracking-wide">Chapter</p>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   onClick={() => setActiveChapterId(null)}
@@ -934,8 +946,8 @@ export default function BookResponsesViewer({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Response type</p>
+            <div className="flex flex-col gap-1.5 border-2 border-blue-300 rounded-md px-3 py-2.5 bg-blue-50/40">
+              <p className="text-[11px] font-extrabold text-blue-700 uppercase tracking-wide">Response type</p>
               <div className="flex flex-wrap gap-1.5">
                 {availableTypes.map(type => {
                   const meta = typeMeta(type);
@@ -955,8 +967,8 @@ export default function BookResponsesViewer({
             </div>
 
             {availableVisibilities.length > 0 && (
-              <div className="flex flex-col gap-1.5 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Visibility</p>
+              <div className="flex flex-col gap-1.5 border-2 border-gray-400 rounded-md px-3 py-2.5 bg-gray-50/60">
+                <p className="text-[11px] font-extrabold text-gray-600 uppercase tracking-wide">Visibility</p>
                 <div className="flex flex-wrap gap-1.5">
                   {availableVisibilities.map(visibility => {
                     const active = activeVisibilities.includes(visibility);
@@ -977,8 +989,8 @@ export default function BookResponsesViewer({
             )}
 
             {availableClubs.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Club / Group</p>
+              <div className="flex flex-col gap-1.5 min-w-0 border-2 border-amber-300 rounded-md px-3 py-2.5 bg-amber-50/40">
+                <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide">Club / Group</p>
                 <div className="flex flex-wrap gap-1.5">
                   {availableClubs.map(club => {
                     const active = activeClubIds.includes(club.id);
@@ -997,8 +1009,8 @@ export default function BookResponsesViewer({
             )}
 
             {availableSharedUsers.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Shared To User</p>
+              <div className="flex flex-col gap-1.5 min-w-0 border-2 border-cyan-300 rounded-md px-3 py-2.5 bg-cyan-50/40">
+                <p className="text-[11px] font-extrabold text-cyan-700 uppercase tracking-wide">Shared To User</p>
                 <div className="flex flex-wrap gap-1.5">
                   {availableSharedUsers.map(sharedUser => {
                     const active = activeSharedUserIds.includes(sharedUser.id);
@@ -1017,8 +1029,8 @@ export default function BookResponsesViewer({
             )}
 
             {memberFilter && memberFilter.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Member</p>
+              <div className="flex flex-col gap-1.5 min-w-0 border-2 border-violet-300 rounded-md px-3 py-2.5 bg-violet-50/40">
+                <p className="text-[11px] font-extrabold text-violet-700 uppercase tracking-wide">Member</p>
                 <div className="flex flex-wrap gap-1.5">
                   {memberFilter.map(member => {
                     const active = activeMemberIds.includes(member.id);

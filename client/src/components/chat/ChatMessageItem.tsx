@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import type { ChatMessage } from '../../hooks/useClubChat'
 import ChatSnippetCard from './ChatSnippetCard'
 import ChatSystemMessage from './ChatSystemMessage'
+import UserAvatar from '../profile/UserAvatar'
 
 interface Props {
   message: ChatMessage
@@ -48,23 +49,38 @@ export default function ChatMessageItem({ message, currentUserId, bookId, onEdit
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      {/* Avatar */}
-      <div style={{ flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', marginTop: '2px' }}>
-        {message.sender?.avatar_url ? (
-          <img src={message.sender.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: '100%', height: '100%', backgroundColor: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.8125rem', fontWeight: 600 }}>
-            {avatarLetter}
-          </div>
-        )}
-      </div>
+      {/* Avatar — clicking opens profile popup */}
+      {message.sender_id ? (
+        <UserAvatar
+          userId={message.sender_id}
+          displayName={message.sender?.display_name || 'Member'}
+          avatarUrl={message.sender?.avatar_url}
+          size="md"
+          className="mt-0.5"
+        />
+      ) : (
+        <div style={{ flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', marginTop: '2px', backgroundColor: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.8125rem', fontWeight: 600 }}>
+          {avatarLetter}
+        </div>
+      )}
 
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.25rem' }}>
-          <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>
-            {message.sender?.display_name || 'Member'}
-          </span>
+          {message.sender_id ? (
+            <UserAvatar
+              userId={message.sender_id}
+              displayName={message.sender?.display_name || 'Member'}
+              avatarUrl={message.sender?.avatar_url}
+              showName
+              hideAvatar
+              nameClassName="font-semibold text-sm"
+            />
+          ) : (
+            <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>
+              {message.sender?.display_name || 'Member'}
+            </span>
+          )}
           <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
             {new Date(message.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
           </span>
