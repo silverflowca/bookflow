@@ -911,8 +911,8 @@ export default function BookResponsesViewer({
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap gap-4 pt-1">
-            <div className="flex flex-col gap-1.5 min-w-0">
+          <div className="flex flex-wrap gap-3 pt-1">
+            <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Chapter</p>
               <div className="flex flex-wrap gap-1.5">
                 <button
@@ -934,7 +934,7 @@ export default function BookResponsesViewer({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Response type</p>
               <div className="flex flex-wrap gap-1.5">
                 {availableTypes.map(type => {
@@ -955,7 +955,7 @@ export default function BookResponsesViewer({
             </div>
 
             {availableVisibilities.length > 0 && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Visibility</p>
                 <div className="flex flex-wrap gap-1.5">
                   {availableVisibilities.map(visibility => {
@@ -977,7 +977,7 @@ export default function BookResponsesViewer({
             )}
 
             {availableClubs.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Club / Group</p>
                 <div className="flex flex-wrap gap-1.5">
                   {availableClubs.map(club => {
@@ -997,7 +997,7 @@ export default function BookResponsesViewer({
             )}
 
             {availableSharedUsers.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Shared To User</p>
                 <div className="flex flex-wrap gap-1.5">
                   {availableSharedUsers.map(sharedUser => {
@@ -1017,7 +1017,7 @@ export default function BookResponsesViewer({
             )}
 
             {memberFilter && memberFilter.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex flex-col gap-1.5 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Member</p>
                 <div className="flex flex-wrap gap-1.5">
                   {memberFilter.map(member => {
