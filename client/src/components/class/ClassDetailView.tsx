@@ -5,7 +5,7 @@ import type { BookResponseItem } from '../../types';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
   Settings, ArrowLeft, TrendingUp, ChevronRight, ClipboardList, Loader2, ChevronDown,
-  X, ZoomIn,
+  X, ZoomIn, BarChart2, BookMarked, CheckCircle2, Activity,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ClubChatPanel from '../chat/ClubChatPanel';
@@ -213,6 +213,9 @@ function ClassOverviewTab({
   const [selectedBookId, setSelectedBookId] = useState<string | undefined>(defaultBook?.book?.id);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedCover, setExpandedCover] = useState<string | null>(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [bookStats, setBookStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Keep selected book in sync if books list changes
   useEffect(() => {
@@ -337,25 +340,51 @@ function ClassOverviewTab({
             {/* ── Selected book detail card ── */}
             {book && (
               <div className="p-4 flex gap-4">
-                {/* Cover — clickable to expand */}
+                {/* Cover — click for stats, small zoom button */}
                 <div className="flex-shrink-0 relative group">
                   {book.cover_image_url ? (
                     <>
                       <img
                         src={book.cover_image_url}
                         alt={book.title}
-                        className="w-20 h-28 object-cover rounded-xl shadow-lg cursor-zoom-in"
-                        onClick={() => setExpandedCover(book.cover_image_url!)}
+                        className="w-20 h-28 object-cover rounded-xl shadow-lg cursor-pointer"
+                        onClick={async () => {
+                          setShowStatsModal(true);
+                          if (!bookStats || (bookStats as any).__bookId !== book.id) {
+                            setStatsLoading(true);
+                            try {
+                              const s = await api.getBookStats(book.id);
+                              setBookStats({ ...s, __bookId: book.id });
+                            } catch { setBookStats(null); }
+                            finally { setStatsLoading(false); }
+                          }
+                        }}
                       />
-                      <div
-                        className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center cursor-zoom-in"
-                        onClick={() => setExpandedCover(book.cover_image_url!)}
+                      <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
+                      {/* Zoom button — bottom-right corner */}
+                      <button
+                        className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={e => { e.stopPropagation(); setExpandedCover(book.cover_image_url!); }}
+                        title="Zoom cover"
                       >
-                        <ZoomIn className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
-                      </div>
+                        <ZoomIn className="h-3 w-3 text-white" />
+                      </button>
                     </>
                   ) : (
-                    <div className="w-20 h-28 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <div
+                      className="w-20 h-28 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg cursor-pointer hover:brightness-110 transition-all"
+                      onClick={async () => {
+                        setShowStatsModal(true);
+                        if (!bookStats || (bookStats as any).__bookId !== book.id) {
+                          setStatsLoading(true);
+                          try {
+                            const s = await api.getBookStats(book.id);
+                            setBookStats({ ...s, __bookId: book.id });
+                          } catch { setBookStats(null); }
+                          finally { setStatsLoading(false); }
+                        }
+                      }}
+                    >
                       <BookOpen className="h-8 w-8 text-white" />
                     </div>
                   )}
@@ -443,6 +472,139 @@ function ClassOverviewTab({
             className="max-h-[80vh] max-w-[80vw] object-contain rounded-xl shadow-2xl"
             onClick={e => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {/* Book stats modal */}
+      {showStatsModal && book && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setShowStatsModal(false)}
+        >
+          <div
+            className="theme-modal rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 p-4 border-b border-strong/20">
+              {book.cover_image_url ? (
+                <img src={book.cover_image_url} alt={book.title} className="w-10 h-14 object-cover rounded-lg flex-shrink-0 shadow" />
+              ) : (
+                <div className="w-10 h-14 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="h-5 w-5 text-white" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-theme text-sm leading-snug truncate">{book.title}</p>
+                <p className="text-xs text-muted mt-0.5">Book Stats</p>
+              </div>
+              <button onClick={() => setShowStatsModal(false)} className="p-1.5 text-muted hover:text-theme transition-colors flex-shrink-0">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Stats body */}
+            <div className="p-4">
+              {statsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted" />
+                </div>
+              ) : bookStats ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5">
+                    <BookMarked className="h-5 w-5 text-violet-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-lg font-bold text-theme leading-none">{bookStats.overview.total_chapters}</p>
+                      <p className="text-xs text-muted mt-0.5">Chapters</p>
+                    </div>
+                  </div>
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5">
+                    <Users className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-lg font-bold text-theme leading-none">{bookStats.overview.total_readers}</p>
+                      <p className="text-xs text-muted mt-0.5">Readers</p>
+                    </div>
+                  </div>
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5">
+                    <Activity className="h-5 w-5 text-amber-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-lg font-bold text-theme leading-none">{bookStats.overview.avg_progress}%</p>
+                      <p className="text-xs text-muted mt-0.5">Avg Progress</p>
+                    </div>
+                  </div>
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-lg font-bold text-theme leading-none">{bookStats.overview.completed_readers}</p>
+                      <p className="text-xs text-muted mt-0.5">Completed</p>
+                    </div>
+                  </div>
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5">
+                    <TrendingUp className="h-5 w-5 text-indigo-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-lg font-bold text-theme leading-none">{bookStats.overview.active_readers}</p>
+                      <p className="text-xs text-muted mt-0.5">Active (30d)</p>
+                    </div>
+                  </div>
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5">
+                    <BarChart2 className="h-5 w-5 text-pink-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-lg font-bold text-theme leading-none">{bookStats.overview.total_form_responses}</p>
+                      <p className="text-xs text-muted mt-0.5">Responses</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Student view — no access to book stats, show personal progress */
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="theme-section rounded-xl p-3 flex items-center gap-2.5 col-span-2">
+                    <Activity className="h-5 w-5 text-accent flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex justify-between mb-1">
+                        <p className="text-xs text-muted">Your reading progress</p>
+                        <p className="text-xs font-bold text-theme">{Math.round(prog?.readPct ?? 0)}%</p>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(prog?.readPct ?? 0)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                  {prog && prog.itemsTotal > 0 && (
+                    <div className="theme-section rounded-xl p-3 flex items-center gap-2.5 col-span-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex justify-between mb-1">
+                          <p className="text-xs text-muted">Activities</p>
+                          <p className="text-xs font-bold text-theme">{prog.itemsCompleted}/{prog.itemsTotal}</p>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round((prog.itemsCompleted / prog.itemsTotal) * 100)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {prog?.currentChapterTitle && (
+                    <div className="theme-section rounded-xl p-3 col-span-2">
+                      <p className="text-xs text-muted">Last read</p>
+                      <p className="text-sm font-medium text-theme mt-0.5 truncate">{prog.currentChapterTitle}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 pb-4">
+              <Link
+                to={readTo}
+                onClick={() => setShowStatsModal(false)}
+                className="flex items-center justify-center gap-2 w-full theme-button-primary py-2.5 rounded-xl text-sm font-medium"
+              >
+                {(prog?.readPct ?? 0) > 0 ? 'Continue Reading' : 'Start Reading'}
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
