@@ -880,48 +880,6 @@ export default function BookResponsesViewer({
     <div className="flex flex-col h-full min-h-0">
       <div className="flex flex-col gap-3 px-5 py-4 bg-white border-b border-gray-200">
 
-        {/* Member filter chips — only shown when memberFilter is provided */}
-        {memberFilter && memberFilter.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Filter by member</p>
-            <div className="flex flex-wrap gap-1.5">
-              {memberFilter.map(member => {
-                const active = activeMemberIds.includes(member.id);
-                return (
-                  <button
-                    key={member.id}
-                    onClick={() => setActiveMemberIds(current =>
-                      active ? current.filter(id => id !== member.id) : [...current, member.id]
-                    )}
-                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      active
-                        ? 'bg-purple-600 text-white border-purple-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700'
-                    }`}
-                  >
-                    <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0 bg-purple-200 flex items-center justify-center">
-                      {member.avatar_url
-                        ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <span className="text-[8px] font-bold text-purple-700">{(member.display_name || '?')[0].toUpperCase()}</span>
-                      }
-                    </div>
-                    {member.display_name}
-                    {active && <X className="h-2.5 w-2.5 ml-0.5" />}
-                  </button>
-                );
-              })}
-              {activeMemberIds.length > 0 && (
-                <button
-                  onClick={() => setActiveMemberIds([])}
-                  className="text-xs text-gray-400 hover:text-gray-600 px-1.5 py-1"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -1051,6 +1009,38 @@ export default function BookResponsesViewer({
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${active ? 'bg-purple-600 text-white border-purple-600' : 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100'}`}
                       >
                         {sharedUser.display_name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {memberFilter && memberFilter.length > 0 && (
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Member</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {memberFilter.map(member => {
+                    const active = activeMemberIds.includes(member.id);
+                    return (
+                      <button
+                        key={member.id}
+                        onClick={() => setActiveMemberIds(current =>
+                          active ? current.filter(id => id !== member.id) : [...current, member.id]
+                        )}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                          active
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700'
+                        }`}
+                      >
+                        <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0 bg-purple-200 flex items-center justify-center">
+                          {member.avatar_url
+                            ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-[8px] font-bold text-purple-700">{(member.display_name || '?')[0].toUpperCase()}</span>
+                          }
+                        </div>
+                        {member.display_name}
                       </button>
                     );
                   })}
