@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../lib/api';
 import type { BookResponseItem } from '../../types';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
   Settings, ArrowLeft, TrendingUp, ChevronRight, ClipboardList, Loader2, ChevronDown,
+  X, ZoomIn,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ClubChatPanel from '../chat/ClubChatPanel';
@@ -22,6 +23,14 @@ interface ClubBook {
   book_id: string;
   is_current: boolean;
   book?: { id: string; title: string; cover_image_url?: string };
+}
+
+interface BookProgress {
+  readPct: number;
+  currentChapterId?: string;
+  currentChapterTitle?: string;
+  itemsCompleted: number;
+  itemsTotal: number;
 }
 
 interface Club {
@@ -51,24 +60,43 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   const [tab, setTab] = useState<ClassTab>('overview');
   const isTeacher = role === 'owner' || role === 'admin';
   const currentBook = club.books?.find(b => b.is_current);
-  const [myReadPct, setMyReadPct] = useState<number>(0);
-  const [myCurrentChapterId, setMyCurrentChapterId] = useState<string | undefined>(undefined);
-  const [myItemProgress, setMyItemProgress] = useState<{ completed: number; total: number } | null>(null);
+
+  // Per-book progress map: bookId → BookProgress
+  const [bookProgress, setBookProgress] = useState<Record<string, BookProgress>>({});
+
+  const loadProgressForBook = useCallback(async (bookId: string) => {
+    try {
+      const [prog, breakdown, chapters] = await Promise.all([
+        api.getReadingProgress(bookId).catch(() => null),
+        api.getBookProgress(bookId).catch(() => [] as { chapter_id: string; completed: number; total: number }[]),
+        api.getChapters(bookId).catch(() => [] as { id: string; title: string }[]),
+      ]);
+      const completed = breakdown.reduce((s: number, b: { completed: number }) => s + b.completed, 0);
+      const total = breakdown.reduce((s: number, b: { total: number }) => s + b.total, 0);
+      const currentChapterId = prog?.current_chapter_id;
+      const currentChapterTitle = currentChapterId
+        ? chapters.find((c: { id: string; title: string }) => c.id === currentChapterId)?.title
+        : undefined;
+      setBookProgress(prev => ({
+        ...prev,
+        [bookId]: {
+          readPct: prog?.percent_complete ?? 0,
+          currentChapterId,
+          currentChapterTitle,
+          itemsCompleted: completed,
+          itemsTotal: total,
+        },
+      }));
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
-    const bookId = currentBook?.book?.id;
-    if (!bookId || !user) return;
-    api.getReadingProgress(bookId)
-      .then(p => { if (p) { setMyReadPct(p.percent_complete); setMyCurrentChapterId(p.current_chapter_id); } })
-      .catch(() => {});
-    api.getBookProgress(bookId)
-      .then(breakdown => {
-        const completed = breakdown.reduce((s, b) => s + b.completed, 0);
-        const total = breakdown.reduce((s, b) => s + b.total, 0);
-        setMyItemProgress({ completed, total });
-      })
-      .catch(() => {});
-  }, [currentBook?.book?.id, user]);
+    if (!user || !club.books?.length) return;
+    club.books.forEach(cb => {
+      if (cb.book?.id) loadProgressForBook(cb.book.id);
+    });
+  }, [club.books, user, loadProgressForBook]);
+
   const memberCount = club.member_count ?? (club.members?.filter(m => m.invite_accepted_at).length ?? 0);
 
   const tabs: { key: ClassTab; label: string; icon: React.ReactNode; teacherOnly?: boolean; studentOnly?: boolean }[] = [
@@ -134,11 +162,9 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       {tab === 'overview' && (
         <ClassOverviewTab
           isTeacher={isTeacher}
-          currentBook={currentBook}
+          books={club.books ?? []}
           clubId={club.id}
-          readPct={myReadPct}
-          currentChapterId={myCurrentChapterId}
-          itemProgress={myItemProgress}
+          bookProgress={bookProgress}
           onGoToTab={setTab}
         />
       )}
@@ -172,96 +198,63 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
 
 function ClassOverviewTab({
   isTeacher,
-  currentBook,
+  books,
   clubId,
-  readPct,
-  currentChapterId,
-  itemProgress,
+  bookProgress,
   onGoToTab,
 }: {
   isTeacher: boolean;
-  currentBook?: ClubBook;
+  books: ClubBook[];
   clubId: string;
-  readPct: number;
-  currentChapterId?: string;
-  itemProgress: { completed: number; total: number } | null;
+  bookProgress: Record<string, BookProgress>;
   onGoToTab: (t: ClassTab) => void;
 }) {
+  const defaultBook = books.find(b => b.is_current) ?? books[0];
+  const [selectedBookId, setSelectedBookId] = useState<string | undefined>(defaultBook?.book?.id);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [expandedCover, setExpandedCover] = useState<string | null>(null);
+
+  // Keep selected book in sync if books list changes
+  useEffect(() => {
+    if (!selectedBookId && books.length > 0) {
+      setSelectedBookId(books.find(b => b.is_current)?.book?.id ?? books[0]?.book?.id);
+    }
+  }, [books, selectedBookId]);
+
+  const selectedCb = books.find(b => b.book?.id === selectedBookId) ?? books[0];
+  const book = selectedCb?.book;
+  const prog = book ? bookProgress[book.id] : undefined;
+  const readPct = prog?.readPct ?? 0;
   const hasStarted = readPct > 0;
-  const itemPct = itemProgress && itemProgress.total > 0
-    ? Math.round((itemProgress.completed / itemProgress.total) * 100)
+  const itemPct = prog && prog.itemsTotal > 0
+    ? Math.round((prog.itemsCompleted / prog.itemsTotal) * 100)
     : 0;
-  const readTo = currentBook?.book
-    ? `/clubs/${clubId}/read/${currentBook.book.id}${currentChapterId ? `?chapter=${currentChapterId}` : ''}`
+  const readTo = book
+    ? `/clubs/${clubId}/read/${book.id}${prog?.currentChapterId ? `?chapter=${prog.currentChapterId}` : ''}`
     : '#';
 
   return (
     <div className="space-y-6">
-      {/* Current book */}
-      <div className="theme-section rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Current Book</h2>
-        {currentBook?.book ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              {currentBook.book.cover_image_url ? (
-                <img src={currentBook.book.cover_image_url} alt={currentBook.book.title} className="w-14 h-20 object-cover rounded-lg flex-shrink-0" />
-              ) : (
-                <div className="w-14 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-theme">{currentBook.book.title}</p>
-                <p className="text-xs text-muted mt-1">Currently reading</p>
-                {isTeacher && (
-                  <button onClick={() => onGoToTab('settings')} className="text-xs text-violet-500 hover:text-violet-600 mt-1 transition-colors">
-                    Change book →
-                  </button>
-                )}
-                <Link
-                  to={readTo}
-                  className="mt-3 inline-flex items-center gap-1.5 theme-button-primary px-4 py-2 rounded-lg text-sm font-medium"
-                >
-                  {hasStarted ? 'Continue Reading' : 'Start Reading'}
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-            {/* Progress bars */}
-            {!isTeacher && (
-              <div className="space-y-2 pt-1">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-muted">Reading progress</span>
-                    <span className="text-xs font-medium text-theme">{Math.round(readPct)}%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-accent transition-all duration-500"
-                      style={{ width: `${Math.round(readPct)}%` }}
-                    />
-                  </div>
-                </div>
-                {itemProgress && itemProgress.total > 0 && (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs text-muted">Components completed</span>
-                      <span className="text-xs font-medium text-theme">{itemPct}% · {itemProgress.completed}/{itemProgress.total}</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${itemPct}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <p className="text-muted text-sm flex-1">No book assigned yet.</p>
+
+      {/* ── Books section ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">
+            Class Books
+          </h2>
+          {isTeacher && (
+            <button
+              onClick={() => onGoToTab('settings')}
+              className="flex items-center gap-1.5 text-xs theme-button-secondary px-3 py-1.5 rounded-lg"
+            >
+              <BookOpen className="h-3.5 w-3.5" /> Manage Books
+            </button>
+          )}
+        </div>
+
+        {books.length === 0 ? (
+          <div className="theme-section rounded-xl p-6 flex items-center gap-3">
+            <p className="text-muted text-sm flex-1">No books assigned yet.</p>
             {isTeacher && (
               <button
                 onClick={() => onGoToTab('settings')}
@@ -271,8 +264,187 @@ function ClassOverviewTab({
               </button>
             )}
           </div>
+        ) : (
+          <div className="theme-section rounded-xl overflow-visible">
+            {/* ── Book dropdown selector (only shown when >1 book) ── */}
+            {books.length > 1 && (
+              <div className="relative px-4 pt-4 pb-3 border-b border-white/8">
+                <button
+                  onClick={() => setDropdownOpen(o => !o)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/8 border border-white/10 hover:border-white/20 transition-all text-left"
+                >
+                  {book?.cover_image_url ? (
+                    <img src={book.cover_image_url} alt={book.title} className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-11 bg-gradient-to-br from-indigo-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-theme truncate">{book?.title ?? 'Select a book'}</p>
+                    {selectedCb?.is_current && (
+                      <p className="text-xs text-violet-400 font-medium">★ Currently reading</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-xs text-muted">{books.length} books</span>
+                    <ChevronDown className={`h-4 w-4 text-muted transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+
+                {/* Dropdown list */}
+                {dropdownOpen && (
+                  <div className="absolute left-4 right-4 top-full mt-1 z-30 bg-surface border border-white/15 rounded-xl shadow-2xl overflow-hidden">
+                    {books.map(cb => {
+                      const cbBook = cb.book;
+                      if (!cbBook) return null;
+                      const cbProg = bookProgress[cbBook.id];
+                      const cbPct = cbProg?.readPct ?? 0;
+                      const isSelected = cbBook.id === selectedBookId;
+                      return (
+                        <button
+                          key={cb.id}
+                          onClick={() => { setSelectedBookId(cbBook.id); setDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/5 ${isSelected ? 'bg-violet-500/10' : ''}`}
+                        >
+                          {cbBook.cover_image_url ? (
+                            <img src={cbBook.cover_image_url} alt={cbBook.title} className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-11 bg-gradient-to-br from-indigo-400 to-purple-500 rounded flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="h-3.5 w-3.5 text-white" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${isSelected ? 'text-violet-400' : 'text-theme'}`}>{cbBook.title}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {cb.is_current && <span className="text-xs text-violet-400">★ Current</span>}
+                              {cbPct > 0 && <span className="text-xs text-muted">{Math.round(cbPct)}% read</span>}
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center flex-shrink-0">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Selected book detail card ── */}
+            {book && (
+              <div className="p-4 flex gap-4">
+                {/* Cover — clickable to expand */}
+                <div className="flex-shrink-0 relative group">
+                  {book.cover_image_url ? (
+                    <>
+                      <img
+                        src={book.cover_image_url}
+                        alt={book.title}
+                        className="w-20 h-28 object-cover rounded-xl shadow-lg cursor-zoom-in"
+                        onClick={() => setExpandedCover(book.cover_image_url!)}
+                      />
+                      <div
+                        className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center cursor-zoom-in"
+                        onClick={() => setExpandedCover(book.cover_image_url!)}
+                      >
+                        <ZoomIn className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-20 h-28 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <BookOpen className="h-8 w-8 text-white" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info column */}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                  <div>
+                    <p className="font-bold text-theme text-base leading-tight">{book.title}</p>
+                    {selectedCb?.is_current && (
+                      <span className="text-xs text-violet-400 font-medium">★ Currently reading</span>
+                    )}
+                  </div>
+
+                  {/* Progress — students only */}
+                  {!isTeacher && (
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs text-muted">Reading progress</span>
+                          <span className="text-xs font-bold text-theme">{Math.round(readPct)}%</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-accent transition-all duration-500"
+                            style={{ width: `${Math.round(readPct)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {prog?.currentChapterTitle && (
+                        <p className="text-xs text-muted truncate">
+                          Last read: <span className="text-theme font-medium">{prog.currentChapterTitle}</span>
+                        </p>
+                      )}
+
+                      {prog && prog.itemsTotal > 0 && (
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs text-muted">Activities</span>
+                            <span className="text-xs font-medium text-theme">{itemPct}% · {prog.itemsCompleted}/{prog.itemsTotal}</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                              style={{ width: `${itemPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-auto pt-1">
+                    <Link
+                      to={readTo}
+                      className="inline-flex items-center gap-1.5 theme-button-primary px-4 py-2 rounded-lg text-sm font-medium"
+                    >
+                      {hasStarted ? 'Continue Reading' : 'Start Reading'}
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Cover lightbox */}
+      {expandedCover && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 cursor-zoom-out"
+          onClick={() => setExpandedCover(null)}
+        >
+          <button
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+            onClick={() => setExpandedCover(null)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={expandedCover}
+            alt="Book cover"
+            className="max-h-[80vh] max-w-[80vw] object-contain rounded-xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
