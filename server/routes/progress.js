@@ -460,12 +460,14 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
       .eq('club_id', clubId)
       .maybeSingle();
 
-    if (!clubSettings?.enable_progress_tracking) {
+    const isPrivileged = membership.role === 'owner' || membership.role === 'admin';
+
+    // Privileged users can always view progress; others need the setting enabled
+    if (!isPrivileged && !clubSettings?.enable_progress_tracking) {
       return res.status(403).json({ error: 'Progress tracking not enabled for this club' });
     }
 
-    const isPrivileged = membership.role === 'owner' || membership.role === 'admin';
-    const canSeeAll = isPrivileged || clubSettings.show_member_reading_progress;
+    const canSeeAll = isPrivileged || clubSettings?.show_member_reading_progress;
 
     // Load club members
     const membersQuery = supabase

@@ -726,7 +726,7 @@ export default function ClubDetailPage() {
       const result = await api.getClubProgress(clubId);
       setProgressData(result.members ?? []);
       setProgressClubId(clubId);
-    } catch { setProgressData([]); }
+    } catch (e) { console.error('loadProgress error:', e); setProgressData([]); }
     finally { setProgressLoading(false); }
   }
 
