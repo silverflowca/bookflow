@@ -461,6 +461,7 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
       .maybeSingle();
 
     const isPrivileged = membership.role === 'owner' || membership.role === 'admin';
+    console.log(`[progress/club] clubId=${clubId} role=${membership.role} isPrivileged=${isPrivileged} settings=`, clubSettings);
 
     // Privileged users can always view progress; others need the setting enabled
     if (!isPrivileged && !clubSettings?.enable_progress_tracking) {
@@ -482,6 +483,7 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
       : await membersQuery.eq('user_id', req.user.id);
 
     if (mErr) throw mErr;
+    console.log(`[progress/club] members found: ${members?.length}, canSeeAll=${canSeeAll}`);
 
     // Load current club book (fall back to most recently added if none marked current)
     let { data: clubBook } = await supabase
@@ -504,6 +506,7 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
       clubBook = fallback;
     }
 
+    console.log(`[progress/club] clubBook=`, clubBook);
     if (!clubBook) return res.json({ members: [], chapters: [] });
 
     // Load all chapters for the current book (ordered for consistent breakdown array)
