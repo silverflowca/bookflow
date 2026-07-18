@@ -481,14 +481,26 @@ router.get('/club/:clubId', authenticate, async (req, res) => {
 
     if (mErr) throw mErr;
 
-    // Load current club book
-    const { data: clubBook } = await supabase
+    // Load current club book (fall back to most recently added if none marked current)
+    let { data: clubBook } = await supabase
       .schema('bookflow')
       .from('club_books')
       .select('book_id')
       .eq('club_id', clubId)
       .eq('is_current', true)
       .maybeSingle();
+
+    if (!clubBook) {
+      const { data: fallback } = await supabase
+        .schema('bookflow')
+        .from('club_books')
+        .select('book_id')
+        .eq('club_id', clubId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      clubBook = fallback;
+    }
 
     if (!clubBook) return res.json({ members: [], chapters: [] });
 
