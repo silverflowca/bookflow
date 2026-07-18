@@ -87,14 +87,26 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
       .not('invite_accepted_at', 'is', null);
     if (mErr) throw mErr;
 
-    // Load current club book
-    const { data: clubBook } = await supabase
+    // Load current club book (fall back to most recently added if none marked current)
+    let { data: clubBook } = await supabase
       .schema('bookflow')
       .from('club_books')
       .select('book_id')
       .eq('club_id', clubId)
       .eq('is_current', true)
       .maybeSingle();
+
+    if (!clubBook) {
+      const { data: fallback } = await supabase
+        .schema('bookflow')
+        .from('club_books')
+        .select('book_id')
+        .eq('club_id', clubId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      clubBook = fallback;
+    }
 
     if (!clubBook) return res.json({ members: [], chapters: [] });
 
@@ -202,14 +214,26 @@ router.get('/:clubId/class/my-progress', authenticate, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Current book
-    const { data: clubBook } = await supabase
+    // Current book (fall back to most recently added if none marked current)
+    let { data: clubBook } = await supabase
       .schema('bookflow')
       .from('club_books')
       .select('book_id, book:books(id, title, cover_image_url)')
       .eq('club_id', clubId)
       .eq('is_current', true)
       .maybeSingle();
+
+    if (!clubBook) {
+      const { data: fallback } = await supabase
+        .schema('bookflow')
+        .from('club_books')
+        .select('book_id, book:books(id, title, cover_image_url)')
+        .eq('club_id', clubId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      clubBook = fallback;
+    }
 
     if (!clubBook) return res.json({ chapters: [], book: null, completion_pct: 0, items_completed: 0, items_total: 0, submissions: [] });
 
