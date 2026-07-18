@@ -1028,6 +1028,10 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/members/${memberId}`, { method: 'DELETE' });
   }
 
+  async restoreClubMember(clubId: string, memberId: string): Promise<{ success: boolean }> {
+    return this.request(`/clubs/${clubId}/members/${memberId}/restore`, { method: 'PATCH' });
+  }
+
   async updateClubMemberRole(clubId: string, memberId: string, role: 'admin' | 'member'): Promise<any> {
     return this.request(`/clubs/${clubId}/members/${memberId}`, { method: 'PUT', body: JSON.stringify({ role }) });
   }
@@ -1430,6 +1434,15 @@ class ApiClient {
 
   async getClassRoster(clubId: string): Promise<{ members: ClassRosterEntry[]; chapters: { id: string; title: string }[] }> {
     return this.request(`/clubs/${clubId}/class/roster`);
+  }
+
+  async exportClassRoster(clubId: string): Promise<Blob> {
+    const token = this.getToken();
+    const res = await fetch(`${API_URL}/clubs/${clubId}/class/roster/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Export failed');
+    return res.blob();
   }
 
   async getClassSessions(clubId: string): Promise<ClassSession[]> {

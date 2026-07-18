@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GraduationCap, MessageSquare } from 'lucide-react';
+import { GraduationCap, MessageSquare, Download } from 'lucide-react';
 import api from '../../lib/api';
 import type { ClassRosterEntry } from '../../types';
 import ClassStudentDetailPanel from './ClassStudentDetailPanel';
@@ -38,6 +38,24 @@ export default function ClassRosterPanel({ clubId, currentUserId }: Props) {
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'last_active'>('progress');
   const [viewStudent, setViewStudent] = useState<{ id: string } | null>(null);
   const [dmStudent, setDmStudent] = useState<{ id: string; name: string; avatar?: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const blob = await api.exportClassRoster(clubId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `class_roster.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed:', e);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     api.getClassRoster(clubId)
@@ -95,7 +113,7 @@ export default function ClassRosterPanel({ clubId, currentUserId }: Props) {
 
   return (
     <div>
-      {/* Sort controls */}
+      {/* Sort controls + Export */}
       <div className="flex items-center gap-2 mb-4 text-xs">
         <span className="text-muted">Sort:</span>
         {(['progress', 'last_active', 'name'] as const).map(s => (
@@ -107,6 +125,14 @@ export default function ClassRosterPanel({ clubId, currentUserId }: Props) {
             {s === 'last_active' ? 'Last Active' : s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
         ))}
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg theme-button-secondary text-xs font-medium disabled:opacity-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {exporting ? 'Exporting…' : 'Export CSV'}
+        </button>
       </div>
 
       <div className="space-y-2">

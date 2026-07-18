@@ -881,6 +881,7 @@ export interface ClassRosterEntry {
   user_id: string;
   display_name: string;
   avatar_url?: string;
+  email?: string | null;
   role: string;
   enrolled_at: string;
   items_completed: number;

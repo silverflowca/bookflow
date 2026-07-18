@@ -78,13 +78,14 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
   if (!role) return;
 
   try {
-    // Load all accepted members with profile
+    // Load all accepted, non-removed members with profile
     const { data: members, error: mErr } = await supabase
       .schema('bookflow')
       .from('club_members')
-      .select('user_id, role, invite_accepted_at, profile:profiles!club_members_user_id_fkey(display_name, avatar_url)')
+      .select('user_id, role, invite_accepted_at, invited_email, profile:profiles!club_members_user_id_fkey(display_name, avatar_url, email)')
       .eq('club_id', clubId)
-      .not('invite_accepted_at', 'is', null);
+      .not('invite_accepted_at', 'is', null)
+      .is('removed_at', null);
     if (mErr) throw mErr;
 
     // Load current club book (fall back to most recently added if none marked current)
@@ -179,6 +180,7 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
         user_id: member.user_id,
         display_name: profile?.display_name || 'Member',
         avatar_url: profile?.avatar_url || null,
+        email: profile?.email || member.invited_email || null,
         role: member.role,
         enrolled_at: member.invite_accepted_at,
         items_completed: completedCount,
@@ -197,6 +199,183 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error('Class roster error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPORT ROSTER
+// GET /api/clubs/:clubId/class/roster/export
+// Teacher only — returns CSV of all members with email + progress detail
+// ═══════════════════════════════════════════════════════════════════════════════
+router.get('/:clubId/class/roster/export', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const role = await requireClassAccess(req, res, 'teacher');
+  if (!role) return;
+
+  try {
+    // Club info
+    const { data: club } = await supabase
+      .schema('bookflow')
+      .from('book_clubs')
+      .select('name, club_type')
+      .eq('id', clubId)
+      .single();
+
+    // Members with email
+    const { data: members, error: mErr } = await supabase
+      .schema('bookflow')
+      .from('club_members')
+      .select('user_id, role, invite_accepted_at, invited_email, profile:profiles!club_members_user_id_fkey(display_name, avatar_url, email)')
+      .eq('club_id', clubId)
+      .not('invite_accepted_at', 'is', null)
+      .is('removed_at', null);
+    if (mErr) throw mErr;
+
+    // Current book
+    let { data: clubBook } = await supabase
+      .schema('bookflow')
+      .from('club_books')
+      .select('book_id, book:books(id, title)')
+      .eq('club_id', clubId)
+      .eq('is_current', true)
+      .maybeSingle();
+
+    if (!clubBook) {
+      const { data: fallback } = await supabase
+        .schema('bookflow')
+        .from('club_books')
+        .select('book_id, book:books(id, title)')
+        .eq('club_id', clubId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      clubBook = fallback;
+    }
+
+    const bookTitle = clubBook ? (Array.isArray(clubBook.book) ? clubBook.book[0]?.title : clubBook.book?.title) || '' : '';
+
+    let grandTotal = 0;
+    let chaptersMap = [];
+
+    if (clubBook) {
+      const { data: chapters } = await supabase
+        .schema('bookflow')
+        .from('chapters')
+        .select('id, title, order_index, content')
+        .eq('book_id', clubBook.book_id)
+        .eq('status', 'published')
+        .order('order_index', { ascending: true });
+
+      const chapterIds = (chapters || []).map(c => c.id);
+      const { data: allInline } = await supabase
+        .schema('bookflow')
+        .from('inline_content')
+        .select('id, chapter_id, content_type')
+        .in('chapter_id', chapterIds.length ? chapterIds : ['none'])
+        .in('content_type', TRACKABLE_TYPES);
+
+      const totalByChapter = {};
+      for (const ch of (chapters || [])) {
+        const formCount = (allInline || []).filter(ic => ic.chapter_id === ch.id).length;
+        const mediaCount = extractMediaKeys(ch.content?.content || [], ch.id).length;
+        totalByChapter[ch.id] = formCount + mediaCount;
+      }
+      grandTotal = Object.values(totalByChapter).reduce((a, b) => a + b, 0);
+
+      const memberIds = (members || []).map(m => m.user_id);
+      const { data: allCompletions } = await supabase
+        .schema('bookflow')
+        .from('chapter_item_completions')
+        .select('user_id, chapter_id, item_key, completed_at')
+        .in('chapter_id', chapterIds.length ? chapterIds : ['none'])
+        .in('user_id', memberIds.length ? memberIds : ['none']);
+
+      const { data: allSubmissions } = await supabase
+        .schema('bookflow')
+        .from('class_submissions')
+        .select('student_id, status')
+        .eq('club_id', clubId)
+        .in('status', ['submitted', 'graded']);
+
+      chaptersMap = (members || []).map(member => {
+        const profile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
+        const userCompletions = (allCompletions || []).filter(c => c.user_id === member.user_id);
+        const userSubs = (allSubmissions || []).filter(s => s.student_id === member.user_id);
+        const completedCount = userCompletions.length;
+        const completionPct = grandTotal > 0 ? Math.round((completedCount / grandTotal) * 100) : 0;
+        const completedChapters = (chapters || []).filter(ch => {
+          const total = totalByChapter[ch.id] || 0;
+          const done = userCompletions.filter(c => c.chapter_id === ch.id).length;
+          return total > 0 && done >= total;
+        }).length;
+        const lastActive = userCompletions.length
+          ? userCompletions.reduce((l, c) => c.completed_at > l ? c.completed_at : l, userCompletions[0].completed_at)
+          : null;
+
+        return {
+          display_name: profile?.display_name || 'Member',
+          email: profile?.email || member.invited_email || '',
+          role: member.role,
+          enrolled_at: member.invite_accepted_at,
+          completion_pct: completionPct,
+          items_completed: completedCount,
+          items_total: grandTotal,
+          chapters_completed: completedChapters,
+          chapters_total: (chapters || []).length,
+          submissions_submitted: userSubs.filter(s => s.status === 'submitted').length,
+          submissions_graded: userSubs.filter(s => s.status === 'graded').length,
+          last_active: lastActive,
+        };
+      });
+    } else {
+      chaptersMap = (members || []).map(member => {
+        const profile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
+        return {
+          display_name: profile?.display_name || 'Member',
+          email: profile?.email || member.invited_email || '',
+          role: member.role,
+          enrolled_at: member.invite_accepted_at,
+          completion_pct: 0, items_completed: 0, items_total: 0,
+          chapters_completed: 0, chapters_total: 0,
+          submissions_submitted: 0, submissions_graded: 0, last_active: null,
+        };
+      });
+    }
+
+    // Build CSV
+    const clubType = club?.club_type || 'club';
+    const groupLabel = clubType === 'online_class' ? 'Class' : clubType === 'study_group' ? 'Study Group' : 'Book Club';
+    const clubName = club?.name || clubId;
+
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const headers = ['Name', 'Email', 'Role', groupLabel, 'Book', 'Progress %', 'Items Completed', 'Items Total', 'Chapters Completed', 'Chapters Total', 'Submitted', 'Graded', 'Enrolled At', 'Last Active'];
+    const rows = chaptersMap.map(m => [
+      escape(m.display_name),
+      escape(m.email),
+      escape(m.role),
+      escape(clubName),
+      escape(bookTitle),
+      escape(m.completion_pct),
+      escape(m.items_completed),
+      escape(m.items_total),
+      escape(m.chapters_completed),
+      escape(m.chapters_total),
+      escape(m.submissions_submitted),
+      escape(m.submissions_graded),
+      escape(m.enrolled_at ? new Date(m.enrolled_at).toLocaleDateString() : ''),
+      escape(m.last_active ? new Date(m.last_active).toLocaleDateString() : ''),
+    ]);
+
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const filename = `${clubName.replace(/[^a-z0-9]/gi, '_')}_roster.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('Class roster export error:', err);
     res.status(500).json({ error: err.message });
   }
 });
