@@ -32,6 +32,7 @@ interface BookProgress {
   currentChapterTitle?: string;
   itemsCompleted: number;
   itemsTotal: number;
+  chapters: { chapter_id: string; title: string; completed: number; total: number }[];
 }
 
 interface Club {
@@ -83,6 +84,12 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       const currentChapterTitle = currentChapterId
         ? chapters.find((c: { id: string; title: string }) => c.id === currentChapterId)?.title
         : undefined;
+      const chaptersWithTitles = breakdown.map((b: { chapter_id: string; completed: number; total: number }) => ({
+        chapter_id: b.chapter_id,
+        title: chapters.find((c: { id: string; title: string }) => c.id === b.chapter_id)?.title ?? 'Chapter',
+        completed: b.completed,
+        total: b.total,
+      }));
       setBookProgress(prev => ({
         ...prev,
         [bookId]: {
@@ -91,6 +98,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
           currentChapterTitle,
           itemsCompleted: completed,
           itemsTotal: total,
+          chapters: chaptersWithTitles,
         },
       }));
     } catch { /* ignore */ }
@@ -219,6 +227,34 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   );
 }
 
+function SegmentedProgressBar({ chapters }: { chapters: { chapter_id: string; title: string; completed: number; total: number }[] }) {
+  if (!chapters.length) return null;
+  const grandTotal = chapters.reduce((s, c) => s + (c.total || 1), 0);
+  return (
+    <div className="flex gap-px w-full h-2.5 rounded-full overflow-hidden">
+      {chapters.map((ch, i) => {
+        const widthPct = ((ch.total || 1) / grandTotal) * 100;
+        const fillPct = ch.total > 0 ? Math.min(100, (ch.completed / ch.total) * 100) : 0;
+        const done = ch.total > 0 && ch.completed >= ch.total;
+        const started = fillPct > 0 && !done;
+        return (
+          <div
+            key={ch.chapter_id ?? i}
+            style={{ width: `${widthPct}%` }}
+            className="relative h-full bg-white/10 rounded-sm overflow-hidden flex-shrink-0"
+            title={`Ch ${i + 1}: ${ch.title} — ${ch.completed}/${ch.total}`}
+          >
+            <div
+              className={`absolute inset-y-0 left-0 transition-all duration-500 ${done ? 'bg-emerald-500' : started ? 'bg-amber-400' : ''}`}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ClassOverviewTab({
   isTeacher,
   books,
@@ -252,9 +288,6 @@ function ClassOverviewTab({
   const prog = book ? bookProgress[book.id] : undefined;
   const readPct = prog?.readPct ?? 0;
   const hasStarted = readPct > 0;
-  const itemPct = prog && prog.itemsTotal > 0
-    ? Math.round((prog.itemsCompleted / prog.itemsTotal) * 100)
-    : 0;
   const readTo = book
     ? `/clubs/${clubId}/read/${book.id}${prog?.currentChapterId ? `?chapter=${prog.currentChapterId}` : ''}`
     : '#';
@@ -423,37 +456,39 @@ function ClassOverviewTab({
                   </div>
 
                   {/* Progress — students only */}
-                  {!isTeacher && (
+                  {!isTeacher && prog && (
                     <div className="space-y-2">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs text-muted">Reading progress</span>
-                          <span className="text-xs font-bold text-theme">{Math.round(readPct)}%</span>
-                        </div>
-                        <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-accent transition-all duration-500"
-                            style={{ width: `${Math.round(readPct)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {prog?.currentChapterTitle && (
-                        <p className="text-xs text-muted truncate">
-                          Last read: <span className="text-theme font-medium">{prog.currentChapterTitle}</span>
-                        </p>
-                      )}
-
-                      {prog && prog.itemsTotal > 0 && (
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs text-muted">Activities</span>
-                            <span className="text-xs font-medium text-theme">{itemPct}% · {prog.itemsCompleted}/{prog.itemsTotal}</span>
+                      {prog.chapters.length > 0 ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted">Your progress</span>
+                            <span className="text-xs font-bold text-theme">{Math.round(readPct)}%</span>
                           </div>
-                          <div className="w-full h-2 rounded-full bg-surface-hover overflow-hidden">
+                          <SegmentedProgressBar chapters={prog.chapters} />
+                          <div className="flex items-center justify-between text-xs text-muted">
+                            <span>
+                              {prog.chapters.filter(c => c.total > 0 && c.completed >= c.total).length}/{prog.chapters.length} chapters
+                            </span>
+                            {prog.itemsTotal > 0 && (
+                              <span>{prog.itemsCompleted}/{prog.itemsTotal} activities</span>
+                            )}
+                          </div>
+                          {prog.currentChapterTitle && (
+                            <p className="text-xs text-muted truncate">
+                              Reading: <span className="text-theme font-medium">{prog.currentChapterTitle}</span>
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted">Your progress</span>
+                            <span className="text-xs font-bold text-theme">{Math.round(readPct)}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                              style={{ width: `${itemPct}%` }}
+                              className="h-full rounded-full bg-accent transition-all duration-500"
+                              style={{ width: `${Math.round(readPct)}%` }}
                             />
                           </div>
                         </div>
