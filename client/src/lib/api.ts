@@ -30,6 +30,8 @@ import type {
   ClassAnswerFeedback,
   ClassRosterEntry,
   ClubRegistrationSettings,
+  SubmissionComment,
+  StudentProgressReport,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -1535,6 +1537,47 @@ class ApiClient {
 
   async listClassDMConversations(clubId: string): Promise<{ other_user_id: string; last_message: string; last_at: string; unread_count: number; profile: { id: string; display_name: string; avatar_url?: string } | null }[]> {
     return this.request(`/clubs/${clubId}/class/dm`);
+  }
+
+  // ── Submission Comments ───────────────────────────────────────────────────────
+
+  async getSubmissionComments(clubId: string, subId: string): Promise<SubmissionComment[]> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}/comments`);
+  }
+
+  async postSubmissionComment(clubId: string, subId: string, body: string, opts?: { chapter_id?: string; response_id?: string }): Promise<SubmissionComment> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body, ...opts }),
+    });
+  }
+
+  async deleteSubmissionComment(clubId: string, subId: string, commentId: string): Promise<{ success: boolean }> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}/comments/${commentId}`, { method: 'DELETE' });
+  }
+
+  async studentNoteOnFeedback(clubId: string, subId: string, student_note: string): Promise<ClassSubmissionFeedback> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}/feedback/student-note`, {
+      method: 'PATCH',
+      body: JSON.stringify({ student_note }),
+    });
+  }
+
+  async teacherFollowUpOnFeedback(clubId: string, subId: string, teacher_follow_up: string): Promise<ClassSubmissionFeedback> {
+    return this.request(`/clubs/${clubId}/class/submissions/${subId}/feedback/follow-up`, {
+      method: 'PATCH',
+      body: JSON.stringify({ teacher_follow_up }),
+    });
+  }
+
+  // ── Progress Report ───────────────────────────────────────────────────────────
+
+  async getStudentProgressReport(clubId: string, studentId: string): Promise<StudentProgressReport> {
+    return this.request(`/clubs/${clubId}/class/progress-report/${studentId}`);
+  }
+
+  async getMyProgressReport(clubId: string): Promise<StudentProgressReport> {
+    return this.request(`/clubs/${clubId}/class/my-progress-report`);
   }
 
   // ── Registration Form ────────────────────────────────────────────────────────

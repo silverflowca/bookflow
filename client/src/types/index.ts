@@ -806,8 +806,46 @@ export interface ClassSubmissionFeedback {
   created_by: string;
   grade?: number;
   feedback_text?: string;
+  student_note?: string;
+  student_noted_at?: string;
+  teacher_follow_up?: string;
+  follow_up_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface SubmissionComment {
+  id: string;
+  author_id: string;
+  body: string;
+  chapter_id?: string;
+  response_id?: string;
+  created_at: string;
+  updated_at: string;
+  author: { id: string; display_name: string; avatar_url?: string };
+}
+
+export interface StudentProgressReport {
+  generated_at: string;
+  club: { id: string; name: string; description?: string; cover_image_url?: string } | null;
+  profile: { id: string; display_name: string; avatar_url?: string; email?: string } | null;
+  enrollment: { enrolled_at: string; role: string } | null;
+  books: {
+    book: { id: string; title: string; cover_image_url?: string };
+    is_current: boolean;
+    chapters: { chapter_id: string; title: string; order_index: number; completed: number; total: number; responses: any[] }[];
+    items_completed: number;
+    items_total: number;
+    completion_pct: number;
+  }[];
+  submissions: (ClassSubmission & { feedback?: ClassSubmissionFeedback | null })[];
+  answer_feedback: ClassAnswerFeedback[];
+  summary: {
+    avg_grade: number | null;
+    submissions_submitted: number;
+    submissions_graded: number;
+    total_prompts_assigned: number;
+  };
 }
 
 export interface ClassSubmission {

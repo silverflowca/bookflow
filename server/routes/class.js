@@ -1338,6 +1338,287 @@ router.post('/:clubId/class/dm/:otherUserId', authenticate, async (req, res) => 
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUBMISSION COMMENTS  (threaded dialogue on assignments, linked to chapter/book)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/clubs/:clubId/class/submissions/:subId/comments
+router.get('/:clubId/class/submissions/:subId/comments', authenticate, async (req, res) => {
+  const { clubId, subId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_submission_comments')
+      .select('id, author_id, body, chapter_id, response_id, created_at, updated_at, author:profiles!class_submission_comments_author_id_fkey(id, display_name, avatar_url)')
+      .eq('club_id', clubId)
+      .eq('submission_id', subId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/clubs/:clubId/class/submissions/:subId/comments
+router.post('/:clubId/class/submissions/:subId/comments', authenticate, async (req, res) => {
+  const { clubId, subId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+  const { body, chapter_id, response_id } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: 'body is required' });
+
+  try {
+    // Verify submission belongs to this club
+    const { data: sub, error: subErr } = await supabase
+      .schema('bookflow')
+      .from('class_submissions')
+      .select('id, student_id')
+      .eq('id', subId)
+      .eq('club_id', clubId)
+      .maybeSingle();
+    if (subErr || !sub) return res.status(404).json({ error: 'Submission not found' });
+
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_submission_comments')
+      .insert({ club_id: clubId, submission_id: subId, author_id: req.user.id, body: body.trim(), chapter_id: chapter_id || null, response_id: response_id || null })
+      .select('id, author_id, body, chapter_id, response_id, created_at, updated_at, author:profiles!class_submission_comments_author_id_fkey(id, display_name, avatar_url)')
+      .single();
+    if (error) throw error;
+
+    const isTeacher = role === 'owner' || role === 'admin';
+    if (isTeacher) {
+      // Notify student
+      await notify(sub.student_id, 'class_response_comment', 'New comment on your submission', `Your teacher commented on your submission.`, { club_id: clubId });
+    } else {
+      // Notify all teachers
+      const teacherIds = await getTeacherIds(clubId);
+      for (const tid of teacherIds) {
+        if (tid !== req.user.id) {
+          await notify(tid, 'class_response_comment', 'Student replied on submission', `A student replied on their submission.`, { club_id: clubId });
+        }
+      }
+    }
+
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/clubs/:clubId/class/submissions/:subId/comments/:commentId
+router.delete('/:clubId/class/submissions/:subId/comments/:commentId', authenticate, async (req, res) => {
+  const { clubId, commentId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+  try {
+    const { error } = await supabase
+      .schema('bookflow')
+      .from('class_submission_comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('club_id', clubId)
+      .eq('author_id', req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Student note / teacher follow-up on feedback ─────────────────────────────
+
+// PATCH /api/clubs/:clubId/class/submissions/:subId/feedback/student-note
+// Student replies to feedback they received
+router.patch('/:clubId/class/submissions/:subId/feedback/student-note', authenticate, async (req, res) => {
+  const { clubId, subId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+  if (role === 'owner' || role === 'admin') return res.status(403).json({ error: 'Students only' });
+
+  const { student_note } = req.body;
+  if (typeof student_note !== 'string') return res.status(400).json({ error: 'student_note required' });
+
+  try {
+    const { data: sub } = await supabase.schema('bookflow').from('class_submissions').select('student_id').eq('id', subId).eq('club_id', clubId).maybeSingle();
+    if (!sub || sub.student_id !== req.user.id) return res.status(403).json({ error: 'Not your submission' });
+
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_submission_feedback')
+      .update({ student_note: student_note.trim() || null, student_noted_at: new Date().toISOString() })
+      .eq('submission_id', subId)
+      .eq('club_id', clubId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Notify teachers
+    const teacherIds = await getTeacherIds(clubId);
+    for (const tid of teacherIds) {
+      await notify(tid, 'class_response_comment', 'Student replied to feedback', `A student left a note on your feedback.`, { club_id: clubId });
+    }
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/clubs/:clubId/class/submissions/:subId/feedback/follow-up
+// Teacher adds a follow-up note after student replied
+router.patch('/:clubId/class/submissions/:subId/feedback/follow-up', authenticate, async (req, res) => {
+  const { clubId, subId } = req.params;
+  const role = await requireClassAccess(req, res, 'teacher');
+  if (!role) return;
+
+  const { teacher_follow_up } = req.body;
+  if (typeof teacher_follow_up !== 'string') return res.status(400).json({ error: 'teacher_follow_up required' });
+
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_submission_feedback')
+      .update({ teacher_follow_up: teacher_follow_up.trim() || null, follow_up_at: new Date().toISOString() })
+      .eq('submission_id', subId)
+      .eq('club_id', clubId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Notify student
+    const { data: sub } = await supabase.schema('bookflow').from('class_submissions').select('student_id').eq('id', subId).single();
+    if (sub?.student_id) {
+      await notify(sub.student_id, 'class_feedback_posted', 'Teacher follow-up on your submission', `Your teacher added a follow-up note on your submission.`, { club_id: clubId });
+    }
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROGRESS REPORT  — rich snapshot for PDF/print
+// GET /api/clubs/:clubId/class/progress-report/:studentId  (teacher)
+// GET /api/clubs/:clubId/class/my-progress-report          (student)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function buildProgressReport(clubId, studentId) {
+  // Club info
+  const { data: club } = await supabase.schema('bookflow').from('book_clubs')
+    .select('id, name, description, cover_image_url').eq('id', clubId).single();
+
+  // Student profile
+  const { data: profile } = await supabase.schema('bookflow').from('profiles')
+    .select('id, display_name, avatar_url, email').eq('id', studentId).single();
+
+  // Enrolled date
+  const { data: membership } = await supabase.schema('bookflow').from('club_members')
+    .select('invite_accepted_at, role').eq('club_id', clubId).eq('user_id', studentId).maybeSingle();
+
+  // All books in this class
+  const { data: clubBooks } = await supabase.schema('bookflow').from('club_books')
+    .select('book_id, is_current, book:books!club_books_book_id_fkey(id, title, cover_image_url)')
+    .eq('club_id', clubId).order('created_at', { ascending: true });
+
+  const bookReports = [];
+  for (const cb of (clubBooks || [])) {
+    const book = Array.isArray(cb.book) ? cb.book[0] : cb.book;
+    if (!book) continue;
+
+    const { data: chapters } = await supabase.schema('bookflow').from('chapters')
+      .select('id, title, order_index, content')
+      .eq('book_id', book.id).eq('status', 'published').order('order_index', { ascending: true });
+
+    const chapterIds = (chapters || []).map(c => c.id);
+
+    const { data: allInline } = await supabase.schema('bookflow').from('inline_content')
+      .select('id, chapter_id, content_type, label')
+      .in('chapter_id', chapterIds).in('content_type', TRACKABLE_TYPES);
+
+    const { data: completions } = await supabase.schema('bookflow').from('chapter_item_completions')
+      .select('chapter_id, item_key, completed_at')
+      .in('chapter_id', chapterIds).eq('user_id', studentId);
+
+    const { data: responses } = await supabase.schema('bookflow').from('form_responses')
+      .select('id, inline_content_id, response_data, created_at')
+      .in('inline_content_id', (allInline || []).map(ic => ic.id)).eq('user_id', studentId);
+
+    const chapterRows = (chapters || []).map(ch => {
+      const inline = (allInline || []).filter(ic => ic.chapter_id === ch.id);
+      const mediaCount = extractMediaKeys(ch.content?.content || [], ch.id).length;
+      const total = inline.length + mediaCount;
+      const completed = (completions || []).filter(c => c.chapter_id === ch.id).length;
+      const chResponses = (responses || []).filter(r => inline.some(ic => ic.id === r.inline_content_id));
+      return { chapter_id: ch.id, title: ch.title, order_index: ch.order_index, completed, total, responses: chResponses };
+    });
+
+    const totalCompleted = chapterRows.reduce((a, c) => a + c.completed, 0);
+    const totalItems = chapterRows.reduce((a, c) => a + c.total, 0);
+    bookReports.push({ book, is_current: cb.is_current, chapters: chapterRows, items_completed: totalCompleted, items_total: totalItems, completion_pct: totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0 });
+  }
+
+  // Submissions + feedback
+  const { data: submissions } = await supabase.schema('bookflow').from('class_submissions')
+    .select('id, title, body, status, submitted_at, created_at, prompt:class_submission_prompts(title, prompt_type, chapter_id), feedback:class_submission_feedback(grade, feedback_text, student_note, teacher_follow_up, created_at)')
+    .eq('club_id', clubId).eq('student_id', studentId).order('created_at', { ascending: true });
+
+  // Q&A feedback (graded answers)
+  const { data: answerFeedback } = await supabase.schema('bookflow').from('class_answer_feedback')
+    .select('id, response_id, grade, feedback_text, created_at')
+    .eq('club_id', clubId).eq('student_id', studentId);
+
+  // Compute grade average
+  const grades = (submissions || []).map(s => s.feedback?.grade).filter(g => g != null);
+  const answerGrades = (answerFeedback || []).map(a => a.grade).filter(g => g != null);
+  const allGrades = [...grades, ...answerGrades];
+  const avgGrade = allGrades.length > 0 ? Math.round(allGrades.reduce((a, b) => a + b, 0) / allGrades.length) : null;
+
+  return {
+    generated_at: new Date().toISOString(),
+    club,
+    profile,
+    enrollment: membership ? { enrolled_at: membership.invite_accepted_at, role: membership.role } : null,
+    books: bookReports,
+    submissions: submissions || [],
+    answer_feedback: answerFeedback || [],
+    summary: {
+      avg_grade: avgGrade,
+      submissions_submitted: (submissions || []).filter(s => s.status !== 'draft').length,
+      submissions_graded: (submissions || []).filter(s => s.status === 'graded').length,
+      total_prompts_assigned: (submissions || []).length,
+    },
+  };
+}
+
+// Teacher: view any student's report
+router.get('/:clubId/class/progress-report/:studentId', authenticate, async (req, res) => {
+  const { clubId, studentId } = req.params;
+  const role = await requireClassAccess(req, res, 'teacher');
+  if (!role) return;
+  try {
+    res.json(await buildProgressReport(clubId, studentId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Student: view own report
+router.get('/:clubId/class/my-progress-report', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const role = await requireClassAccess(req, res, 'member');
+  if (!role) return;
+  try {
+    res.json(await buildProgressReport(clubId, req.user.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/clubs/:clubId/class/dm — list all DM conversations for current user
 router.get('/:clubId/class/dm', authenticate, async (req, res) => {
   const { clubId } = req.params;

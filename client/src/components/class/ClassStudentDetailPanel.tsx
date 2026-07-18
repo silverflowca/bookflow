@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, BookOpen, MessageSquare, Send, ChevronDown, ChevronUp, Star } from 'lucide-react';
+import { ArrowLeft, BookOpen, MessageSquare, Send, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import api from '../../lib/api';
+import ClassSubmissionThread from './ClassSubmissionThread';
+import StudentProgressReport from './StudentProgressReport';
 
 interface Comment {
   id: string;
@@ -163,6 +165,7 @@ export default function ClassStudentDetailPanel({ clubId, studentId, currentUser
   const [detail, setDetail] = useState<StudentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<'progress' | 'answers' | 'assignments'>('progress');
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     api.getClassStudentDetail(clubId, studentId)
@@ -205,7 +208,22 @@ export default function ClassStudentDetailPanel({ clubId, studentId, currentUser
         >
           <MessageSquare className="h-4 w-4" /> Message
         </button>
+        <button
+          onClick={() => setShowReport(true)}
+          className="flex items-center gap-1.5 theme-button-secondary px-3 py-2 rounded-lg text-sm"
+          title="View progress report"
+        >
+          <FileText className="h-4 w-4" /> Report
+        </button>
       </div>
+
+      {showReport && (
+        <StudentProgressReport
+          clubId={clubId}
+          studentId={studentId}
+          onClose={() => setShowReport(false)}
+        />
+      )}
 
       {/* Section tabs */}
       <div className="flex gap-1 mb-6 theme-section p-1 rounded-lg w-fit">
@@ -311,8 +329,8 @@ export default function ClassStudentDetailPanel({ clubId, studentId, currentUser
               const prompt = sub.prompt;
               const feedback = sub.feedback;
               return (
-                <div key={sub.id} className="theme-section rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                <div key={sub.id} className="theme-section rounded-xl p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-theme">{sub.title || prompt?.title || 'Untitled'}</p>
                       {prompt && <p className="text-xs text-muted capitalize mt-0.5">{prompt.prompt_type}</p>}
@@ -324,19 +342,16 @@ export default function ClassStudentDetailPanel({ clubId, studentId, currentUser
                     }`}>{sub.status}</span>
                   </div>
                   {sub.body && (
-                    <p className="text-sm text-muted whitespace-pre-wrap max-h-32 overflow-y-auto border-t border-strong/20 pt-2 mt-2">{sub.body}</p>
+                    <p className="text-sm text-muted whitespace-pre-wrap max-h-32 overflow-y-auto bg-strong/5 rounded-lg px-3 py-2">{sub.body}</p>
                   )}
-                  {feedback && (
-                    <div className="mt-3 pt-3 border-t border-strong/20 flex items-center gap-2">
-                      <Star className="h-4 w-4 text-amber-400 flex-shrink-0" />
-                      {feedback.grade !== undefined && feedback.grade !== null && (
-                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{feedback.grade}/100</span>
-                      )}
-                      {feedback.feedback_text && (
-                        <span className="text-sm text-muted">{feedback.feedback_text}</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Thread: feedback loop + back-and-forth comments */}
+                  <ClassSubmissionThread
+                    clubId={clubId}
+                    submissionId={sub.id}
+                    feedback={feedback ? { ...feedback, id: '', submission_id: sub.id, club_id: clubId, created_by: '', created_at: '', updated_at: '' } : null}
+                    isTeacher={true}
+                    chapterId={(prompt as any)?.chapter_id}
+                  />
                 </div>
               );
             })

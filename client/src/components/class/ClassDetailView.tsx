@@ -4,7 +4,7 @@ import api from '../../lib/api';
 import {
   GraduationCap, Users, Calendar, BookOpen, MessageSquare,
   Settings, ArrowLeft, TrendingUp, ChevronRight, ClipboardList, Loader2, ChevronDown,
-  X, ZoomIn, BarChart2, BookMarked, CheckCircle2, Activity,
+  X, ZoomIn, BarChart2, BookMarked, CheckCircle2, Activity, Inbox, FileText,
 } from 'lucide-react';
 
 import BookResponsesViewer from '../responses/BookResponsesViewer';
@@ -16,8 +16,10 @@ import ClassSubmissionsPanel from './ClassSubmissionsPanel';
 import ClassMembersPanel from './ClassMembersPanel';
 import ClassSettingsPanel from './ClassSettingsPanel';
 import ClassProgressPanel from './ClassProgressPanel';
+import StudentProgressReport from './StudentProgressReport';
+import ClassDMPanel from './ClassDMPanel';
 
-type ClassTab = 'overview' | 'roster' | 'progress' | 'schedule' | 'assignments' | 'responses' | 'chat' | 'members' | 'settings';
+type ClassTab = 'overview' | 'roster' | 'progress' | 'schedule' | 'assignments' | 'responses' | 'chat' | 'messages' | 'members' | 'settings';
 
 interface ClubBook {
   id: string;
@@ -61,6 +63,10 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   const { user } = useAuth();
   const [tab, setTab] = useState<ClassTab>('overview');
   const isTeacher = role === 'owner' || role === 'admin';
+  // Messages tab: active DM conversation
+  const [activeDM, setActiveDM] = useState<{ userId: string; name: string } | null>(null);
+  // Progress report modal (student's own)
+  const [showMyReport, setShowMyReport] = useState(false);
   // Normalize book nested object (Supabase may return as array in some paths)
   const normalizedBooks = (club.books ?? []).map(cb => ({
     ...cb,
@@ -121,6 +127,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
     { key: 'assignments', label: 'Assignments', icon: <BookOpen className="h-4 w-4" /> },
     { key: 'responses', label: 'Responses', icon: <ClipboardList className="h-4 w-4" />, teacherOnly: true },
     { key: 'chat', label: 'Chat', icon: <MessageSquare className="h-4 w-4" /> },
+    { key: 'messages', label: 'Messages', icon: <Inbox className="h-4 w-4" /> },
     { key: 'members', label: `Members (${memberCount})`, icon: <Users className="h-4 w-4" /> },
     { key: 'settings', label: 'Settings', icon: <Settings className="h-4 w-4" />, teacherOnly: true },
   ];
@@ -186,7 +193,17 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
         <ClassRosterPanel clubId={club.id} currentUserId={user?.id ?? ''} />
       )}
       {tab === 'progress' && !isTeacher && (
-        <ClassProgressPanel clubId={club.id} />
+        <div>
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setShowMyReport(true)}
+              className="flex items-center gap-1.5 theme-button-secondary px-3 py-2 rounded-lg text-sm"
+            >
+              <FileText className="h-4 w-4" /> Download Report
+            </button>
+          </div>
+          <ClassProgressPanel clubId={club.id} />
+        </div>
       )}
       {tab === 'schedule' && (
         <ClassSessionsPanel clubId={club.id} isTeacher={isTeacher} />
@@ -220,8 +237,21 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
           />
         );
       })()}
+      {tab === 'messages' && (
+        <ClassMessagesTab
+          clubId={club.id}
+          currentUserId={user?.id ?? ''}
+          isTeacher={isTeacher}
+          activeDM={activeDM}
+          onOpenDM={(userId, name) => setActiveDM({ userId, name })}
+          onCloseDM={() => setActiveDM(null)}
+        />
+      )}
       {tab === 'settings' && isTeacher && (
         <ClassSettingsPanel club={club} onReload={onReload} />
+      )}
+      {showMyReport && (
+        <StudentProgressReport clubId={club.id} onClose={() => setShowMyReport(false)} />
       )}
     </div>
   );
@@ -746,4 +776,115 @@ function ClassResponsesPanel({
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
   return <BookResponsesViewer bookId={bookId} mode="author" memberFilter={memberFilter} />;
+}
+
+// ── Messages Tab ──────────────────────────────────────────────────────────────
+// Shows all DM conversations + lets you open one
+interface Conversation {
+  other_user_id: string;
+  last_message: string;
+  last_at: string;
+  unread_count: number;
+  profile: { id: string; display_name: string; avatar_url?: string } | null;
+}
+
+function ClassMessagesTab({
+  clubId, currentUserId, activeDM, onOpenDM, onCloseDM,
+}: {
+  clubId: string;
+  currentUserId: string;
+  isTeacher: boolean;
+  activeDM: { userId: string; name: string } | null;
+  onOpenDM: (userId: string, name: string) => void;
+  onCloseDM: () => void;
+}) {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.listClassDMConversations(clubId)
+      .then(setConversations)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [clubId]);
+
+  if (activeDM) {
+    return (
+      <ClassDMPanel
+        clubId={clubId}
+        currentUserId={currentUserId}
+        otherUserId={activeDM.userId}
+        otherName={activeDM.name}
+        onBack={onCloseDM}
+      />
+    );
+  }
+
+  const timeAgo = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  return (
+    <div className="max-w-2xl">
+      <div className="flex items-center gap-2 mb-6">
+        <Inbox className="h-5 w-5 text-muted" />
+        <h2 className="font-semibold text-theme">Private Messages</h2>
+        {conversations.some(c => c.unread_count > 0) && (
+          <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+            {conversations.reduce((s, c) => s + c.unread_count, 0)}
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-strong" />
+        </div>
+      ) : conversations.length === 0 ? (
+        <div className="text-center py-16 text-muted">
+          <Inbox className="h-10 w-10 opacity-30 mx-auto mb-3" />
+          <p className="text-sm">No messages yet.</p>
+          <p className="text-xs mt-1">Start a conversation from the Roster tab.</p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {conversations.map(conv => (
+            <button
+              key={conv.other_user_id}
+              onClick={() => onOpenDM(conv.other_user_id, conv.profile?.display_name ?? 'Member')}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-strong/5 transition-colors text-left"
+            >
+              {/* Avatar */}
+              <div className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white font-semibold text-sm">
+                {conv.profile?.avatar_url
+                  ? <img src={conv.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  : (conv.profile?.display_name ?? '?').charAt(0)
+                }
+              </div>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-medium text-theme text-sm truncate">{conv.profile?.display_name ?? 'Member'}</span>
+                  <span className="text-[11px] text-muted flex-shrink-0">{timeAgo(conv.last_at)}</span>
+                </div>
+                <p className="text-xs text-muted truncate mt-0.5">{conv.last_message}</p>
+              </div>
+              {/* Unread badge */}
+              {conv.unread_count > 0 && (
+                <span className="bg-violet-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  {conv.unread_count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
