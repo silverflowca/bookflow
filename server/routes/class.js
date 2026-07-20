@@ -84,8 +84,7 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
       .from('club_members')
       .select('user_id, role, invite_accepted_at, invited_email, profile:profiles!club_members_user_id_fkey(display_name, avatar_url, email)')
       .eq('club_id', clubId)
-      .not('invite_accepted_at', 'is', null)
-      .is('removed_at', null);
+      .not('invite_accepted_at', 'is', null);
     if (mErr) throw mErr;
 
     // Load current club book (fall back to most recently added if none marked current)
@@ -229,8 +228,7 @@ router.get('/:clubId/class/roster/export', authenticate, async (req, res) => {
       .from('club_members')
       .select('user_id, role, invite_accepted_at, invited_email, profile:profiles!club_members_user_id_fkey(display_name, avatar_url, email)')
       .eq('club_id', clubId)
-      .not('invite_accepted_at', 'is', null)
-      .is('removed_at', null);
+      .not('invite_accepted_at', 'is', null);
     if (mErr) throw mErr;
 
     // Current book
