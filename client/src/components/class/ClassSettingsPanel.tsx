@@ -70,6 +70,8 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
   const [responsesVisibleToAll, setResponsesVisibleToAll] = useState(false);
   const [visSaving, setVisSaving] = useState(false);
   const [visSaved, setVisSaved] = useState(false);
+  const visLoadedRef = useRef(false);
+  const visDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Only sync from parent when the picker is closed, to avoid wiping optimistic updates
@@ -122,25 +124,28 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
           setAllowStudentsSetVisibility(s.allow_students_set_visibility ?? false);
           setResponsesVisibleToAll(s.responses_visible_to_all ?? false);
         }
+        visLoadedRef.current = true;
       })
-      .catch(() => {});
+      .catch(() => { visLoadedRef.current = true; });
   }, [club.id]);
 
-  async function handleSaveVisibility() {
-    setVisSaving(true);
-    try {
-      await api.updateClubSettings(club.id, {
-        allow_students_set_visibility: allowStudentsSetVisibility,
-        responses_visible_to_all: responsesVisibleToAll,
-      });
-      setVisSaved(true);
-      setTimeout(() => setVisSaved(false), 2500);
-    } catch (err: any) {
-      console.error('Failed to save visibility settings:', err);
-    } finally {
-      setVisSaving(false);
-    }
-  }
+  // Auto-save visibility settings whenever they change (debounced 400ms)
+  useEffect(() => {
+    if (!visLoadedRef.current) return;
+    if (visDebounceRef.current) clearTimeout(visDebounceRef.current);
+    visDebounceRef.current = setTimeout(async () => {
+      setVisSaving(true);
+      try {
+        await api.updateClubSettings(club.id, {
+          allow_students_set_visibility: allowStudentsSetVisibility,
+          responses_visible_to_all: responsesVisibleToAll,
+        });
+        setVisSaved(true);
+        setTimeout(() => setVisSaved(false), 2000);
+      } catch { /* ignore */ } finally { setVisSaving(false); }
+    }, 400);
+    return () => { if (visDebounceRef.current) clearTimeout(visDebounceRef.current); };
+  }, [allowStudentsSetVisibility, responsesVisibleToAll, club.id]);
 
   async function handleSaveSettings() {
     if (!name.trim()) { setSaveError('Name is required'); return; }
@@ -585,18 +590,17 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
               checked={allowStudentsSetVisibility}
               onChange={e => {
                 setAllowStudentsSetVisibility(e.target.checked);
-                // If this is turned off, all-visible can't be on either
                 if (!e.target.checked) setResponsesVisibleToAll(false);
               }}
             />
-            <div className="w-9 h-5 rounded-full bg-strong/20 peer-checked:bg-violet-500 transition-colors" />
-            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+            <div className="w-10 h-6 rounded-full bg-gray-300 dark:bg-gray-600 peer-checked:bg-violet-500 transition-colors" />
+            <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform peer-checked:translate-x-4" />
           </div>
           <div>
             <p className="text-sm font-medium text-theme">Allow students to share their responses</p>
             <p className="text-xs text-muted mt-0.5">
-              Students get a per-response toggle to make their answer visible to classmates.
-              Responses remain private until each student opts in.
+              Students get a toggle in their My Progress tab to share their answers with classmates.
+              Responses stay private until each student opts in.
             </p>
           </div>
         </label>
@@ -611,30 +615,22 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
               disabled={!allowStudentsSetVisibility}
               onChange={e => setResponsesVisibleToAll(e.target.checked)}
             />
-            <div className="w-9 h-5 rounded-full bg-strong/20 peer-checked:bg-violet-500 transition-colors" />
-            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+            <div className="w-10 h-6 rounded-full bg-gray-300 dark:bg-gray-600 peer-checked:bg-violet-500 transition-colors" />
+            <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform peer-checked:translate-x-4" />
           </div>
           <div>
             <p className="text-sm font-medium text-theme">Make all responses visible by default</p>
             <p className="text-xs text-muted mt-0.5">
-              All member responses are shown to the class automatically — students don't need to opt in individually.
+              All member responses are shown to the class automatically — no student opt-in required.
               Requires "Allow students to share" to be enabled first.
             </p>
           </div>
         </label>
 
-        <div className="flex items-center justify-between pt-1">
-          {visSaved
-            ? <span className="text-xs text-emerald-500 flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Saved</span>
-            : <span />
-          }
-          <button
-            onClick={handleSaveVisibility}
-            disabled={visSaving}
-            className="theme-button-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-          >
-            {visSaving ? 'Saving...' : 'Save'}
-          </button>
+        {/* Auto-save indicator */}
+        <div className="h-4">
+          {visSaving && <span className="text-xs text-muted">Saving…</span>}
+          {visSaved && !visSaving && <span className="text-xs text-emerald-500 flex items-center gap-1"><Check className="h-3 w-3" /> Saved</span>}
         </div>
       </div>
 
