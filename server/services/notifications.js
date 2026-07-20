@@ -64,6 +64,27 @@ async function resolveEmailFrom(supabase, { book_id, club_id, study_group_id } =
   return ENV_EMAIL_FROM;
 }
 
+async function logNotification(supabase, { userId, type, title, body, emailTo, emailSent, emailError, bookId, clubId }) {
+  try {
+    await supabase
+      .schema('bookflow')
+      .from('notification_log')
+      .insert({
+        user_id: userId || null,
+        type,
+        title,
+        body: body || null,
+        email_to: emailTo || null,
+        email_sent: emailSent,
+        email_error: emailError || null,
+        book_id: bookId || null,
+        club_id: clubId || null,
+      });
+  } catch (err) {
+    console.error('[notify] log insert failed:', err.message);
+  }
+}
+
 export async function createNotification(supabase, { userId, type, title, body, ...extras }) {
   if (!userId) return;
 
@@ -79,6 +100,10 @@ export async function createNotification(supabase, { userId, type, title, body, 
   }
 
   // 2. Look up recipient profile for email + prefs
+  let emailTo = null;
+  let emailSent = false;
+  let emailError = null;
+
   try {
     const { data: profile } = await supabase
       .schema('bookflow')
@@ -87,32 +112,56 @@ export async function createNotification(supabase, { userId, type, title, body, 
       .eq('id', userId)
       .single();
 
-    if (!profile?.email) return;
+    emailTo = profile?.email || null;
 
-    // 3. Check system-level master kill switch + load resend key
+    if (!profile?.email) {
+      await logNotification(supabase, { userId, type, title, body, emailTo: null, emailSent: false, emailError: 'No email on profile', bookId: extras.book_id, clubId: extras.club_id });
+      return;
+    }
+
+    // 3. Check system-level master kill switch + load resend key + type config
     const { data: sysSettings } = await supabase
       .schema('bookflow')
       .from('app_settings')
-      .select('email_notifications_enabled, resend_api_key')
+      .select('email_notifications_enabled, resend_api_key, notification_type_config')
       .limit(1)
       .maybeSingle();
-    if (sysSettings?.email_notifications_enabled === false) return;
 
-    // 4. Check user opt-out (absence = opted IN)
+    if (sysSettings?.email_notifications_enabled === false) {
+      await logNotification(supabase, { userId, type, title, body, emailTo, emailSent: false, emailError: 'Email notifications disabled (system)', bookId: extras.book_id, clubId: extras.club_id });
+      return;
+    }
+
+    // 4. Check per-type system config (absence = enabled)
+    const typeConfig = sysSettings?.notification_type_config ?? {};
+    if (typeConfig[type] === false) {
+      await logNotification(supabase, { userId, type, title, body, emailTo, emailSent: false, emailError: `Type "${type}" disabled in config`, bookId: extras.book_id, clubId: extras.club_id });
+      return;
+    }
+
+    // 5. Check user opt-out (absence = opted IN)
     const prefs = profile.notification_prefs ?? {};
-    if (prefs[type] === false) return;
+    if (prefs[type] === false) {
+      await logNotification(supabase, { userId, type, title, body, emailTo, emailSent: false, emailError: 'User opted out', bookId: extras.book_id, clubId: extras.club_id });
+      return;
+    }
 
-    // 5. Resolve from address from context chain
+    // 6. Resolve from address from context chain
     const from = await resolveEmailFrom(supabase, extras);
 
-    // 6. Send email (use DB key if env key not set)
+    // 7. Send email
     const apiKey = sysSettings?.resend_api_key || undefined;
     const { subject, html } = getEmailTemplate(type, { title, body, ...extras });
-    await sendEmail({ from, to: profile.email, subject, html, apiKey });
+    const sent = await sendEmail({ from, to: profile.email, subject, html, apiKey });
+    emailSent = !!sent;
+    if (!sent) emailError = 'Resend API returned failure';
   } catch (err) {
-    // Email failure never breaks the request
+    emailError = err.message;
     console.error('[notify] email failed:', err.message);
   }
+
+  // 8. Always log the attempt
+  await logNotification(supabase, { userId, type, title, body, emailTo, emailSent, emailError, bookId: extras.book_id, clubId: extras.club_id });
 }
 
 export async function createNotifications(supabase, rows) {

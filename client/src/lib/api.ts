@@ -1627,6 +1627,24 @@ class ApiClient {
     return res.json();
   }
 
+  // ── Admin: Notifications ────────────────────────────────────────────────────
+
+  async adminGetNotificationLog(opts?: { type?: string; limit?: number }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (opts?.type) params.set('type', opts.type);
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    const qs = params.toString();
+    return this.request(`/admin/notifications/log${qs ? `?${qs}` : ''}`);
+  }
+
+  async adminGetNotificationConfig(): Promise<{ email_notifications_enabled: boolean; notification_type_config: Record<string, boolean> }> {
+    return this.request('/admin/notifications/config');
+  }
+
+  async adminUpdateNotificationConfig(data: { email_notifications_enabled?: boolean; notification_type_config?: Record<string, boolean> }): Promise<void> {
+    return this.request('/admin/notifications/config', { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
 }
 
 export const api = new ApiClient();

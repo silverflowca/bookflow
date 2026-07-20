@@ -24,11 +24,12 @@ export async function getClubRole(clubId, userId) {
 
   const { data: member } = await supabase
     .from('club_members')
-    .select('role, invite_accepted_at')
+    .select('role, invite_accepted_at, removed_at')
     .eq('club_id', clubId)
     .eq('user_id', userId)
     .single();
-  if (!member || !member.invite_accepted_at) return null;
+  // Removed members lose access as if they were never in the club
+  if (!member || !member.invite_accepted_at || member.removed_at) return null;
   return member.role;
 }
 
@@ -201,11 +202,11 @@ router.get('/:clubId', optionalAuth, async (req, res) => {
       return res.status(403).json({ error: 'You are not a member of this club' });
     }
 
-    // Members (accepted) — FK hint needed: club_members has two FKs to profiles (user_id + invited_by)
+    // Members (accepted, including removed) — FK hint needed: club_members has two FKs to profiles
     const { data: members } = await supabase
       .from('club_members')
       .select(`
-        id, user_id, role, joined_at, invite_accepted_at,
+        id, user_id, role, joined_at, invite_accepted_at, removed_at, removed_by,
         profile:profiles!club_members_user_id_fkey(id, display_name, avatar_url, email)
       `)
       .eq('club_id', req.params.clubId)
@@ -393,10 +394,29 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
     if (userId) {
       const { data: existing } = await supabase.schema('bookflow')
         .from('club_members')
-        .select('id, invite_accepted_at')
+        .select('id, invite_accepted_at, removed_at')
         .eq('club_id', clubId)
         .eq('user_id', userId)
         .maybeSingle();
+
+      // Re-adding a previously removed member: restore their row (all data intact)
+      if (existing?.removed_at) {
+        const { data: restored, error } = await supabase.schema('bookflow')
+          .from('club_members')
+          .update({ removed_at: null, removed_by: null, role: memberRole })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        const roleLabel = memberRole === 'admin' ? 'teacher/facilitator' : 'member';
+        await notify(userId, 'club_invite',
+          `You've been re-added to "${club.name}"`,
+          `You've been re-added to the class "${club.name}" as a ${roleLabel}. Your previous progress is intact.`,
+          { club_id: clubId }
+        );
+        return res.status(200).json(restored);
+      }
+
       if (existing?.invite_accepted_at) return res.status(409).json({ error: 'User is already a member' });
       if (existing) return res.status(409).json({ error: 'User already has a pending invite' });
 
@@ -426,10 +446,23 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
     if (targetProfile) {
       const { data: existing } = await supabase.schema('bookflow')
         .from('club_members')
-        .select('id, invite_accepted_at')
+        .select('id, invite_accepted_at, removed_at')
         .eq('club_id', clubId)
         .eq('user_id', targetProfile.id)
         .maybeSingle();
+
+      // Re-inviting a removed member: restore immediately
+      if (existing?.removed_at) {
+        const { data: restored, error } = await supabase.schema('bookflow')
+          .from('club_members')
+          .update({ removed_at: null, removed_by: null, role: memberRole })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return res.status(200).json(restored);
+      }
+
       if (existing?.invite_accepted_at) return res.status(409).json({ error: 'User is already a member' });
       if (existing) return res.status(409).json({ error: 'User already has a pending invite' });
     }
@@ -754,7 +787,9 @@ router.post('/accept/:token', authenticate, async (req, res) => {
   }
 });
 
-// ── DELETE /api/clubs/:clubId/members/:memberId — remove/leave ────────────────
+// ── DELETE /api/clubs/:clubId/members/:memberId — soft-remove (or self-leave) ─
+// Teacher removing a student: sets removed_at (data preserved, access revoked).
+// Member leaving their own club: hard-deletes their row (self-leave, no data concern).
 router.delete('/:clubId/members/:memberId', authenticate, async (req, res) => {
   try {
     const { data: member } = await supabase
@@ -772,7 +807,46 @@ router.delete('/:clubId/members/:memberId', authenticate, async (req, res) => {
     if (!canRemove) return res.status(403).json({ error: 'Not authorized to remove this member' });
     if (member.role === 'owner' && !isSelf) return res.status(403).json({ error: 'Cannot remove the club owner' });
 
-    const { error } = await supabase.from('club_members').delete().eq('id', req.params.memberId);
+    if (isSelf) {
+      // Self-leave: hard delete (they chose to leave, no teacher data to preserve)
+      const { error } = await supabase.from('club_members').delete().eq('id', req.params.memberId);
+      if (error) throw error;
+    } else {
+      // Teacher removing student: soft-remove — preserves all progress/submission data
+      const { error } = await supabase
+        .from('club_members')
+        .update({ removed_at: new Date().toISOString(), removed_by: req.user.id })
+        .eq('id', req.params.memberId);
+      if (error) throw error;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/clubs/:clubId/members/:memberId/restore — re-add removed member ─
+router.patch('/:clubId/members/:memberId/restore', authenticate, async (req, res) => {
+  try {
+    const myRole = await getClubRole(req.params.clubId, req.user.id);
+    if (!['owner', 'admin'].includes(myRole)) {
+      return res.status(403).json({ error: 'Teacher access required' });
+    }
+
+    const { data: member } = await supabase
+      .from('club_members')
+      .select('id, removed_at')
+      .eq('id', req.params.memberId)
+      .eq('club_id', req.params.clubId)
+      .single();
+
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    if (!member.removed_at) return res.status(400).json({ error: 'Member is not removed' });
+
+    const { error } = await supabase
+      .from('club_members')
+      .update({ removed_at: null, removed_by: null })
+      .eq('id', req.params.memberId);
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {

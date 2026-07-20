@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore, Archive, ImagePlus } from 'lucide-react';
+import { Shield, Users, BookOpen, Users2, Crown, X, Loader2, AlertCircle, Clapperboard, Settings, MessageSquarePlus, ArchiveRestore, Archive, ImagePlus, Bell } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Profile, SystemRole } from '../types';
@@ -12,6 +12,7 @@ import {
 } from './Home';
 import SettingsPage from './Settings';
 import FeedbackAdminTab from '../components/feedback/FeedbackAdminTab';
+import NotificationsAdminTab from '../components/admin/NotificationsAdminTab';
 
 interface AdminStats {
   users: number;
@@ -20,7 +21,7 @@ interface AdminStats {
   super_admins: number;
 }
 
-type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'feedback';
+type Tab = 'users' | 'books' | 'clubs' | 'carousel' | 'settings' | 'feedback' | 'notifications';
 
 function BookCover({ book, onUpdate }: { book: any; onUpdate: (url: string) => void }) {
   const [uploading, setUploading] = useState(false);
@@ -178,7 +179,7 @@ export default function AdminPage() {
 
   const [tab, setTab] = useState<Tab>(() => {
     const requested = searchParams.get('tab');
-    return (requested && ['users', 'books', 'clubs', 'carousel', 'settings', 'feedback'].includes(requested))
+    return (requested && ['users', 'books', 'clubs', 'carousel', 'settings', 'feedback', 'notifications'].includes(requested))
       ? requested as Tab
       : 'settings';
   });
@@ -205,7 +206,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     const requested = searchParams.get('tab');
-    if (requested && ['users', 'books', 'clubs', 'carousel', 'settings', 'feedback'].includes(requested) && requested !== tab) {
+    if (requested && ['users', 'books', 'clubs', 'carousel', 'settings', 'feedback', 'notifications'].includes(requested) && requested !== tab) {
       loadTab(requested as Tab);
     }
   }, [searchParams]);
@@ -306,12 +307,12 @@ export default function AdminPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-surface-hover">
-        {(['settings', 'users', 'books', 'clubs', 'carousel', 'feedback'] as Tab[]).map(t => (
+      <div className="flex gap-1 mb-6 border-b border-surface-hover overflow-x-auto">
+        {(['settings', 'users', 'books', 'clubs', 'carousel', 'feedback', 'notifications'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => loadTab(t)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors -mb-px ${
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors -mb-px whitespace-nowrap ${
               tab === t
                 ? 'border-purple-500 text-purple-600 dark:text-purple-400'
                 : 'border-transparent text-muted hover:text-theme'
@@ -320,6 +321,7 @@ export default function AdminPage() {
             {t === 'carousel' && <Clapperboard className="h-3.5 w-3.5" />}
             {t === 'settings' && <Settings className="h-3.5 w-3.5" />}
             {t === 'feedback' && <MessageSquarePlus className="h-3.5 w-3.5" />}
+            {t === 'notifications' && <Bell className="h-3.5 w-3.5" />}
             {t}
           </button>
         ))}
@@ -514,6 +516,11 @@ export default function AdminPage() {
           {/* ── Feedback tab ───────────────────────────────────────────────────── */}
           {tab === 'feedback' && (
             <FeedbackAdminTab />
+          )}
+
+          {/* ── Notifications tab ─────────────────────────────────────────────── */}
+          {tab === 'notifications' && (
+            <NotificationsAdminTab />
           )}
         </>
       )}

@@ -153,4 +153,92 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// ── Notification Log ──────────────────────────────────────────────────────────
+
+/** GET /api/admin/notifications/log — recent notification log (last 200 entries) */
+router.get('/notifications/log', async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 200, 500);
+  const type = req.query.type || null;
+
+  try {
+    let query = supabase
+      .schema('bookflow')
+      .from('notification_log')
+      .select('id, user_id, type, title, body, email_to, email_sent, email_error, book_id, club_id, created_at, recipient:profiles!notification_log_user_id_fkey(display_name)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (type) query = query.eq('type', type);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data ?? []);
+  } catch (err) {
+    console.error('Admin notification log error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** GET /api/admin/notifications/config — current email notification config */
+router.get('/notifications/config', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('app_settings')
+      .select('email_notifications_enabled, notification_type_config')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    res.json({
+      email_notifications_enabled: data?.email_notifications_enabled ?? true,
+      notification_type_config: data?.notification_type_config ?? {},
+    });
+  } catch (err) {
+    console.error('Admin notification config error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** PATCH /api/admin/notifications/config — update master toggle or per-type config */
+router.patch('/notifications/config', async (req, res) => {
+  const { email_notifications_enabled, notification_type_config } = req.body;
+
+  try {
+    // Ensure a settings row exists
+    const { data: existing } = await supabase
+      .schema('bookflow')
+      .from('app_settings')
+      .select('user_id')
+      .limit(1)
+      .maybeSingle();
+
+    const patch = {};
+    if (email_notifications_enabled !== undefined) patch.email_notifications_enabled = email_notifications_enabled;
+    if (notification_type_config !== undefined) patch.notification_type_config = notification_type_config;
+    patch.updated_at = new Date().toISOString();
+
+    if (existing) {
+      const { error } = await supabase
+        .schema('bookflow')
+        .from('app_settings')
+        .update(patch)
+        .eq('user_id', existing.user_id);
+      if (error) throw error;
+    } else {
+      // No settings row yet — insert with admin's user_id
+      const { error } = await supabase
+        .schema('bookflow')
+        .from('app_settings')
+        .insert({ user_id: req.user.id, ...patch });
+      if (error) throw error;
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin notification config update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

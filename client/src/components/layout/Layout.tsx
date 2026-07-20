@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, colorSchemes, ColorSchemeKey } from '../../contexts/ThemeContext';
-import { BookOpen, User, LogOut, LogIn, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, Sparkles, HelpCircle, Inbox } from 'lucide-react';
+import { BookOpen, User, LogOut, LogIn, Plus, Settings, Sun, Moon, Check, Palette, Menu, X, Users, ChevronDown, ChevronRight, GraduationCap, CheckCircle, Volume2, MessageSquare, MessageSquarePlus, BarChart2, Video, Shield, HelpCircle, Inbox } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 import TutorialOverlay, { TutorialChapter } from '../reader/TutorialOverlay';
 import FeedbackButton from '../feedback/FeedbackButton';
@@ -417,10 +417,11 @@ export default function Layout() {
                     <Video className="h-4 w-4 flex-shrink-0" />
                     <span className="hidden md:inline">Live</span>
                   </span>
-                  {/* Tutorial + Help + Admin — only on xl screens */}
-                  <Link to="/clubs?tab=onlineclasses" className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                    <GraduationCap className="h-4 w-4" /> Online Classes
+                  <Link to="/clubs?tab=onlineclasses" id="bf-nav-classes" className="flex items-center gap-1 text-muted hover:text-theme px-2 md:px-3 py-2 rounded-md text-sm font-medium transition-colors" title="Online Classes">
+                    <GraduationCap className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden md:inline">Classes</span>
                   </Link>
+                  {/* Help + Admin — only on xl screens */}
                   <Link to="/docs" className="hidden xl:flex items-center gap-1 text-muted hover:text-theme px-3 py-2 rounded-md text-sm font-medium transition-colors">
                     <HelpCircle className="h-4 w-4" /> Help
                   </Link>
@@ -691,33 +692,19 @@ export default function Layout() {
               </span>
             )}
           </Link>
-          <button
-            onClick={() => {
-              const scrollToFeatures = () => {
-                const el = document.getElementById('features');
-                if (el) {
-                  const top = el.getBoundingClientRect().top + window.scrollY - 64;
-                  window.scrollTo({ top, behavior: 'smooth' });
-                }
-              };
-              if (location.pathname === '/') {
-                // Defer past the current rAF tick so carousel doesn't interrupt
-                setTimeout(scrollToFeatures, 50);
-              } else {
-                window.location.href = '/#features';
-              }
-            }}
-            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.hash === '#features' ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
-          >
-            <Sparkles className="h-5 w-5" />
-            <span>Features</span>
-          </button>
           <Link
             to="/clubs"
-            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/clubs') ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.pathname.startsWith('/clubs') && !location.search ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
           >
             <Users className="h-5 w-5" />
             <span>Clubs</span>
+          </Link>
+          <Link
+            to="/clubs?tab=onlineclasses"
+            className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 text-xs font-medium transition-colors ${location.search === '?tab=onlineclasses' ? 'text-accent' : 'text-gray-600 dark:text-gray-400 hover:text-accent'}`}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>Classes</span>
           </Link>
           <Link
             to="/profile"
