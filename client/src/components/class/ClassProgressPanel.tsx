@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BookOpen, CheckCircle2, Clock, Star } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { BookOpen, CheckCircle2, Clock, Star, Users } from 'lucide-react';
 import api from '../../lib/api';
 import type { ClassSubmission, ClassSubmissionFeedback } from '../../types';
 
@@ -54,6 +54,56 @@ function StatusBadge({ status }: { status: string }) {
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold">Draft</span>;
 }
 
+function SharingPrefCard({ clubId }: { clubId: string }) {
+  const [pref, setPref] = useState<{ allow_students_set_visibility: boolean; responses_visible_to_all: boolean; share_responses: boolean } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => {
+    api.getMyVisibilityPref(clubId).then(setPref).catch(() => {});
+  }, [clubId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function toggle() {
+    if (!pref || saving) return;
+    setSaving(true);
+    try {
+      const result = await api.updateMyVisibilityPref(clubId, !pref.share_responses);
+      setPref(p => p ? { ...p, share_responses: result.share_responses } : p);
+    } catch { /* ignore */ } finally { setSaving(false); }
+  }
+
+  // Don't render if teacher hasn't enabled it, or if teacher forced all-visible (no choice needed)
+  if (!pref || !pref.allow_students_set_visibility || pref.responses_visible_to_all) return null;
+
+  const on = pref.share_responses;
+
+  return (
+    <div className="theme-section rounded-xl p-4 flex items-start gap-3">
+      <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex-shrink-0">
+        <Users className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-theme">Share my responses with classmates</p>
+        <p className="text-xs text-muted mt-0.5">
+          {on
+            ? 'Your answers are visible to other students in this class.'
+            : 'Your answers are private. Only your teacher can see them.'}
+        </p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={saving}
+        aria-pressed={on}
+        className="relative flex-shrink-0 mt-0.5 disabled:opacity-50"
+      >
+        <div className={`w-10 h-6 rounded-full transition-colors ${on ? 'bg-violet-500' : 'bg-strong/20'}`} />
+        <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : ''}`} />
+      </button>
+    </div>
+  );
+}
+
 export default function ClassProgressPanel({ clubId }: { clubId: string }) {
   const [data, setData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +142,9 @@ export default function ClassProgressPanel({ clubId }: { clubId: string }) {
 
   return (
     <div className="space-y-5 max-w-2xl">
+
+      {/* ── Sharing preference (only shown if teacher enabled it) ─ */}
+      <SharingPrefCard clubId={clubId} />
 
       {/* ── Progress card ─────────────────────────────────────── */}
       <div className="theme-section rounded-xl overflow-hidden">

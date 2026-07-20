@@ -1199,21 +1199,79 @@ router.get('/:clubId/members/:memberUserId/progress', authenticate, async (req, 
   }
 });
 
+// ── GET /api/clubs/:clubId/my-visibility-pref — student's sharing pref ──────────
+router.get('/:clubId/my-visibility-pref', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  try {
+    // Return club's allow_students_set_visibility setting alongside the user's pref
+    const [{ data: settings }, { data: pref }] = await Promise.all([
+      supabase.schema('bookflow').from('club_settings')
+        .select('allow_students_set_visibility, responses_visible_to_all')
+        .eq('club_id', clubId)
+        .maybeSingle(),
+      supabase.schema('bookflow').from('club_member_visibility_prefs')
+        .select('share_responses')
+        .eq('club_id', clubId)
+        .eq('user_id', req.user.id)
+        .maybeSingle(),
+    ]);
+    res.json({
+      allow_students_set_visibility: settings?.allow_students_set_visibility ?? false,
+      responses_visible_to_all: settings?.responses_visible_to_all ?? false,
+      share_responses: pref?.share_responses ?? false,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/clubs/:clubId/my-visibility-pref — update student's sharing pref ─
+router.patch('/:clubId/my-visibility-pref', authenticate, async (req, res) => {
+  const { clubId } = req.params;
+  const { share_responses } = req.body;
+  if (typeof share_responses !== 'boolean') {
+    return res.status(400).json({ error: 'share_responses must be a boolean' });
+  }
+  try {
+    // Only allowed if teacher has enabled it
+    const { data: settings } = await supabase.schema('bookflow').from('club_settings')
+      .select('allow_students_set_visibility')
+      .eq('club_id', clubId)
+      .maybeSingle();
+    if (!settings?.allow_students_set_visibility) {
+      return res.status(403).json({ error: 'Response sharing is not enabled for this class' });
+    }
+    await supabase.schema('bookflow').from('club_member_visibility_prefs')
+      .upsert({ club_id: clubId, user_id: req.user.id, share_responses, updated_at: new Date().toISOString() },
+        { onConflict: 'club_id,user_id' });
+    res.json({ share_responses });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/clubs/:clubId/members/:memberUserId/answers — Q&A answers ─────────
 router.get('/:clubId/members/:memberUserId/answers', authenticate, async (req, res) => {
   const myRole = await getClubRole(req.params.clubId, req.user.id);
   if (!myRole) return res.status(403).json({ error: 'Not a member of this club' });
 
   try {
-    const { data: settings } = await supabase
-      .from('club_settings')
-      .select('show_member_answers, responses_visible_to_all')
-      .eq('club_id', req.params.clubId)
-      .single();
+    const [{ data: settings }, { data: memberVisPref }] = await Promise.all([
+      supabase.schema('bookflow').from('club_settings')
+        .select('show_member_answers, responses_visible_to_all, allow_students_set_visibility')
+        .eq('club_id', req.params.clubId)
+        .single(),
+      supabase.schema('bookflow').from('club_member_visibility_prefs')
+        .select('share_responses')
+        .eq('club_id', req.params.clubId)
+        .eq('user_id', req.params.memberUserId)
+        .maybeSingle(),
+    ]);
 
     const isOwnAnswers = req.params.memberUserId === req.user.id;
-    const isPrivileged = ['owner', 'admin', 'teacher'].includes(await getClubRole(req.params.clubId, req.user.id) || '');
-    if (!isOwnAnswers && !isPrivileged && !settings?.show_member_answers && !settings?.responses_visible_to_all) {
+    const isPrivileged = ['owner', 'admin', 'teacher'].includes(myRole || '');
+    const memberOptedIn = settings?.allow_students_set_visibility && memberVisPref?.share_responses === true;
+    if (!isOwnAnswers && !isPrivileged && !settings?.show_member_answers && !settings?.responses_visible_to_all && !memberOptedIn) {
       return res.status(403).json({ error: 'Member answers are private for this club' });
     }
 
@@ -1289,11 +1347,17 @@ router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (re
   if (!myRole) return res.status(403).json({ error: 'Not a member of this club' });
 
   try {
-    const { data: settings } = await supabase
-      .from('club_settings')
-      .select('enable_progress_tracking, show_member_answers, responses_visible_to_all')
-      .eq('club_id', clubId)
-      .single();
+    const [{ data: settings }, { data: memberVisPref }] = await Promise.all([
+      supabase.schema('bookflow').from('club_settings')
+        .select('enable_progress_tracking, show_member_answers, responses_visible_to_all, allow_students_set_visibility')
+        .eq('club_id', clubId)
+        .single(),
+      supabase.schema('bookflow').from('club_member_visibility_prefs')
+        .select('share_responses')
+        .eq('club_id', clubId)
+        .eq('user_id', memberUserId)
+        .maybeSingle(),
+    ]);
 
     if (!settings?.enable_progress_tracking) {
       return res.status(403).json({ error: 'Progress tracking not enabled for this club' });
@@ -1301,7 +1365,9 @@ router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (re
 
     const isPrivileged = myRole === 'owner' || myRole === 'admin';
     const isOwnData = memberUserId === req.user.id;
-    const canSeeResponses = isPrivileged || settings.show_member_answers || settings.responses_visible_to_all || isOwnData;
+    // Member opted in to share their own responses
+    const memberOptedIn = settings?.allow_students_set_visibility && memberVisPref?.share_responses === true;
+    const canSeeResponses = isPrivileged || settings.show_member_answers || settings.responses_visible_to_all || memberOptedIn || isOwnData;
 
     // Verify target user is a club member
     const targetRole = await getClubRole(clubId, memberUserId);

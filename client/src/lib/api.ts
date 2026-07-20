@@ -992,6 +992,14 @@ class ApiClient {
     return this.request(`/clubs/${clubId}/settings`, { method: 'PUT', body: JSON.stringify(settings) });
   }
 
+  async getMyVisibilityPref(clubId: string): Promise<{ allow_students_set_visibility: boolean; responses_visible_to_all: boolean; share_responses: boolean }> {
+    return this.request(`/clubs/${clubId}/my-visibility-pref`);
+  }
+
+  async updateMyVisibilityPref(clubId: string, shareResponses: boolean): Promise<{ share_responses: boolean }> {
+    return this.request(`/clubs/${clubId}/my-visibility-pref`, { method: 'PATCH', body: JSON.stringify({ share_responses: shareResponses }) });
+  }
+
   async deleteClub(clubId: string): Promise<void> {
     return this.request(`/clubs/${clubId}`, { method: 'DELETE' });
   }
