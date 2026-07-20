@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, BookOpen, Star, Trash2, Plus, Search, Check, Copy, Link, AlertCircle, ClipboardList, Image, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, BookOpen, Star, Trash2, Plus, Search, Check, Copy, Link, AlertCircle, ClipboardList, Image, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import api from '../../lib/api';
 import type { Book, ClubRegistrationSettings } from '../../types';
 import RegistrationFormBuilder from './RegistrationFormBuilder';
@@ -65,6 +65,12 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
   const [bgUploading, setBgUploading] = useState(false);
   const [bgError, setBgError] = useState('');
 
+  // Response visibility settings
+  const [allowStudentsSetVisibility, setAllowStudentsSetVisibility] = useState(false);
+  const [responsesVisibleToAll, setResponsesVisibleToAll] = useState(false);
+  const [visSaving, setVisSaving] = useState(false);
+  const [visSaved, setVisSaved] = useState(false);
+
   useEffect(() => {
     // Only sync from parent when the picker is closed, to avoid wiping optimistic updates
     if (!pickerOpen) {
@@ -106,6 +112,35 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
       })
       .catch(() => {});
   }, [club.id]);
+
+  // Load current response visibility settings
+  useEffect(() => {
+    api.getClub(club.id)
+      .then(data => {
+        const s = data?.settings;
+        if (s) {
+          setAllowStudentsSetVisibility(s.allow_students_set_visibility ?? false);
+          setResponsesVisibleToAll(s.responses_visible_to_all ?? false);
+        }
+      })
+      .catch(() => {});
+  }, [club.id]);
+
+  async function handleSaveVisibility() {
+    setVisSaving(true);
+    try {
+      await api.updateClubSettings(club.id, {
+        allow_students_set_visibility: allowStudentsSetVisibility,
+        responses_visible_to_all: responsesVisibleToAll,
+      });
+      setVisSaved(true);
+      setTimeout(() => setVisSaved(false), 2500);
+    } catch (err: any) {
+      console.error('Failed to save visibility settings:', err);
+    } finally {
+      setVisSaving(false);
+    }
+  }
 
   async function handleSaveSettings() {
     if (!name.trim()) { setSaveError('Name is required'); return; }
@@ -527,6 +562,80 @@ export default function ClassSettingsPanel({ club, onReload }: Props) {
             {generating ? 'Generating...' : 'Generate Invite Link'}
           </button>
         )}
+      </div>
+
+      {/* ── Response Visibility ───────────────────────────────── */}
+      <div className="theme-section rounded-xl p-5 space-y-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Eye className="h-5 w-5 text-muted" />
+          <h2 className="font-semibold text-theme">Response Visibility</h2>
+        </div>
+
+        <p className="text-sm text-muted -mt-2">
+          Control whether students can see each other's answers to book activities.
+          By default all responses are private — only you can view them.
+        </p>
+
+        {/* Toggle: let students choose */}
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <div className="relative mt-0.5 flex-shrink-0">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={allowStudentsSetVisibility}
+              onChange={e => {
+                setAllowStudentsSetVisibility(e.target.checked);
+                // If this is turned off, all-visible can't be on either
+                if (!e.target.checked) setResponsesVisibleToAll(false);
+              }}
+            />
+            <div className="w-9 h-5 rounded-full bg-strong/20 peer-checked:bg-violet-500 transition-colors" />
+            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-theme">Allow students to share their responses</p>
+            <p className="text-xs text-muted mt-0.5">
+              Students get a per-response toggle to make their answer visible to classmates.
+              Responses remain private until each student opts in.
+            </p>
+          </div>
+        </label>
+
+        {/* Toggle: force all visible */}
+        <label className={`flex items-start gap-3 cursor-pointer select-none ${!allowStudentsSetVisibility ? 'opacity-40 pointer-events-none' : ''}`}>
+          <div className="relative mt-0.5 flex-shrink-0">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={responsesVisibleToAll}
+              disabled={!allowStudentsSetVisibility}
+              onChange={e => setResponsesVisibleToAll(e.target.checked)}
+            />
+            <div className="w-9 h-5 rounded-full bg-strong/20 peer-checked:bg-violet-500 transition-colors" />
+            <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-theme">Make all responses visible by default</p>
+            <p className="text-xs text-muted mt-0.5">
+              All member responses are shown to the class automatically — students don't need to opt in individually.
+              Requires "Allow students to share" to be enabled first.
+            </p>
+          </div>
+        </label>
+
+        <div className="flex items-center justify-between pt-1">
+          {visSaved
+            ? <span className="text-xs text-emerald-500 flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Saved</span>
+            : <span />
+          }
+          <button
+            onClick={handleSaveVisibility}
+            disabled={visSaving}
+            className="theme-button-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+          >
+            {visSaving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
       </div>
 
       {/* ── Registration Form ─────────────────────────────────── */}

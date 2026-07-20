@@ -251,13 +251,27 @@ function ChapterShareDropdown({ chapter, chapterIndex, book, bookId, onClose }: 
   const [currentChapterUrl, setCurrentChapterUrl] = useState(chapterUrl);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Generate QR on mount + auto-copy URL
+  // Generate QR on mount; auto-generate slug if chapter has none
   useEffect(() => {
-    QRCode.toDataURL(chapterUrl, { width: 512, margin: 2 }).then(setQrDataUrl);
-    navigator.clipboard.writeText(chapterUrl).catch(() => {});
-    setCopied('url');
-    const t = setTimeout(() => setCopied(null), 2000);
-    return () => clearTimeout(t);
+    const init = async () => {
+      let url = chapterUrl;
+      // If no slug yet, auto-generate one now so the QR/URL is human-readable
+      if (!chapter.slug) {
+        try {
+          const updated = await api.generateChapterSlug(bookId, chapter.id);
+          setCurrentSlug(updated.slug);
+          setSlugInput(updated.slug);
+          url = `${origin}/bl/${bookSlug}?chapter=${updated.slug}`;
+          setCurrentChapterUrl(url);
+        } catch { /* fall back to ID-based URL */ }
+      }
+      QRCode.toDataURL(url, { width: 512, margin: 2 }).then(setQrDataUrl);
+      navigator.clipboard.writeText(url).catch(() => {});
+      setCopied('url');
+      const t = setTimeout(() => setCopied(null), 2000);
+      return () => clearTimeout(t);
+    };
+    init();
   }, []);
 
   // Close on outside click

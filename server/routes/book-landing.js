@@ -20,8 +20,7 @@ router.get('/:slug', optionalAuth, async (req, res) => {
           allow_reader_highlights, enable_chapter_qr_codes
         ),
         chapters(id, title, slug, order_index, status, word_count, estimated_read_time_minutes)
-      `)
-      .eq('status', 'published');
+      `);
 
     // UUID pattern check
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.slug);
@@ -37,19 +36,24 @@ router.get('/:slug', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
 
+    const isOwner = req.user && book.author?.id === req.user.id;
+
+    // Non-published books: only the author can access via landing route
+    if (book.status !== 'published' && !isOwner) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+
     // Private book — only return if user is authenticated (author or collaborator)
-    if (book.visibility !== 'public') {
+    if (book.visibility !== 'public' && !isOwner) {
       if (!req.user) {
         return res.status(401).json({ error: 'Login required', book_id: book.id });
       }
-      if (book.author?.id !== req.user.id) {
-        return res.status(403).json({ error: 'Not authorized' });
-      }
+      return res.status(403).json({ error: 'Not authorized' });
     }
 
-    // Sort chapters
+    // Sort chapters — owner sees all, public sees only published
     const chapters = (book.chapters || [])
-      .filter(c => c.status === 'published')
+      .filter(c => isOwner || c.status === 'published')
       .sort((a, b) => a.order_index - b.order_index);
 
     // Check if book is in any clubs (club_required indicator)

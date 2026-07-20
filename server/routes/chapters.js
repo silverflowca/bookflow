@@ -139,6 +139,10 @@ router.post('/books/:bookId/chapters', authenticate, async (req, res) => {
       chapterOrder = (lastChapter?.order_index ?? -1) + 1;
     }
 
+    // Auto-generate slug from title
+    const autoSlugBase = generateSlug(title || 'chapter');
+    const autoSlug = await uniqueChapterSlug(autoSlugBase, req.params.bookId, null);
+
     const { data: chapter, error } = await supabase
       .from('chapters')
       .insert({
@@ -147,7 +151,8 @@ router.post('/books/:bookId/chapters', authenticate, async (req, res) => {
         content,
         content_text,
         order_index: chapterOrder,
-        status: status || 'draft'
+        status: status || 'draft',
+        slug: autoSlug
       })
       .select()
       .single();

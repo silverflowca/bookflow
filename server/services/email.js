@@ -204,6 +204,28 @@ export function getEmailTemplate(type, data = {}) {
         }),
       };
 
+    case 'student_joined':
+      return {
+        subject: title || 'A student joined your class',
+        html: layout({
+          title: title || 'New Student',
+          body: body,
+          ctaLabel: 'View Class',
+          ctaUrl: clubUrl,
+        }),
+      };
+
+    case 'student_welcome':
+      return {
+        subject: title || 'Welcome to your class!',
+        html: layout({
+          title: title || 'You\'re enrolled!',
+          body: body,
+          ctaLabel: 'Go to Class',
+          ctaUrl: clubUrl,
+        }),
+      };
+
     case 'club_request_declined':
     case 'club_invite_cancelled':
       return {

@@ -988,7 +988,7 @@ class ApiClient {
     return this.request(`/clubs/${clubId}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 
-  async updateClubSettings(clubId: string, settings: Partial<{ show_member_reading_progress: boolean; show_member_answers: boolean; show_member_highlights: boolean; show_member_media: boolean }>): Promise<any> {
+  async updateClubSettings(clubId: string, settings: Partial<{ show_member_reading_progress: boolean; show_member_answers: boolean; show_member_highlights: boolean; show_member_media: boolean; allow_students_set_visibility: boolean; responses_visible_to_all: boolean }>): Promise<any> {
     return this.request(`/clubs/${clubId}/settings`, { method: 'PUT', body: JSON.stringify(settings) });
   }
 

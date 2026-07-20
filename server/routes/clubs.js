@@ -40,6 +40,54 @@ async function notify(userId, type, title, body, extra = {}) {
   } catch (_) {}
 }
 
+/**
+ * Notify all teachers/owners of a club that a student just joined,
+ * and send a welcome notification to the student themselves.
+ *
+ * @param {string} clubId
+ * @param {string} studentUserId  — the user who just joined
+ * @param {string} studentName    — display name for the notification body
+ * @param {string} clubName       — club name for the notification body
+ */
+async function notifyJoin(clubId, studentUserId, studentName, clubName) {
+  try {
+    // 1. Welcome the student
+    await notify(
+      studentUserId,
+      'student_welcome',
+      `Welcome to "${clubName}"!`,
+      `You've successfully joined the class "${clubName}". Your teacher can now track your progress. Good luck!`,
+      { club_id: clubId }
+    );
+
+    // 2. Notify all owners/admins of the club
+    const { data: teachers } = await supabase
+      .schema('bookflow')
+      .from('club_members')
+      .select('user_id')
+      .eq('club_id', clubId)
+      .in('role', ['owner', 'admin'])
+      .not('invite_accepted_at', 'is', null)
+      .is('removed_at', null);
+
+    if (!teachers?.length) return;
+
+    await Promise.all(
+      teachers
+        .filter(t => t.user_id && t.user_id !== studentUserId)
+        .map(t =>
+          notify(
+            t.user_id,
+            'student_joined',
+            `${studentName} joined "${clubName}"`,
+            `${studentName} has accepted their invite and enrolled in your class "${clubName}".`,
+            { club_id: clubId }
+          )
+        )
+    );
+  } catch (_) {}
+}
+
 // ── GET /api/clubs  — list clubs for current user (guests get empty array) ────
 router.get('/', optionalAuth, async (req, res) => {
   const { type } = req.query; // optional: 'club' | 'study_group'
@@ -297,7 +345,7 @@ router.put('/:clubId/settings', authenticate, async (req, res) => {
     return res.status(403).json({ error: 'Only owners/admins can change settings' });
   }
 
-  const { show_member_reading_progress, show_member_answers, show_member_highlights, show_member_media, enable_progress_tracking, allow_join_requests } = req.body;
+  const { show_member_reading_progress, show_member_answers, show_member_highlights, show_member_media, enable_progress_tracking, allow_join_requests, allow_students_set_visibility, responses_visible_to_all } = req.body;
   try {
     const { data, error } = await supabase
       .from('club_settings')
@@ -309,6 +357,8 @@ router.put('/:clubId/settings', authenticate, async (req, res) => {
         show_member_media,
         enable_progress_tracking,
         allow_join_requests,
+        allow_students_set_visibility,
+        responses_visible_to_all,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'club_id' })
       .select()
@@ -433,6 +483,13 @@ router.post('/:clubId/invite', authenticate, async (req, res) => {
         `You've been added to the class "${club.name}" as a ${roleLabel}.`,
         { club_id: clubId }
       );
+
+      // Notify other teachers that a new student was added
+      if (memberRole === 'member') {
+        const { data: addedProf } = await supabase.schema('bookflow').from('profiles').select('display_name').eq('id', userId).maybeSingle();
+        notifyJoin(clubId, userId, addedProf?.display_name || 'A student', club.name);
+      }
+
       return res.status(201).json(member);
     }
 
@@ -780,6 +837,13 @@ router.post('/accept/:token', authenticate, async (req, res) => {
       .eq('id', member.id);
 
     if (updateErr) throw updateErr;
+
+    // Notify student (welcome) + teachers (student joined) — fire and forget
+    supabase.schema('bookflow').from('profiles').select('display_name').eq('id', req.user.id).maybeSingle()
+      .then(({ data: prof }) => {
+        const studentName = prof?.display_name || req.user.email || 'A student';
+        notifyJoin(member.club_id, req.user.id, studentName, member.club?.name || 'your class');
+      });
 
     res.json({ success: true, club: member.club });
   } catch (err) {
@@ -1143,11 +1207,13 @@ router.get('/:clubId/members/:memberUserId/answers', authenticate, async (req, r
   try {
     const { data: settings } = await supabase
       .from('club_settings')
-      .select('show_member_answers')
+      .select('show_member_answers, responses_visible_to_all')
       .eq('club_id', req.params.clubId)
       .single();
 
-    if (!settings?.show_member_answers && req.params.memberUserId !== req.user.id) {
+    const isOwnAnswers = req.params.memberUserId === req.user.id;
+    const isPrivileged = ['owner', 'admin', 'teacher'].includes(await getClubRole(req.params.clubId, req.user.id) || '');
+    if (!isOwnAnswers && !isPrivileged && !settings?.show_member_answers && !settings?.responses_visible_to_all) {
       return res.status(403).json({ error: 'Member answers are private for this club' });
     }
 
@@ -1198,6 +1264,16 @@ router.post('/:clubId/members/:memberId/approve', authenticate, async (req, res)
       .eq('id', memberId);
 
     if (updateErr) throw updateErr;
+
+    // Notify student (welcome) + teachers (student joined) — fire and forget
+    Promise.all([
+      supabase.schema('bookflow').from('profiles').select('display_name').eq('id', member.user_id).maybeSingle(),
+      supabase.schema('bookflow').from('book_clubs').select('name').eq('id', clubId).maybeSingle(),
+    ]).then(([{ data: prof }, { data: club }]) => {
+      const studentName = prof?.display_name || member.invited_email || 'A student';
+      notifyJoin(clubId, member.user_id, studentName, club?.name || 'your class');
+    });
+
     res.json({ success: true });
   } catch (err) {
     console.error('Approve invite error:', err);
@@ -1215,7 +1291,7 @@ router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (re
   try {
     const { data: settings } = await supabase
       .from('club_settings')
-      .select('enable_progress_tracking, show_member_answers')
+      .select('enable_progress_tracking, show_member_answers, responses_visible_to_all')
       .eq('club_id', clubId)
       .single();
 
@@ -1225,7 +1301,7 @@ router.get('/:clubId/members/:memberUserId/submissions', authenticate, async (re
 
     const isPrivileged = myRole === 'owner' || myRole === 'admin';
     const isOwnData = memberUserId === req.user.id;
-    const canSeeResponses = isPrivileged || settings.show_member_answers || isOwnData;
+    const canSeeResponses = isPrivileged || settings.show_member_answers || settings.responses_visible_to_all || isOwnData;
 
     // Verify target user is a club member
     const targetRole = await getClubRole(clubId, memberUserId);
@@ -1423,6 +1499,18 @@ router.post('/:clubId/registration-response', authenticate, async (req, res) => 
       responses,
       submitted_at: new Date().toISOString(),
     }, { onConflict: 'club_id,user_id' });
+
+    // 4. Notify student + teachers if this was a new enrollment — fire and forget
+    const wasNewEnrollment = !existing || !existing.invite_accepted_at;
+    if (wasNewEnrollment) {
+      Promise.all([
+        supabase.schema('bookflow').from('profiles').select('display_name').eq('id', userId).maybeSingle(),
+        supabase.schema('bookflow').from('book_clubs').select('name').eq('id', clubId).maybeSingle(),
+      ]).then(([{ data: prof }, { data: club }]) => {
+        const studentName = prof?.display_name || req.user.email || 'A student';
+        notifyJoin(clubId, userId, studentName, club?.name || 'your class');
+      });
+    }
 
     res.json({ success: true, club_id: clubId });
   } catch (err) {
