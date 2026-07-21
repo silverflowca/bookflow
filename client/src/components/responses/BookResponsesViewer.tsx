@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import UserAvatar from '../profile/UserAvatar';
 import {
   BarChart2,
@@ -32,6 +32,7 @@ interface Props {
   mode?: 'author' | 'accessible';
   viewerUserId?: string | null;
   memberFilter?: { id: string; display_name: string; avatar_url?: string | null }[];
+  clubId?: string;
 }
 
 type ResponseVisibility = 'private' | 'shared' | 'public';
@@ -456,7 +457,48 @@ function AggregateChart({ item }: { item: BookResponseItem }) {
   );
 }
 
-function ResponseRow({ response, type }: { response: ResponseRowData; type: string }) {
+function TeacherCommentBox({ clubId, responseId, studentId }: { clubId: string; responseId: string; studentId: string }) {
+  const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedRef = useRef(false);
+
+  useEffect(() => { loadedRef.current = true; }, []);
+
+  function triggerSave(text: string) {
+    if (!loadedRef.current) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!text.trim()) return;
+    debounceRef.current = setTimeout(async () => {
+      setSaving(true);
+      try {
+        await api.postAnswerFeedback(clubId, responseId, { feedback_text: text, student_id: studentId });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch { /* silent */ } finally { setSaving(false); }
+    }, 800);
+  }
+
+  return (
+    <div className="mt-2 pt-2 border-t border-gray-100">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Teacher comment</p>
+        {saving && <span className="text-[10px] text-gray-400">Saving…</span>}
+        {saved && !saving && <span className="text-[10px] text-green-600">Saved</span>}
+      </div>
+      <textarea
+        rows={2}
+        placeholder="Add a comment for this student…"
+        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-purple-400 focus:border-purple-400 focus:outline-none resize-none transition-colors"
+        value={comment}
+        onChange={e => { setComment(e.target.value); triggerSave(e.target.value); }}
+      />
+    </div>
+  );
+}
+
+function ResponseRow({ response, type, clubId }: { response: ResponseRowData; type: string; clubId?: string }) {
   const user = getResponseUser(response);
   const name = user?.display_name || 'Anonymous';
   const badge = response.visibility ? VISIBILITY_META[response.visibility] : null;
@@ -465,63 +507,68 @@ function ResponseRow({ response, type }: { response: ResponseRowData; type: stri
   const value = getResponseText(response, type);
 
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-0">
-      {!response.user_id && <Avatar name={name} url={user?.avatar_url} />}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          {response.user_id ? (
-            <UserAvatar
-              userId={response.user_id}
-              displayName={name}
-              avatarUrl={user?.avatar_url}
-              size="sm"
-              showName
-              nameClassName="text-sm font-semibold text-gray-800"
-            />
+    <div className="py-2.5 border-b border-gray-100 last:border-0">
+      <div className="flex items-start gap-3">
+        {!response.user_id && <Avatar name={name} url={user?.avatar_url} />}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            {response.user_id ? (
+              <UserAvatar
+                userId={response.user_id}
+                displayName={name}
+                avatarUrl={user?.avatar_url}
+                size="sm"
+                showName
+                nameClassName="text-sm font-semibold text-gray-800"
+              />
+            ) : (
+              <span className="text-sm font-semibold text-gray-800">{name}</span>
+            )}
+            {response.is_correct === true && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
+                <CheckCircle className="h-2.5 w-2.5" />
+                Correct
+              </span>
+            )}
+            {response.is_correct === false && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                <XCircle className="h-2.5 w-2.5" />
+                Incorrect
+              </span>
+            )}
+            <span className="ml-auto text-[11px] text-gray-400 shrink-0">{fmtDate(response.updated_at || response.created_at)}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+            {badge && (
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${badge.className}`}>
+                {badge.icon}
+                {badge.label}
+              </span>
+            )}
+            {clubs.slice(0, 2).map(club => (
+              <span key={club.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium border bg-amber-50 text-amber-700 border-amber-200">
+                <Users className="h-3 w-3" />
+                {club.club_type === 'study_group' ? 'Group' : 'Club'}: {club.name}
+              </span>
+            ))}
+            {sharedUsers.slice(0, 1).map(sharedUser => (
+              <span key={sharedUser.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium border bg-cyan-50 text-cyan-700 border-cyan-200">
+                <Share2 className="h-3 w-3" />
+                Shared with {sharedUser.display_name}
+              </span>
+            ))}
+          </div>
+          {type === 'media_response' && response.response_type === 'audio' && response.media_url ? (
+            <audio src={response.media_url} controls className="mt-1 h-9 w-full" preload="metadata" />
+          ) : type === 'media_response' && response.response_type === 'video' && response.media_url ? (
+            <video src={response.media_url} controls className="mt-1 max-h-52 w-full rounded-lg bg-black" preload="metadata" playsInline />
           ) : (
-            <span className="text-sm font-semibold text-gray-800">{name}</span>
+            <p className="text-sm text-gray-600 leading-relaxed break-words">{value}</p>
           )}
-          {response.is_correct === true && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
-              <CheckCircle className="h-2.5 w-2.5" />
-              Correct
-            </span>
+          {clubId && response.user_id && (
+            <TeacherCommentBox clubId={clubId} responseId={response.id} studentId={response.user_id} />
           )}
-          {response.is_correct === false && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
-              <XCircle className="h-2.5 w-2.5" />
-              Incorrect
-            </span>
-          )}
-          <span className="ml-auto text-[11px] text-gray-400 shrink-0">{fmtDate(response.updated_at || response.created_at)}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-          {badge && (
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${badge.className}`}>
-              {badge.icon}
-              {badge.label}
-            </span>
-          )}
-          {clubs.slice(0, 2).map(club => (
-            <span key={club.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium border bg-amber-50 text-amber-700 border-amber-200">
-              <Users className="h-3 w-3" />
-              {club.club_type === 'study_group' ? 'Group' : 'Club'}: {club.name}
-            </span>
-          ))}
-          {sharedUsers.slice(0, 1).map(sharedUser => (
-            <span key={sharedUser.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium border bg-cyan-50 text-cyan-700 border-cyan-200">
-              <Share2 className="h-3 w-3" />
-              Shared with {sharedUser.display_name}
-            </span>
-          ))}
-        </div>
-        {type === 'media_response' && response.response_type === 'audio' && response.media_url ? (
-          <audio src={response.media_url} controls className="mt-1 h-9 w-full" preload="metadata" />
-        ) : type === 'media_response' && response.response_type === 'video' && response.media_url ? (
-          <video src={response.media_url} controls className="mt-1 max-h-52 w-full rounded-lg bg-black" preload="metadata" playsInline />
-        ) : (
-          <p className="text-sm text-gray-600 leading-relaxed break-words">{value}</p>
-        )}
       </div>
     </div>
   );
@@ -560,7 +607,7 @@ function OptionsList({ item }: { item: BookResponseItem }) {
   );
 }
 
-function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; searchQuery: string; itemNumber: number }) {
+function ItemCard({ item, searchQuery, itemNumber, clubId }: { item: BookResponseItem; searchQuery: string; itemNumber: number; clubId?: string }) {
   const [expanded, setExpanded] = useState(true);
   const isChoice = CHOICE_TYPES.includes(item.content_type);
   const isText = TEXT_TYPES.includes(item.content_type);
@@ -628,7 +675,7 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
               {hasOptions && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Responses</p>}
               <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
                 {item.responses.map((response: ResponseRowData) => (
-                  <ResponseRow key={response.id} response={response} type={item.content_type} />
+                  <ResponseRow key={response.id} response={response} type={item.content_type} clubId={clubId} />
                 ))}
               </div>
             </div>
@@ -639,7 +686,7 @@ function ItemCard({ item, searchQuery, itemNumber }: { item: BookResponseItem; s
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Individual Responses</p>
               <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
                 {item.responses.map((response: ResponseRowData) => (
-                  <ResponseRow key={response.id} response={response} type={item.content_type} />
+                  <ResponseRow key={response.id} response={response} type={item.content_type} clubId={clubId} />
                 ))}
               </div>
             </div>
@@ -683,6 +730,7 @@ export default function BookResponsesViewer({
   compact = false,
   mode = 'author',
   memberFilter,
+  clubId,
 }: Props) {
   const [responseItems, setResponseItems] = useState<BookResponseItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1202,6 +1250,7 @@ export default function BookResponsesViewer({
                                   item={item}
                                   searchQuery={search}
                                   itemNumber={index + 1}
+                                  clubId={clubId}
                                 />
                               ))}
                             </div>

@@ -760,6 +760,7 @@ function ClassOverviewTab({
 
 function ClassResponsesPanel({
   bookId,
+  clubId,
   members,
 }: {
   bookId: string;
@@ -775,7 +776,7 @@ function ClassResponsesPanel({
     }))
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
-  return <BookResponsesViewer bookId={bookId} mode="author" memberFilter={memberFilter} />;
+  return <BookResponsesViewer bookId={bookId} mode="author" memberFilter={memberFilter} clubId={clubId} />;
 }
 
 // ── Messages Tab ──────────────────────────────────────────────────────────────

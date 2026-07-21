@@ -1297,13 +1297,14 @@ router.get('/:clubId/class/students/:studentId', authenticate, async (req, res) 
       total: totalByChapter[ch.id] || 0,
     }));
 
-    // Q&A answers with inline_content label + response comments
+    // Q&A answers with inline_content label + response comments + teacher feedback
     const { data: answers } = await supabase
       .schema('bookflow')
       .from('form_responses')
       .select(`
         id, chapter_id, content_id, response_data, created_at,
-        comments:class_response_comments(id, author_id, body, created_at, author:profiles!class_response_comments_author_id_fkey(id, display_name, avatar_url))
+        comments:class_response_comments(id, author_id, body, created_at, author:profiles!class_response_comments_author_id_fkey(id, display_name, avatar_url)),
+        feedback:class_answer_feedback(id, grade, feedback_text, created_at)
       `)
       .eq('user_id', studentId)
       .in('chapter_id', chapterIds)
@@ -1314,7 +1315,7 @@ router.get('/:clubId/class/students/:studentId', authenticate, async (req, res) 
     const enrichedAnswers = (answers || []).map(a => {
       const ic = (allInline || []).find(i => i.id === a.content_id);
       const comments = (a.comments || []).map(c => ({ ...c, author: norm(c.author) }));
-      return { ...a, question_label: ic?.label || null, chapter_title: (chapters || []).find(c => c.id === a.chapter_id)?.title || null, comments };
+      return { ...a, question_label: ic?.label || null, chapter_title: (chapters || []).find(c => c.id === a.chapter_id)?.title || null, comments, feedback: norm(a.feedback) };
     });
 
     // Submissions with feedback

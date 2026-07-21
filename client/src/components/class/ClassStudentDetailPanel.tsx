@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, BookOpen, MessageSquare, Send, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { ArrowLeft, BookOpen, MessageSquare, Send, ChevronDown, ChevronUp, FileText, Star } from 'lucide-react';
 import api from '../../lib/api';
 import ClassSubmissionThread from './ClassSubmissionThread';
 import StudentProgressReport from './StudentProgressReport';
@@ -12,6 +12,13 @@ interface Comment {
   author: { id: string; display_name: string; avatar_url?: string };
 }
 
+interface AnswerFeedback {
+  id: string;
+  grade?: number | null;
+  feedback_text?: string | null;
+  created_at: string;
+}
+
 interface Answer {
   id: string;
   chapter_id: string;
@@ -21,6 +28,7 @@ interface Answer {
   question_label: string | null;
   chapter_title: string | null;
   comments: Comment[];
+  feedback?: AnswerFeedback | null;
 }
 
 interface Submission {
@@ -56,12 +64,41 @@ function ProgressBar({ pct }: { pct: number }) {
   );
 }
 
-function ResponseCard({ answer, clubId, currentUserId }: { answer: Answer; clubId: string; currentUserId: string }) {
+function ResponseCard({ answer, clubId, studentId, currentUserId }: { answer: Answer; clubId: string; studentId: string; currentUserId: string }) {
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<Comment[]>(answer.comments);
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Teacher feedback state
+  const [feedbackText, setFeedbackText] = useState(answer.feedback?.feedback_text ?? '');
+  const [grade, setGrade] = useState<string>(answer.feedback?.grade != null ? String(answer.feedback.grade) : '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedRef = useRef(false);
+
+  useEffect(() => { loadedRef.current = true; }, []);
+
+  const saveFeedback = useCallback(async (text: string, gradeVal: string) => {
+    setSaving(true);
+    try {
+      await api.postAnswerFeedback(clubId, answer.id, {
+        feedback_text: text || undefined,
+        grade: gradeVal !== '' ? Number(gradeVal) : undefined,
+        student_id: studentId,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* silent */ } finally { setSaving(false); }
+  }, [clubId, answer.id, studentId]);
+
+  function triggerAutoSave(text: string, gradeVal: string) {
+    if (!loadedRef.current) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => saveFeedback(text, gradeVal), 800);
+  }
 
   const responseText = typeof answer.response_data === 'string'
     ? answer.response_data
@@ -81,6 +118,7 @@ function ResponseCard({ answer, clubId, currentUserId }: { answer: Answer; clubI
 
   return (
     <div className="rounded-lg border border-strong/20 overflow-hidden">
+      {/* Header — click to expand full answer + comments */}
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-start gap-3 p-3 text-left hover:bg-strong/5 transition-colors"
@@ -100,6 +138,38 @@ function ResponseCard({ answer, clubId, currentUserId }: { answer: Answer; clubI
         </div>
       </button>
 
+      {/* Teacher feedback — always visible */}
+      <div className="border-t border-strong/10 bg-strong/3 px-3 pb-3 pt-2 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide flex items-center gap-1.5">
+            <Star className="h-3 w-3" /> Teacher Feedback
+          </p>
+          {saving && <span className="text-xs text-muted">Saving…</span>}
+          {saved && !saving && <span className="text-xs text-emerald-500">Saved</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted flex-shrink-0">Grade</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            placeholder="—"
+            className="theme-input rounded-md px-2 py-1 text-sm w-20"
+            value={grade}
+            onChange={e => { setGrade(e.target.value); triggerAutoSave(feedbackText, e.target.value); }}
+          />
+          <span className="text-xs text-muted">/100</span>
+        </div>
+        <textarea
+          rows={2}
+          placeholder="Add feedback for this student's answer…"
+          className="w-full theme-input rounded-md px-3 py-2 text-sm resize-none"
+          value={feedbackText}
+          onChange={e => { setFeedbackText(e.target.value); triggerAutoSave(e.target.value, grade); }}
+        />
+      </div>
+
+      {/* Expanded: full answer + comments */}
       {expanded && (
         <div className="border-t border-strong/20 bg-strong/5 p-3 space-y-3">
           {/* Full answer */}
@@ -134,7 +204,7 @@ function ResponseCard({ answer, clubId, currentUserId }: { answer: Answer; clubI
           <div className="flex gap-2">
             <input
               className="flex-1 theme-input rounded-lg px-3 py-1.5 text-sm"
-              placeholder="Add a comment..."
+              placeholder="Add a comment…"
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && postComment()}
@@ -311,7 +381,7 @@ export default function ClassStudentDetailPanel({ clubId, studentId, currentUser
             </div>
           ) : (
             answers.map(a => (
-              <ResponseCard key={a.id} answer={a} clubId={clubId} currentUserId={currentUserId} />
+              <ResponseCard key={a.id} answer={a} clubId={clubId} studentId={studentId} currentUserId={currentUserId} />
             ))
           )}
         </div>
