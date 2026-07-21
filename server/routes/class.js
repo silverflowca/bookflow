@@ -428,37 +428,37 @@ router.get('/:clubId/class/my-progress', authenticate, async (req, res) => {
     const chapterIds = (chapters || []).map(c => c.id);
 
     // Inline trackable content totals per chapter
-    const { data: allInline } = await supabase
-      .schema('bookflow')
-      .from('inline_content')
-      .select('id, chapter_id, content_type')
-      .in('chapter_id', chapterIds)
-      .in('content_type', TRACKABLE_TYPES);
+    const allInline = chapterIds.length > 0
+      ? (await supabase.schema('bookflow').from('inline_content')
+          .select('id, chapter_id, content_type')
+          .in('chapter_id', chapterIds)
+          .in('content_type', TRACKABLE_TYPES)).data || []
+      : [];
 
     const totalByChapter = {};
     for (const ch of (chapters || [])) {
-      const formCount = (allInline || []).filter(ic => ic.chapter_id === ch.id).length;
+      const formCount = allInline.filter(ic => ic.chapter_id === ch.id).length;
       const mediaCount = extractMediaKeys(ch.content?.content || [], ch.id).length;
       totalByChapter[ch.id] = formCount + mediaCount;
     }
     const grandTotal = Object.values(totalByChapter).reduce((a, b) => a + b, 0);
 
     // My completions
-    const { data: completions } = await supabase
-      .schema('bookflow')
-      .from('chapter_item_completions')
-      .select('chapter_id, item_key, completed_at')
-      .eq('user_id', userId)
-      .in('chapter_id', chapterIds);
+    const completions = chapterIds.length > 0
+      ? (await supabase.schema('bookflow').from('chapter_item_completions')
+          .select('chapter_id, item_key, completed_at')
+          .eq('user_id', userId)
+          .in('chapter_id', chapterIds)).data || []
+      : [];
 
     const chapters_breakdown = (chapters || []).map(ch => ({
       chapter_id: ch.id,
       title: ch.title,
-      completed: (completions || []).filter(c => c.chapter_id === ch.id).length,
+      completed: completions.filter(c => c.chapter_id === ch.id).length,
       total: totalByChapter[ch.id] || 0,
     }));
 
-    const completedCount = (completions || []).length;
+    const completedCount = completions.length;
 
     // My submissions with prompts and feedback
     const { data: submissions } = await supabase

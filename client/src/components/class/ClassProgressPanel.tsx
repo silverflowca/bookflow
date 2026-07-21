@@ -97,7 +97,7 @@ function SharingPrefCard({ clubId }: { clubId: string }) {
         aria-pressed={on}
         className="relative flex-shrink-0 mt-0.5 disabled:opacity-50"
       >
-        <div className={`w-10 h-6 rounded-full transition-colors ${on ? 'bg-violet-500' : 'bg-strong/20'}`} />
+        <div className={`w-10 h-6 rounded-full transition-colors ${on ? 'bg-violet-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
         <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : ''}`} />
       </button>
     </div>
