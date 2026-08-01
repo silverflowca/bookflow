@@ -108,7 +108,28 @@ router.get('/:clubId/class/roster', authenticate, async (req, res) => {
       clubBook = fallback;
     }
 
-    if (!clubBook) return res.json({ members: [], chapters: [] });
+    // If no book assigned yet, return members with zeroed progress
+    if (!clubBook) {
+      const result = (members || []).map(member => {
+        const profile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
+        return {
+          user_id: member.user_id,
+          display_name: profile?.display_name || 'Member',
+          avatar_url: profile?.avatar_url || null,
+          email: profile?.email || member.invited_email || null,
+          role: member.role,
+          enrolled_at: member.invite_accepted_at,
+          items_completed: 0,
+          items_total: 0,
+          completion_pct: 0,
+          chapters_breakdown: [],
+          submissions_submitted: 0,
+          submissions_graded: 0,
+          last_active: null,
+        };
+      });
+      return res.json({ members: result, chapters: [] });
+    }
 
     // Load chapters
     const { data: chapters } = await supabase
@@ -480,6 +501,41 @@ router.get('/:clubId/class/my-progress', authenticate, async (req, res) => {
       feedback: norm(s.feedback),
     }));
 
+    // My Q&A answers with inline_content label + teacher feedback
+    const answerInlineIds = allInline
+      .filter(ic => ['question','poll','radio','select','multiselect','checkbox','textbox','textarea'].includes(ic.content_type))
+      .map(ic => ic.id);
+
+    let myAnswers = [];
+    if (answerInlineIds.length > 0) {
+      const { data: answers } = await supabase
+        .schema('bookflow')
+        .from('form_responses')
+        .select(`
+          id, inline_content_id, chapter_id, response_data, created_at,
+          inline_content:inline_content!form_responses_inline_content_id_fkey(id, content_type, content),
+          feedback:class_answer_feedback(id, grade, feedback_text, created_at)
+        `)
+        .eq('user_id', userId)
+        .in('inline_content_id', answerInlineIds)
+        .order('created_at', { ascending: true });
+
+      const inlineMap = Object.fromEntries(allInline.map(ic => [ic.id, ic]));
+      const chapterMap = Object.fromEntries((chapters || []).map(c => [c.id, c]));
+
+      myAnswers = (answers || []).map(a => {
+        const ic = norm(a.inline_content);
+        const chId = ic?.chapter_id ?? inlineMap[a.inline_content_id]?.chapter_id;
+        return {
+          ...a,
+          inline_content: ic,
+          question_label: ic?.content?.label ?? ic?.content?.question ?? null,
+          chapter_title: chId ? (chapterMap[chId]?.title ?? null) : null,
+          feedback: norm(a.feedback),
+        };
+      });
+    }
+
     res.json({
       book,
       chapters: chapters_breakdown,
@@ -487,6 +543,7 @@ router.get('/:clubId/class/my-progress', authenticate, async (req, res) => {
       items_total: grandTotal,
       completion_pct: grandTotal > 0 ? Math.round((completedCount / grandTotal) * 100) : 0,
       submissions: normalizedSubs,
+      answers: myAnswers,
     });
   } catch (err) {
     console.error('My progress error:', err);

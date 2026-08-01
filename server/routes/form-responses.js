@@ -4,6 +4,42 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Check if user is a teacher (owner/admin) in any class that has this book assigned
+async function isClassTeacherForBook(userId, bookId) {
+  // Find clubs that have this book
+  const { data: clubBooks } = await supabase
+    .schema('bookflow')
+    .from('club_books')
+    .select('club_id')
+    .eq('book_id', bookId);
+
+  if (!clubBooks || clubBooks.length === 0) return false;
+
+  const clubIds = clubBooks.map(cb => cb.club_id);
+
+  // Check if user is owner of any of those clubs
+  const { data: ownedClubs } = await supabase
+    .schema('bookflow')
+    .from('book_clubs')
+    .select('id')
+    .eq('created_by', userId)
+    .in('id', clubIds);
+
+  if (ownedClubs && ownedClubs.length > 0) return true;
+
+  // Check if user is an admin member of any of those clubs
+  const { data: adminMemberships } = await supabase
+    .schema('bookflow')
+    .from('club_members')
+    .select('club_id')
+    .eq('user_id', userId)
+    .eq('role', 'admin')
+    .not('invite_accepted_at', 'is', null)
+    .in('club_id', clubIds);
+
+  return !!(adminMemberships && adminMemberships.length > 0);
+}
+
 // Upsert own response for a form element
 router.post('/form-responses/:contentId', authenticate, async (req, res) => {
   const { response_data, visibility } = req.body;
@@ -28,8 +64,13 @@ router.post('/form-responses/:contentId', authenticate, async (req, res) => {
       || (content.book.collaborators || []).some(
           c => c.user_id === req.user.id && c.invite_accepted_at !== null
         );
+
     if (content.book.visibility !== 'public' && !isAuthor) {
-      return res.status(403).json({ error: 'Not authorized' });
+      // Also allow class teachers on books assigned to their class
+      const teacherAccess = await isClassTeacherForBook(req.user.id, content.book_id);
+      if (!teacherAccess) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
     }
 
     const { data, error } = await supabase

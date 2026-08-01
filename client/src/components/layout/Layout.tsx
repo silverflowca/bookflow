@@ -27,6 +27,7 @@ export default function Layout() {
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showMobileTheme, setShowMobileTheme] = useState(false);
+  const isPublicReader = location.pathname.startsWith('/read/');
   const dropdownRef = useRef<HTMLDivElement>(null);
   // Close mobile menu on route change
   useEffect(() => { setShowMobileMenu(false); }, [location.pathname]);
@@ -642,8 +643,8 @@ export default function Layout() {
       {/* Feedback panel — rendered at layout level, persists across navigation */}
       {user && <FeedbackPanel />}
 
-      {/* Mobile bottom navigation — hidden on md+ */}
-      {!user && (
+      {/* Mobile bottom navigation — hidden on md+ and on public reader */}
+      {!user && !isPublicReader && (
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t-2 border-strong flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Link
             to="/clubs"

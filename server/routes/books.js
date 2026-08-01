@@ -181,8 +181,9 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
   const pollIds = items.filter(i => i.content_type === 'poll').map(i => i.id);
   const questionIds = items.filter(i => i.content_type === 'question').map(i => i.id);
   const mediaResponseIds = items.filter(i => i.content_type === 'media_response').map(i => i.id);
+  const signatureIds = items.filter(i => i.content_type === 'signature').map(i => i.id);
 
-  const [frsRes, prsRes, qasRes, mrsRes] = await Promise.all([
+  const [frsRes, prsRes, qasRes, mrsRes, sigRes] = await Promise.all([
     formIds.length
       ? supabase
           .schema('bookflow')
@@ -214,6 +215,14 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
           .in('inline_content_id', mediaResponseIds)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    signatureIds.length
+      ? supabase
+          .schema('bookflow')
+          .from('signature_responses')
+          .select('inline_content_id, id, user_id, signer_name, signature_type, signature_data, agreed_at, visibility, created_at, user:profiles!signature_responses_user_id_fkey(id, display_name, avatar_url)')
+          .in('inline_content_id', signatureIds)
+          .order('agreed_at', { ascending: false })
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -273,6 +282,19 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
     mediaResponsesByItem[row.inline_content_id].push(enriched);
   }
 
+  const signatureResponsesByItem = {};
+  for (const row of (sigRes.data || [])) {
+    if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    if (!canViewerSeeInClass(row.user_id)) continue;
+    // Normalize: expose signer_name + signature_type as response_data so the client can render it
+    const enriched = withResponseMeta({
+      ...row,
+      response_data: { value: row.signer_name || row.signature_type || 'Signed', signer_name: row.signer_name, signature_type: row.signature_type, signature_data: row.signature_data, agreed_at: row.agreed_at },
+    }, context);
+    if (!signatureResponsesByItem[row.inline_content_id]) signatureResponsesByItem[row.inline_content_id] = [];
+    signatureResponsesByItem[row.inline_content_id].push(enriched);
+  }
+
   const choiceTypes = ['select', 'multiselect', 'radio', 'checkbox'];
   const result = items.map(item => {
     const chap = normalizeOne(item.chapters) || {};
@@ -305,6 +327,9 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
       total = responses.length;
     } else if (item.content_type === 'media_response') {
       responses = mediaResponsesByItem[item.id] || [];
+      total = responses.length;
+    } else if (item.content_type === 'signature') {
+      responses = signatureResponsesByItem[item.id] || [];
       total = responses.length;
     } else if (choiceTypes.includes(item.content_type)) {
       const frs = formResponsesByItem[item.id] || [];
@@ -1085,12 +1110,57 @@ router.get('/:id/stats', authenticate, requireAuthor, async (req, res) => {
 
 // ── GET /books/:id/responses ──────────────────────────────────────────────────
 // Returns all inline content for a book with aggregated responses.
-// Author or super_admin only.  Optional ?chapter_id=uuid to scope to one chapter.
-router.get('/:id/responses', authenticate, requireAuthor, async (req, res) => {
+// Author, super_admin, OR a class teacher (club owner/admin) for a class that has this book.
+router.get('/:id/responses', authenticate, async (req, res) => {
   const bookId = req.params.id;
   const { chapter_id } = req.query;
 
   try {
+    // Check book-level authorship first (fast path)
+    const { data: book } = await supabase
+      .schema('bookflow')
+      .from('books')
+      .select('author_id')
+      .eq('id', bookId)
+      .single();
+
+    const isAuthor = book && book.author_id === req.user.id;
+
+    if (!isAuthor) {
+      // Check super_admin
+      const { data: profile } = await supabase
+        .schema('bookflow')
+        .from('profiles')
+        .select('system_role')
+        .eq('id', req.user.id)
+        .single();
+      const isSuperAdmin = profile?.system_role === 'super_admin';
+
+      if (!isSuperAdmin) {
+        // Check if user is a teacher (owner/admin) in any class that has this book
+        const { data: clubBooks } = await supabase
+          .schema('bookflow')
+          .from('club_books')
+          .select('club_id')
+          .eq('book_id', bookId);
+
+        const clubIds = (clubBooks || []).map(cb => cb.club_id);
+        let isClassTeacher = false;
+
+        if (clubIds.length > 0) {
+          const [{ data: ownedClubs }, { data: adminMemberships }] = await Promise.all([
+            supabase.schema('bookflow').from('book_clubs').select('id').eq('created_by', req.user.id).in('id', clubIds),
+            supabase.schema('bookflow').from('club_members').select('club_id').eq('user_id', req.user.id).eq('role', 'admin').not('invite_accepted_at', 'is', null).in('club_id', clubIds),
+          ]);
+          isClassTeacher = !!(ownedClubs?.length || adminMemberships?.length);
+        }
+
+        if (!isClassTeacher) {
+          return res.status(403).json({ error: 'Not authorized' });
+        }
+      }
+    }
+
     const result = await buildBookResponses(bookId, {
       chapterId: typeof chapter_id === 'string' ? chapter_id : null,
       viewerId: req.user.id,

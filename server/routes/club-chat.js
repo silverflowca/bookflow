@@ -84,7 +84,7 @@ async function notifyMembers(supabase, clubId, excludeUserId, type, title, body,
 router.get('/messages', authenticate, async (req, res) => {
 
   const { clubId } = req.params
-  const { before, limit = 50 } = req.query
+  const { before, limit = 50, chapter_id } = req.query
 
   const role = await requireClubMember(supabase, clubId, req.user.id)
   if (!role) return res.status(403).json({ error: 'Not a club member' })
@@ -115,6 +115,11 @@ router.get('/messages', authenticate, async (req, res) => {
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(Number(limit) + 1)
+
+  // When scoped to a chapter, filter by chapter_id
+  if (chapter_id) {
+    query = query.eq('chapter_id', chapter_id)
+  }
 
   if (before) {
     // cursor: get messages older than this message's created_at
@@ -152,6 +157,7 @@ router.post('/messages', authenticate, async (req, res) => {
     message_type = 'text',
     body,
     book_id,
+    chapter_id,
     reply_to_id,
     // audio
     audio_fileflow_file_id,
@@ -199,6 +205,7 @@ router.post('/messages', authenticate, async (req, res) => {
   const insertData = {
     club_id: clubId,
     book_id: book_id || null,
+    chapter_id: chapter_id || null,
     sender_id: req.user.id,
     message_type,
     body: body || null,

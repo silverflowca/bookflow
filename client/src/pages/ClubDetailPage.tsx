@@ -1015,7 +1015,7 @@ export default function ClubDetailPage() {
             ) : (
               <div className="space-y-2">
                 {club.books?.slice(0, 4).map(cb => (
-                  <Link key={cb.id} to={`/book/${cb.book?.id}`} className="flex items-center gap-2 hover:bg-surface-hover rounded px-1 -mx-1 transition-colors">
+                  <Link key={cb.id} to={`/book/${cb.book?.id}?clubId=${clubId}`} className="flex items-center gap-2 hover:bg-surface-hover rounded px-1 -mx-1 transition-colors">
                     {cb.book?.cover_image_url
                       ? <img src={cb.book.cover_image_url} alt={cb.book.title} className="h-8 w-6 object-cover rounded" />
                       : <div className="h-8 w-6 bg-indigo-500/20 rounded" />

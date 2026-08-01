@@ -46,7 +46,7 @@ type ResponseRowData = {
   selected_option?: string | null;
   answer_text?: string | null;
   selected_options?: string[] | null;
-  response_data?: { value?: unknown } | null;
+  response_data?: { value?: unknown; signer_name?: string; signature_type?: string; signature_data?: string; agreed_at?: string } | null;
   response_type?: 'text' | 'audio' | 'video';
   body?: string | null;
   media_url?: string | null;
@@ -80,6 +80,7 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; icon
   code_block: { label: 'Code', color: 'text-slate-700', bg: 'bg-slate-50 border-slate-200', icon: <List className="h-3.5 w-3.5" /> },
   scripture_block: { label: 'Scripture', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: <MessageSquare className="h-3.5 w-3.5" /> },
   media_response: { label: 'Reader Response', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', icon: <MessageSquare className="h-3.5 w-3.5" /> },
+  signature: { label: 'Signature', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200', icon: <CheckCircle className="h-3.5 w-3.5" /> },
   radio: { label: 'Radio', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: <List className="h-3.5 w-3.5" /> },
   checkbox: { label: 'Checkbox', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: <CheckCircle className="h-3.5 w-3.5" /> },
   select: { label: 'Select', color: 'text-teal-700', bg: 'bg-teal-50 border-teal-200', icon: <ChevronDown className="h-3.5 w-3.5" /> },
@@ -234,6 +235,11 @@ function getResponseText(response: ResponseRowData, type: string) {
   if (type === 'poll') return response.selected_option || '—';
   if (type === 'question') return response.answer_text || response.selected_options?.join(', ') || '—';
   if (type === 'media_response') return response.body || response.media_url || response.response_type || '—';
+  if (type === 'signature') {
+    const d = response.response_data;
+    const name = d?.signer_name || (response.user as any)?.display_name || '—';
+    return `Signed by ${name}`;
+  }
   const value = response.response_data?.value;
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.join(', ');
@@ -619,6 +625,7 @@ function ItemCard({ item, searchQuery, itemNumber, clubId }: { item: BookRespons
   const isChoice = CHOICE_TYPES.includes(item.content_type);
   const isText = TEXT_TYPES.includes(item.content_type);
   const isMediaResponse = item.content_type === 'media_response';
+  const isSignature = item.content_type === 'signature';
   const isPassive = PASSIVE_TYPES.includes(item.content_type as PassiveContentType);
   const hasOptions = !!item.content_data?.options?.length;
   const label = getItemLabel(item);
@@ -685,6 +692,50 @@ function ItemCard({ item, searchQuery, itemNumber, clubId }: { item: BookRespons
                   <ResponseRow key={response.id} response={response} type={item.content_type} clubId={clubId} />
                 ))}
               </div>
+            </div>
+          )}
+
+          {isSignature && (
+            <div className="mt-3">
+              {item.total === 0 ? (
+                <p className="text-xs text-gray-400 italic py-2">No signatures yet</p>
+              ) : (
+                <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+                  {item.responses.map((response: ResponseRowData) => {
+                    const d = response.response_data;
+                    const user = getResponseUser(response);
+                    const name = d?.signer_name || user?.display_name || 'Unknown';
+                    const sigType = d?.signature_type;
+                    const sigData = d?.signature_data;
+                    const agreedAt = d?.agreed_at ? new Date(d.agreed_at).toLocaleDateString() : null;
+                    return (
+                      <div key={response.id} className="py-2.5 flex items-start gap-3">
+                        {user?.avatar_url
+                          ? <img src={user.avatar_url} alt={name} className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+                          : <div className="h-7 w-7 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">{(name[0] ?? '?').toUpperCase()}</div>
+                        }
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-800">{name}</span>
+                            {sigType === 'checkbox' && (
+                              <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                                <CheckCircle className="h-3 w-3" /> Agreed
+                              </span>
+                            )}
+                            {sigType === 'typed' && sigData && (
+                              <span className="text-sm italic text-gray-600 font-serif">{sigData}</span>
+                            )}
+                            {agreedAt && <span className="text-xs text-gray-400">{agreedAt}</span>}
+                          </div>
+                          {sigType === 'drawn' && sigData && (
+                            <img src={sigData} alt="Signature" className="mt-1.5 max-h-12 border border-gray-200 rounded bg-white" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

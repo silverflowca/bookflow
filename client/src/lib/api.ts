@@ -87,7 +87,9 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      throw new Error(data.error || `Request failed (${response.status})`);
+      const err = new Error(data.error || `Request failed (${response.status})`) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
 
     return data;
@@ -1070,10 +1072,11 @@ class ApiClient {
 
   // ── Club Chat ─────────────────────────────────────────────────────────────
 
-  async getClubChatMessages(clubId: string, params?: { before?: string; limit?: number }): Promise<{ messages: any[]; hasMore: boolean }> {
+  async getClubChatMessages(clubId: string, params?: { before?: string; limit?: number; chapter_id?: string }): Promise<{ messages: any[]; hasMore: boolean }> {
     const qs = new URLSearchParams();
     if (params?.before) qs.set('before', params.before);
     if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.chapter_id) qs.set('chapter_id', params.chapter_id);
     const query = qs.toString() ? `?${qs}` : '';
     return this.request(`/clubs/${clubId}/chat/messages${query}`);
   }

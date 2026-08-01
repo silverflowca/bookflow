@@ -1,7 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
-import { BookOpen, CheckCircle2, Clock, Star, Users } from 'lucide-react';
+import { BookOpen, CheckCircle2, Clock, Star, Users, MessageSquare } from 'lucide-react';
 import api from '../../lib/api';
 import type { ClassSubmission, ClassSubmissionFeedback } from '../../types';
+
+interface MyAnswer {
+  id: string;
+  inline_content_id: string;
+  chapter_id?: string;
+  response_data: any;
+  created_at: string;
+  question_label: string | null;
+  chapter_title: string | null;
+  feedback?: { id: string; grade?: number | null; feedback_text?: string | null; created_at: string } | null;
+}
 
 interface ChapterProgress {
   chapter_id: string;
@@ -17,6 +28,7 @@ interface ProgressData {
   items_total: number;
   completion_pct: number;
   submissions: (ClassSubmission & { feedback?: ClassSubmissionFeedback | null })[];
+  answers?: MyAnswer[];
 }
 
 /** Segmented bar — each segment width ∝ chapter's share of total items */
@@ -129,7 +141,7 @@ export default function ClassProgressPanel({ clubId }: { clubId: string }) {
     </div>
   );
 
-  const { book, chapters, completion_pct, items_completed, items_total, submissions } = data;
+  const { book, chapters, completion_pct, items_completed, items_total, submissions, answers = [] } = data;
   const chaptersCompleted = chapters.filter(c => c.total > 0 && c.completed >= c.total).length;
   const submitted = submissions.filter(s => s.status !== 'draft');
   const graded = submissions.filter(s => s.status === 'graded');
@@ -287,6 +299,47 @@ export default function ClassProgressPanel({ clubId }: { clubId: string }) {
 
       {submissions.length === 0 && (
         <p className="text-sm text-muted text-center py-2">No assignments yet. Check the Assignments tab for prompts from your teacher.</p>
+      )}
+
+      {/* ── My Q&A Answers ──────────────────────────────────────── */}
+      {answers.length > 0 && (
+        <div className="theme-section rounded-xl p-5">
+          <h2 className="font-semibold text-theme mb-4 flex items-center gap-2 text-sm">
+            <MessageSquare className="h-4 w-4 text-muted" /> My Answers
+          </h2>
+          <div className="space-y-3">
+            {answers.map(a => {
+              const responseText = typeof a.response_data === 'string'
+                ? a.response_data
+                : a.response_data?.value ?? a.response_data?.text ?? JSON.stringify(a.response_data);
+              return (
+                <div key={a.id} className="rounded-xl bg-strong/5 p-3.5 space-y-2">
+                  <div>
+                    {a.chapter_title && (
+                      <p className="text-[11px] text-muted uppercase tracking-wide mb-0.5">{a.chapter_title}</p>
+                    )}
+                    {a.question_label && (
+                      <p className="text-xs font-semibold text-theme">{a.question_label}</p>
+                    )}
+                    <p className="text-sm text-muted mt-1 whitespace-pre-wrap">{responseText}</p>
+                  </div>
+                  {a.feedback && (
+                    <div className="pt-2 border-t border-strong/10 flex items-start gap-3">
+                      {a.feedback.grade !== undefined && a.feedback.grade !== null && (
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                          {a.feedback.grade}/100
+                        </span>
+                      )}
+                      {a.feedback.feedback_text && (
+                        <p className="text-xs text-muted leading-relaxed">{a.feedback.feedback_text}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

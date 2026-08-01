@@ -574,6 +574,13 @@ export default function BookSettings() {
               checked={settings.auto_play_media ?? false}
               onChange={(v) => updateSetting('auto_play_media', v)}
             />
+
+            <ToggleSetting
+              label="Chapter chat"
+              description="Show a floating chat button on each chapter so club members can discuss the chapter in context. Requires readers to be in a club and open the book via their club."
+              checked={settings.enable_chapter_chat ?? false}
+              onChange={(v) => updateSetting('enable_chapter_chat', v)}
+            />
           </div>
         </div>
 

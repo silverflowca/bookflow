@@ -78,6 +78,7 @@ export interface BookSettings {
   editor_preview_mode?: 'live' | 'minimal';
   enable_listen?: boolean;
   enable_book_chat?: boolean;
+  enable_chapter_chat?: boolean;
   chat_share_reader_progress?: boolean;
   chat_share_book_progress?: boolean;
 }

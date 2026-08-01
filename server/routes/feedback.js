@@ -18,6 +18,15 @@ import supabase from '../config/supabase.js';
 import { authenticate, requireSuperAdmin } from '../middleware/auth.js';
 import { createNotification, createNotifications } from '../services/notifications.js';
 
+async function getSystemRole(userId) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('system_role')
+    .eq('id', userId)
+    .single();
+  return data?.system_role ?? null;
+}
+
 const router = express.Router();
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost:55321';
@@ -324,7 +333,8 @@ router.get('/:id', authenticate, async (req, res) => {
 
     // Authorization: must be owner or super_admin
     const isOwner = feedback.user_id === req.user.id;
-    const isAdmin = req.user.system_role === 'super_admin';
+    const systemRole = isOwner ? null : await getSystemRole(req.user.id);
+    const isAdmin = systemRole === 'super_admin';
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Access denied' });
     }
@@ -362,7 +372,7 @@ router.patch('/:id', authenticate, async (req, res) => {
     if (fbErr || !feedback) return res.status(404).json({ error: 'Feedback not found' });
 
     const isOwner = feedback.user_id === req.user.id;
-    const isAdmin = req.user.system_role === 'super_admin';
+    const isAdmin = isOwner ? false : (await getSystemRole(req.user.id)) === 'super_admin';
     if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Access denied' });
 
     const { data, error } = await supabase
@@ -419,7 +429,8 @@ router.post('/:id/comments', authenticate, async (req, res) => {
 
     // Authorization: must be owner or super_admin
     const isOwner = feedback.user_id === req.user.id;
-    const isAdmin = req.user.system_role === 'super_admin';
+    const systemRole = await getSystemRole(req.user.id);
+    const isAdmin = systemRole === 'super_admin';
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Access denied' });
     }

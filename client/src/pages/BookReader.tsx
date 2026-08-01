@@ -5,7 +5,7 @@ import {
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, FileSignature
+  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, FileSignature, Send
 } from 'lucide-react';
 import { getTextAlignStyle, getTextStyleAttributes } from '../components/editor/PasteFormattingExtensions';
 
@@ -88,6 +88,7 @@ import TutorialOverlay from '../components/reader/TutorialOverlay';
 import { buildFeatureTours } from '../components/reader/FeatureDemoTours';
 import { DEMO_BOOK_ID } from '../config/demoBook';
 import SignatureCanvas from '../components/editor/SignatureCanvas';
+import { useChapterChat } from '../hooks/useChapterChat';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
@@ -180,6 +181,9 @@ export default function BookReader() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const requestAuth = useCallback(() => setShowAuthModal(true), []);
 
+  // Chapter chat FAB state
+  const [showChapterChat, setShowChapterChat] = useState(false);
+
   // Focus / simple view mode — hides sidebar, filter bar, and inline panel
   const [focusMode, setFocusMode] = useState(false);
   const toggleFocusMode = () => {
@@ -244,6 +248,10 @@ export default function BookReader() {
   const canAddLink = settings?.allow_reader_links ?? false;
   const showReaderContentFilters = settings?.show_reader_content_filters ?? true;
   const autoPlayMedia = settings?.auto_play_media ?? false;
+  const enableChapterChat = settings?.enable_chapter_chat ?? false;
+
+  // club context from query param (set by ClubReadPage when navigating to a chapter)
+  const clubIdFromParam = searchParams.get('clubId') || null;
 
   const mediaPauseCallbacks = useRef<Map<string, () => void>>(new Map());
   const mediaPipCloseCallbacks = useRef<Map<string, () => void>>(new Map());
@@ -521,8 +529,9 @@ export default function BookReader() {
       // Record that this reader visited this chapter
       if (book) saveReadingProgress(chapterId);
     } else if (book?.chapters?.length) {
-      // Navigate to first chapter
-      navigate(`/book/${bookId}/chapter/${book.chapters[0].id}`, { replace: true });
+      // Navigate to first chapter, preserving query params (e.g. clubId)
+      const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+      navigate(`/book/${bookId}/chapter/${book.chapters[0].id}${qs}`, { replace: true });
     }
   }, [chapterId, book]);
 
@@ -1692,6 +1701,37 @@ export default function BookReader() {
             }
           }}
         />
+      )}
+
+      {/* Chapter Chat FAB + Panel */}
+      {enableChapterChat && clubIdFromParam && chapterId && user && (
+        <>
+          {/* Floating action button */}
+          <button
+            onClick={() => setShowChapterChat(v => !v)}
+            className={`fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-all duration-200 ${
+              showChapterChat
+                ? 'bg-indigo-600 text-white scale-95'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105'
+            }`}
+            title={showChapterChat ? 'Close chapter chat' : 'Open chapter chat'}
+            aria-label="Chapter chat"
+          >
+            {showChapterChat
+              ? <X className="h-6 w-6" />
+              : <MessageSquare className="h-6 w-6" />
+            }
+          </button>
+
+          {/* Chat slide-up panel */}
+          {showChapterChat && (
+            <ChapterChatPanel
+              clubId={clubIdFromParam}
+              chapterId={chapterId}
+              onClose={() => setShowChapterChat(false)}
+            />
+          )}
+        </>
       )}
 
       {/* Share toast */}
@@ -5645,6 +5685,174 @@ function HeaderComponentIcons({
         </div>
       )}
     </>
+  );
+}
+
+
+// ─── Chapter Chat Panel ──────────────────────────────────────────────────────
+// Slide-up chat panel for per-chapter club discussion.
+// Visible only when enableChapterChat === true and user is in a club context.
+function ChapterChatPanel({
+  clubId,
+  chapterId,
+  onClose,
+}: {
+  clubId: string;
+  chapterId: string;
+  onClose: () => void;
+}) {
+  const { user } = useAuth();
+  const { messages, loading, loadingMore, hasMore, sendMessage, loadMore, markRead } = useChapterChat({
+    clubId,
+    chapterId,
+    enabled: true,
+  });
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
+
+  // Mark read when panel opens
+  useEffect(() => {
+    if (messages.length > 0) {
+      const last = messages[messages.length - 1];
+      markRead(last.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setInput('');
+    try {
+      await sendMessage(text);
+    } catch (_) {
+      setInput(text); // restore on failure
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  function formatTime(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  return (
+    <div className="fixed bottom-24 right-6 z-40 flex w-80 max-w-[calc(100vw-3rem)] flex-col rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden"
+      style={{ height: '420px' }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 bg-indigo-600 px-4 py-3">
+        <div className="flex items-center gap-2 text-white">
+          <MessageSquare className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-semibold">Chapter Chat</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-indigo-200 hover:text-white transition-colors"
+          title="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Messages list */}
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+        {loading && (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+          </div>
+        )}
+        {!loading && messages.length === 0 && (
+          <p className="text-center text-xs text-gray-400 py-6">
+            No messages yet. Be the first to comment on this chapter!
+          </p>
+        )}
+        {hasMore && !loading && (
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="w-full py-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            {loadingMore ? 'Loading…' : 'Load earlier messages'}
+          </button>
+        )}
+        {messages.map(msg => {
+          const isMe = msg.sender_id === user?.id;
+          const deleted = !!msg.deleted_at;
+          return (
+            <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+              {/* Avatar */}
+              <div className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                isMe ? 'bg-indigo-500' : 'bg-gray-400'
+              }`}>
+                {msg.sender?.display_name?.[0]?.toUpperCase() || '?'}
+              </div>
+              <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
+                {!isMe && (
+                  <span className="text-[10px] text-gray-500 font-medium px-1">
+                    {msg.sender?.display_name || 'Member'}
+                  </span>
+                )}
+                <div className={`rounded-2xl px-3 py-1.5 text-sm leading-snug ${
+                  deleted
+                    ? 'bg-gray-100 text-gray-400 italic'
+                    : isMe
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-900'
+                }`}>
+                  {deleted ? 'Message deleted' : msg.body}
+                </div>
+                <span className="text-[10px] text-gray-400 px-1">
+                  {formatTime(msg.created_at)}
+                  {msg.edited_at && ' · edited'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="flex items-end gap-2 border-t border-gray-100 px-3 py-2">
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message this chapter…"
+          rows={1}
+          className="flex-1 resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-0 max-h-24 overflow-y-auto"
+          style={{ lineHeight: '1.4' }}
+          disabled={sending}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || sending}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
+          title="Send"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
   );
 }
 

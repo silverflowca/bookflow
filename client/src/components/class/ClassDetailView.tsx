@@ -319,7 +319,9 @@ function ClassOverviewTab({
   const readPct = prog?.readPct ?? 0;
   const hasStarted = readPct > 0;
   const readTo = book
-    ? `/clubs/${clubId}/read/${book.id}${prog?.currentChapterId ? `?chapter=${prog.currentChapterId}` : ''}`
+    ? prog?.currentChapterId
+      ? `/book/${book.id}/chapter/${prog.currentChapterId}?clubId=${clubId}`
+      : `/book/${book.id}?clubId=${clubId}`
     : '#';
 
   return (
