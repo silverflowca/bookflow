@@ -5,10 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 import { createRequire } from 'module';
-import yaml from 'js-yaml';
-
 const require = createRequire(import.meta.url);
-const swaggerUi = require('swagger-ui-express');
+const yaml = require('js-yaml');
 
 // Load environment variables
 dotenv.config();
@@ -76,12 +74,39 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 
-// ── API Docs (Swagger UI) — public, no auth ───────────────────────────────────
+// ── API Docs (Swagger UI via CDN) — public, no auth ──────────────────────────
 const swaggerDoc = yaml.load(readFileSync(path.join(__dirname, 'openapi.yaml'), 'utf8'));
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, {
-  customSiteTitle: 'BookFlow API Docs',
-  swaggerOptions: { persistAuthorization: true, tryItOutEnabled: true },
-}));
+
+app.get('/api/docs/openapi.json', (_req, res) => {
+  res.json(swaggerDoc);
+});
+
+app.get('/api/docs', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BookFlow API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+  SwaggerUIBundle({
+    url: '/api/docs/openapi.json',
+    dom_id: '#swagger-ui',
+    persistAuthorization: true,
+    tryItOutEnabled: true,
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: 'BaseLayout',
+  });
+</script>
+</body>
+</html>`);
+});
 
 // Health check — includes env/service status for debugging
 app.get('/api/health', (req, res) => {
