@@ -91,7 +91,7 @@ import SignatureCanvas from '../components/editor/SignatureCanvas';
 import type {
   Book, Chapter, InlineContent, InlineContentType, PollData, MediaData, LinkData, NoteData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, ImageData, DrawingData,
-  AllFormResponsesResult, MediaResponsePromptData, MediaResponseRecord, SignatureData, SignatureResponse,
+  AllFormResponsesResult, MediaResponsePromptData, MediaResponseRecord, SignatureData, SignatureResponse, HtmlBlockData,
 } from '../types';
 
 function getExternalEmbedUrl(url?: string | null): string | null {
@@ -2140,6 +2140,7 @@ function ChapterContent({
       checkbox: 'inline-form',
       code_block: 'inline-code',
       scripture_block: 'inline-scripture',
+      html_block: 'inline-code',
       image: 'inline-media',
     }[marker.content_type as string] as string | undefined;
 
@@ -2203,6 +2204,7 @@ function getInlineContentClass(type: string): string {
     checkbox: 'inline-form inline-checkbox',
     code_block: 'inline-code',
     scripture_block: 'inline-scripture',
+    html_block: 'inline-code',
     signature: 'inline-form inline-signature',
   };
   return classes[type] || '';
@@ -2350,7 +2352,7 @@ function TipTapNode({
       if (!node.content || node.content.length === 0) return <p className="min-h-[1.5em]" style={style}>&nbsp;</p>;
       // If paragraph contains only block-level widget nodes (image, drawing, etc.), render as div
       // to avoid invalid HTML (<div> inside <p>) which breaks browser DOM parsing
-      const BLOCK_WIDGET_TYPES = new Set(['question', 'poll', 'image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block', 'media_response', 'signature']);
+      const BLOCK_WIDGET_TYPES = new Set(['question', 'poll', 'image', 'drawing', 'audio', 'video', 'code_block', 'scripture_block', 'media_response', 'signature', 'html_block']);
       const isBlockWidget = node.content.length === 1 &&
         node.content[0].type === 'inlineFormWidget' &&
         BLOCK_WIDGET_TYPES.has(node.content[0].attrs?.contentType);
@@ -2414,7 +2416,7 @@ function TipTapNode({
 
     case 'text': {
       const nodeText = node.text || '';
-      const FORM_TYPES_SET = new Set(['question', 'poll', 'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block', 'signature']);
+      const FORM_TYPES_SET = new Set(['question', 'poll', 'select', 'multiselect', 'textbox', 'textarea', 'radio', 'checkbox', 'code_block', 'scripture_block', 'signature', 'html_block']);
       const MEDIA_TYPES_SET = new Set(['audio', 'video', 'image', 'drawing']);
 
       // Look up pre-assigned matches for this exact node key (computed before render, no mutation)
@@ -2571,7 +2573,7 @@ function TipTapNode({
         return <span>{anchorText}</span>;
       }
       // Block-level types must render as block, not inline-flex
-      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block', 'media_response', 'signature']);
+      const BLOCK_TYPES = new Set(['question', 'poll', 'image', 'audio', 'video', 'code_block', 'scripture_block', 'media_response', 'signature', 'html_block']);
       const isBlock = BLOCK_TYPES.has(effectiveIc.content_type);
       const isFullW = isBlock || (effectiveIc.content_data as any)?.width === 'full' || (!((effectiveIc.content_data as any)?.width) && effectiveIc.content_type === 'textarea');
       const markerClass = getInlineContentClass(effectiveIc.content_type);
@@ -2763,6 +2765,9 @@ function InlineContentBlock({ content, isAuthor = false, userId, defaultVisibili
   }
   if (content.content_type === 'signature') {
     return <SignatureBlock content={content} isAuthor={isAuthor} userId={userId} defaultVisibility={defaultVisibility} />;
+  }
+  if (content.content_type === 'html_block') {
+    return <HtmlBlockDisplay content={content} />;
   }
   return null;
 }
@@ -4804,6 +4809,46 @@ function DrawingBlock({ content }: { content: InlineContent }) {
         <figcaption className="text-center text-xs text-muted mt-1.5 italic">{data.caption}</figcaption>
       )}
     </figure>
+  );
+}
+
+// HTML block display — renders raw HTML in a sandboxed iframe
+function HtmlBlockDisplay({ content }: { content: InlineContent }) {
+  const data = content.content_data as HtmlBlockData;
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(600);
+
+  const resize = () => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentDocument?.body) return;
+    const h = iframe.contentDocument.documentElement.scrollHeight
+      || iframe.contentDocument.body.scrollHeight;
+    if (h > 0) setHeight(h + 8);
+  };
+
+  const handleLoad = () => {
+    // Resize immediately, then again after fonts/images settle
+    resize();
+    setTimeout(resize, 400);
+    setTimeout(resize, 1200);
+  };
+
+  return (
+    <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+      {data.title && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+          {data.title}
+        </div>
+      )}
+      <iframe
+        ref={iframeRef}
+        srcDoc={data.html}
+        sandbox="allow-same-origin allow-scripts"
+        onLoad={handleLoad}
+        style={{ width: '100%', height, border: 'none', display: 'block' }}
+        title={data.title || 'HTML Block'}
+      />
+    </div>
   );
 }
 

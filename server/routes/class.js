@@ -1225,6 +1225,30 @@ router.post('/:clubId/class/answers/:responseId/feedback', authenticate, async (
 });
 
 
+/**
+ * GET /api/clubs/:clubId/class/answers/:responseId/feedback
+ * Teacher only — fetch existing feedback for a single form_response
+ */
+router.get('/:clubId/class/answers/:responseId/feedback', authenticate, async (req, res) => {
+  const { clubId, responseId } = req.params;
+  const role = await requireClassAccess(req, res, 'teacher');
+  if (!role) return;
+  try {
+    const { data, error } = await supabase
+      .schema('bookflow')
+      .from('class_answer_feedback')
+      .select('id, grade, feedback_text, created_at, updated_at')
+      .eq('club_id', clubId)
+      .eq('response_id', responseId)
+      .maybeSingle();
+    if (error) throw error;
+    res.json(data || null);
+  } catch (err) {
+    console.error('Get answer feedback error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // STUDENT DETAIL (teacher drills into one student)
 // GET /api/clubs/:clubId/class/students/:studentId

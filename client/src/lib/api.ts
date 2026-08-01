@@ -394,8 +394,11 @@ class ApiClient {
     return this.request(`/books/${bookId}/responses${qs}`);
   }
 
-  async getAccessibleBookResponses(bookId: string, chapterId?: string): Promise<import('../types').BookResponseItem[]> {
-    const qs = chapterId ? `?chapter_id=${chapterId}` : '';
+  async getAccessibleBookResponses(bookId: string, chapterId?: string, clubId?: string): Promise<import('../types').BookResponseItem[]> {
+    const params = new URLSearchParams();
+    if (chapterId) params.set('chapter_id', chapterId);
+    if (clubId) params.set('club_id', clubId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/books/${bookId}/accessible-responses${qs}`);
   }
 
@@ -1522,6 +1525,10 @@ class ApiClient {
   async getClassAnswers(clubId: string, params?: { student_id?: string }): Promise<ClassAnswerFeedback[]> {
     const qs = params?.student_id ? `?student_id=${params.student_id}` : '';
     return this.request(`/clubs/${clubId}/class/answers${qs}`);
+  }
+
+  async getAnswerFeedback(clubId: string, responseId: string): Promise<ClassAnswerFeedback | null> {
+    return this.request(`/clubs/${clubId}/class/answers/${responseId}/feedback`);
   }
 
   async postAnswerFeedback(clubId: string, responseId: string, data: { grade?: number; feedback_text?: string; student_id: string }): Promise<ClassAnswerFeedback> {

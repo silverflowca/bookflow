@@ -3,6 +3,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
+import { createRequire } from 'module';
+import yaml from 'js-yaml';
+
+const require = createRequire(import.meta.url);
+const swaggerUi = require('swagger-ui-express');
 
 // Load environment variables
 dotenv.config();
@@ -64,11 +70,18 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
+
+// ── API Docs (Swagger UI) — public, no auth ───────────────────────────────────
+const swaggerDoc = yaml.load(readFileSync(path.join(__dirname, 'openapi.yaml'), 'utf8'));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, {
+  customSiteTitle: 'BookFlow API Docs',
+  swaggerOptions: { persistAuthorization: true, tryItOutEnabled: true },
+}));
 
 // Health check — includes env/service status for debugging
 app.get('/api/health', (req, res) => {

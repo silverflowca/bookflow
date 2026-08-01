@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type {
   InlineContent, InlineDisplayMode, SelectData, MultiselectData, TextboxData, TextareaData,
-  RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, LabelPosition, SignatureData
+  RadioData, CheckboxData, CodeBlockData, ScriptureBlockData, LabelPosition, SignatureData,
+  HtmlBlockData
 } from '../../types';
 
 interface FormProps {
@@ -1168,6 +1169,45 @@ export function SignatureForm({ onSubmit, onClose, initialData, isEditing, hideB
         <span className="text-sm">Required</span>
       </label>
 
+      <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
+    </form>
+  );
+}
+
+export function HtmlBlockForm({ onSubmit, onClose, initialData, isEditing, hideButtons }: FormProps & { initialData?: HtmlBlockData }) {
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [html, setHtml] = useState(initialData?.html || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const contentData: HtmlBlockData = { html, title: title || undefined };
+    onSubmit({ content_data: contentData, visibility: 'all_readers', display_mode: 'inline' });
+  };
+
+  return (
+    <form id="modal-form" onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">Title (optional)</label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500"
+          placeholder="Document title"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">HTML</label>
+        <p className="text-xs text-muted mb-2">Paste a full HTML document or snippet. It will render in a sandboxed iframe.</p>
+        <textarea
+          value={html}
+          onChange={(e) => setHtml(e.target.value)}
+          className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 font-mono text-xs"
+          rows={16}
+          required
+          placeholder="<!DOCTYPE html>..."
+        />
+      </div>
       <FormButtons onClose={onClose} submitText={isEditing ? 'Save' : 'Add'} hidden={hideButtons} />
     </form>
   );

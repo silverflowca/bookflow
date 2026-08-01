@@ -461,15 +461,20 @@ function TeacherCommentBox({ clubId, responseId, studentId }: { clubId: string; 
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
 
-  useEffect(() => { loadedRef.current = true; }, []);
+  useEffect(() => {
+    api.getAnswerFeedback(clubId, responseId)
+      .then(fb => { if (fb?.feedback_text) setComment(fb.feedback_text); })
+      .catch(() => {})
+      .finally(() => { setLoading(false); loadedRef.current = true; });
+  }, [clubId, responseId]);
 
   function triggerSave(text: string) {
     if (!loadedRef.current) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!text.trim()) return;
     debounceRef.current = setTimeout(async () => {
       setSaving(true);
       try {
@@ -484,6 +489,7 @@ function TeacherCommentBox({ clubId, responseId, studentId }: { clubId: string; 
     <div className="mt-2 pt-2 border-t border-gray-100">
       <div className="flex items-center justify-between mb-1">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Teacher comment</p>
+        {loading && <span className="text-[10px] text-gray-300">Loading…</span>}
         {saving && <span className="text-[10px] text-gray-400">Saving…</span>}
         {saved && !saving && <span className="text-[10px] text-green-600">Saved</span>}
       </div>
@@ -492,6 +498,7 @@ function TeacherCommentBox({ clubId, responseId, studentId }: { clubId: string; 
         placeholder="Add a comment for this student…"
         className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-purple-400 focus:border-purple-400 focus:outline-none resize-none transition-colors"
         value={comment}
+        disabled={loading}
         onChange={e => { setComment(e.target.value); triggerSave(e.target.value); }}
       />
     </div>
@@ -753,7 +760,7 @@ export default function BookResponsesViewer({
     setError(null);
     try {
       const data = mode === 'accessible'
-        ? await api.getAccessibleBookResponses(bookId, initialChapterId)
+        ? await api.getAccessibleBookResponses(bookId, initialChapterId, clubId)
         : await api.getBookResponses(bookId, initialChapterId);
       if (!signal?.cancelled) setResponseItems(Array.isArray(data) ? data : []);
     } catch (err: any) {

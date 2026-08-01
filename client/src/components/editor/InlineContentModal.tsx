@@ -5,11 +5,12 @@ import { getHighlightTheme } from '../../lib/highlightTheme';
 import type {
   InlineContent, QuestionData, PollData, NoteData, LinkData, MediaData, HighlightData,
   SelectData, MultiselectData, TextboxData, TextareaData, RadioData, CheckboxData,
-  CodeBlockData, ScriptureBlockData, ImageData, DrawingData, MediaResponsePromptData, SignatureData
+  CodeBlockData, ScriptureBlockData, ImageData, DrawingData, MediaResponsePromptData, SignatureData,
+  HtmlBlockData
 } from '../../types';
 import {
   SelectForm, MultiselectForm, TextboxForm, TextareaForm,
-  RadioForm, CheckboxForm, CodeBlockForm, ScriptureBlockForm, SignatureForm
+  RadioForm, CheckboxForm, CodeBlockForm, ScriptureBlockForm, SignatureForm, HtmlBlockForm
 } from './InteractiveForms';
 import DrawingCanvas from './DrawingCanvas';
 
@@ -50,6 +51,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
     checkbox: isEditing ? 'Edit Checkboxes' : 'Add Checkboxes',
     code_block: isEditing ? 'Edit Code Block' : 'Add Code Block',
     scripture_block: isEditing ? 'Edit Scripture' : 'Add Scripture Verse',
+    html_block: isEditing ? 'Edit HTML Block' : 'Add HTML Block',
     drawing: isEditing ? 'Edit Drawing' : 'Add Drawing',
     media_response: isEditing ? 'Edit Reader Response' : 'Add Reader Response',
     signature: isEditing ? 'Edit Signature Request' : 'Add Signature Request',
@@ -170,6 +172,7 @@ export default function InlineContentModal({ type, selectedText, hasCursor, book
             {type === 'checkbox' && <CheckboxForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CheckboxData} isEditing={isEditing} hideButtons />}
             {type === 'code_block' && <CodeBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as CodeBlockData} isEditing={isEditing} hideButtons />}
             {type === 'scripture_block' && <ScriptureBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as ScriptureBlockData} isEditing={isEditing} hideButtons />}
+            {type === 'html_block' && <HtmlBlockForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as HtmlBlockData} isEditing={isEditing} hideButtons />}
             {type === 'signature' && <SignatureForm onSubmit={handleSubmit} onClose={onClose} initialData={editingItem?.content_data as SignatureData} isEditing={isEditing} hideButtons />}
           </div>
         </div>

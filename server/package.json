@@ -18,12 +18,14 @@
     "epub-gen": "^0.1.0",
     "express": "^4.18.2",
     "form-data": "^4.0.5",
+    "js-yaml": "^5.2.3",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "pg": "^8.22.0",
     "puppeteer": "^24.40.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "swagger-ui-express": "^5.0.1"
   }
 }

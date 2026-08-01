@@ -1,0 +1,1523 @@
+openapi: "3.1.0"
+info:
+  title: BookFlow API
+  version: "1.0.0"
+  description: |
+    BookFlow is an interactive book authoring and reading platform.
+
+    **Base URL:** `https://books.silverflow.ca/api`
+
+    ## Authentication
+
+    Two methods are supported:
+
+    ### 1. Bearer JWT (session token)
+    1. Call `POST /auth/login` with `{ email, password }`
+    2. Extract `session.access_token` from the response
+    3. Send `Authorization: Bearer <token>` on every subsequent request
+    Tokens expire after 1 hour; call login again to refresh.
+
+    ### 2. API Key (long-lived, recommended for automation)
+    Send `X-API-Key: <your-api-key>` header instead of Authorization.
+    Keys are stored as SHA-256 hashes in the `api_keys` table.
+    Contact the admin to generate a key.
+
+    ## Roles
+    - `owner` — book creator, full control
+    - `author` / `editor` / `viewer` — collaborator roles set per book
+    - `super_admin` — bypasses all book-level permission checks
+
+servers:
+  - url: https://books.silverflow.ca/api
+    description: Production
+  - url: http://localhost:8682/api
+    description: Local development
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase access_token from POST /auth/login → session.access_token
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Long-lived API key. Contact admin to generate one.
+
+  schemas:
+    Book:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        subtitle: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        cover_image_url: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [draft, published, archived]
+        visibility:
+          type: string
+          enum: [private, shared, public]
+        author_id: { type: string, format: uuid }
+        slug: { type: string, nullable: true }
+        share_token: { type: string, nullable: true }
+        word_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Chapter:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        book_id: { type: string, format: uuid }
+        title: { type: string }
+        content:
+          type: object
+          description: TipTap ProseMirror JSON document. Example — { "type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello world"}]}] }
+        content_text: { type: string, nullable: true, description: Plain text version, auto-extracted from content }
+        order_index: { type: integer }
+        status:
+          type: string
+          enum: [draft, published, archived]
+        slug: { type: string, nullable: true }
+        word_count: { type: integer }
+        estimated_read_time_minutes: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    TipTapDoc:
+      type: object
+      description: |
+        ProseMirror/TipTap JSON format. Always wrap content in a "doc" node.
+        Example paragraph: { "type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}] }
+        Example heading:   { "type":"doc","content":[{"type":"heading","attrs":{"level":1},"content":[{"type":"text","text":"Title"}]}] }
+        Marks (bold/italic): { "type":"text","text":"bold","marks":[{"type":"bold"}] }
+      properties:
+        type:
+          type: string
+          enum: [doc]
+        content:
+          type: array
+          items:
+            type: object
+
+    Profile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        display_name: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        bio: { type: string, nullable: true }
+        system_role: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Session:
+      type: object
+      properties:
+        access_token: { type: string, description: "Use this as Bearer token in Authorization header" }
+        refresh_token: { type: string }
+        expires_at: { type: integer }
+        token_type: { type: string }
+
+    Comment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        content: { type: string }
+        resolved: { type: boolean }
+        resolved_by: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Club:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        owner_id: { type: string, format: uuid }
+        type: { type: string, enum: [book_club, class, group] }
+        visibility: { type: string, enum: [public, private] }
+        created_at: { type: string, format: date-time }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Authenticated but insufficient permissions
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # HEALTH
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Service health check
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: healthy }
+                  service: { type: string, example: bookflow-api }
+                  timestamp: { type: string, format: date-time }
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # AUTH
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 6 }
+                displayName: { type: string }
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/Profile' }
+                  session: { $ref: '#/components/schemas/Session' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and get access token
+      description: |
+        Returns a Supabase session. Use `session.access_token` as the Bearer token.
+        Tokens expire in ~1 hour.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: admin.steen@silverflow.ca }
+                password: { type: string, example: "your-password" }
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/Profile' }
+                  session: { $ref: '#/components/schemas/Session' }
+                  profile: { $ref: '#/components/schemas/Profile' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (invalidate session)
+      responses:
+        "200":
+          description: Logged out successfully
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Send password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Reset email sent if account exists
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using token from email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_token, password]
+              properties:
+                access_token: { type: string }
+                password: { type: string, minLength: 6 }
+      responses:
+        "200":
+          description: Password updated
+
+  /auth/profile:
+    put:
+      tags: [Auth]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                bio: { type: string }
+                avatar_url: { type: string }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # BOOKS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books:
+    get:
+      tags: [Books]
+      summary: List books
+      description: Without auth returns only public books. With auth also returns your own books.
+      security:
+        - {}
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Search by title
+        - in: query
+          name: visibility
+          schema: { type: string, enum: [public, private, shared] }
+        - in: query
+          name: status
+          schema: { type: string, enum: [draft, published, archived] }
+        - in: query
+          name: author_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: List of books
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Book' }
+
+    post:
+      tags: [Books]
+      summary: Create a new book
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, example: My Recovery Story }
+                subtitle: { type: string }
+                description: { type: string }
+                visibility:
+                  type: string
+                  enum: [private, shared, public]
+                  default: private
+                cover_image_url: { type: string, format: uri }
+      responses:
+        "201":
+          description: Book created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Book' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /books/my:
+    get:
+      tags: [Books]
+      summary: List my books (as author)
+      responses:
+        "200":
+          description: Your books
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Book' }
+
+  /books/public:
+    get:
+      tags: [Books]
+      summary: Discover public published books
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Search query
+      responses:
+        "200":
+          description: Public books
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Book' }
+
+  /books/collaborating:
+    get:
+      tags: [Books]
+      summary: Books where I am an accepted collaborator (not owner)
+      responses:
+        "200":
+          description: Collaborating books
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Book' }
+
+  /books/{id}:
+    get:
+      tags: [Books]
+      summary: Get a single book with chapters, settings, and collaborators
+      security:
+        - {}
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Book with chapters
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Book' }
+                  - type: object
+                    properties:
+                      chapters:
+                        type: array
+                        items: { $ref: '#/components/schemas/Chapter' }
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Books]
+      summary: Update book metadata
+      description: Requires owner or author role.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                subtitle: { type: string }
+                description: { type: string }
+                status: { type: string, enum: [draft, published, archived] }
+                visibility: { type: string, enum: [private, shared, public] }
+                cover_image_url: { type: string }
+      responses:
+        "200":
+          description: Updated book
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Book' }
+
+    delete:
+      tags: [Books]
+      summary: Archive (soft-delete) a book
+      description: Sets status to archived. Requires owner or author role.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Book archived
+
+  /books/{id}/settings:
+    put:
+      tags: [Books]
+      summary: Update book reader settings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allow_reader_highlights: { type: boolean }
+                allow_reader_notes: { type: boolean }
+                enable_polls: { type: boolean }
+                enable_tts: { type: boolean }
+                track_progress: { type: boolean }
+                enable_ratings: { type: boolean }
+                enable_chapter_chat: { type: boolean }
+      responses:
+        "200":
+          description: Settings updated
+
+  /books/{id}/stats:
+    get:
+      tags: [Books]
+      summary: Book stats (author dashboard)
+      description: Returns chapters count, total readers, completions, responses per chapter.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Book statistics
+
+  /books/{id}/progress:
+    get:
+      tags: [Books]
+      summary: Get my reading progress for a book
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Reading progress
+
+    put:
+      tags: [Books]
+      summary: Update my reading progress
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chapter_id: { type: string, format: uuid }
+                scroll_position: { type: number }
+                percent_complete: { type: number }
+      responses:
+        "200":
+          description: Progress saved
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # PUBLISH
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books/{bookId}/publish:
+    post:
+      tags: [Publishing]
+      summary: Publish a book
+      description: |
+        Sets status=published, visibility=public, auto-generates slug, creates a version snapshot.
+        Requires owner or author role.
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Book published
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Book' }
+                  - type: object
+                    properties:
+                      slug: { type: string, example: my-book-title }
+
+  /books/{bookId}/unpublish:
+    post:
+      tags: [Publishing]
+      summary: Unpublish a book
+      description: Reverts to draft/private.
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Book unpublished
+
+  /public/books/{slug}:
+    get:
+      tags: [Publishing]
+      summary: Get a published public book by slug
+      security: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string, example: my-book-title }
+      responses:
+        "200":
+          description: Public book with chapters
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /books/{bookId}/invite:
+    post:
+      tags: [Publishing]
+      summary: Send read-invite email for a shared book
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Invite sent
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # CHAPTERS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books/{bookId}/chapters:
+    get:
+      tags: [Chapters]
+      summary: List chapters for a book
+      security:
+        - {}
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Chapters ordered by order_index
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Chapter' }
+
+    post:
+      tags: [Chapters]
+      summary: Create a new chapter
+      description: |
+        Content must be TipTap JSON. Plain text is also accepted in content_text
+        but content (TipTap JSON) is what the reader displays.
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, example: Chapter 1 - The Beginning }
+                content:
+                  $ref: '#/components/schemas/TipTapDoc'
+                content_text:
+                  type: string
+                  description: Plain text. If content (TipTap JSON) not provided, this is used to render the chapter.
+                status:
+                  type: string
+                  enum: [draft, published]
+                  default: draft
+      responses:
+        "201":
+          description: Chapter created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chapter' }
+
+  /books/{bookId}/chapters/reorder:
+    put:
+      tags: [Chapters]
+      summary: Reorder chapters
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chapter_ids]
+              properties:
+                chapter_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                  description: Chapter UUIDs in the desired order
+      responses:
+        "200":
+          description: Chapters reordered
+
+  /chapters/{id}:
+    get:
+      tags: [Chapters]
+      summary: Get a single chapter with full content
+      security:
+        - {}
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Chapter with full TipTap content
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chapter' }
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Chapters]
+      summary: Update a chapter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                content: { $ref: '#/components/schemas/TipTapDoc' }
+                content_text: { type: string }
+                status: { type: string, enum: [draft, published, archived] }
+                order_index: { type: integer }
+      responses:
+        "200":
+          description: Updated chapter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chapter' }
+
+    delete:
+      tags: [Chapters]
+      summary: Delete (archive) a chapter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Chapter archived
+
+  /chapters/{id}/slug:
+    patch:
+      tags: [Chapters]
+      summary: Set chapter slug manually
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug]
+              properties:
+                slug: { type: string }
+      responses:
+        "200":
+          description: Slug updated
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # COLLABORATORS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books/{bookId}/collaborators:
+    get:
+      tags: [Collaborators]
+      summary: List collaborators on a book
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: List of collaborators
+
+    post:
+      tags: [Collaborators]
+      summary: Invite a collaborator
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [author, editor, viewer] }
+      responses:
+        "201":
+          description: Invite sent
+
+  /books/{bookId}/collaborators/{collaboratorId}:
+    put:
+      tags: [Collaborators]
+      summary: Update collaborator role
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: collaboratorId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [author, editor, viewer] }
+      responses:
+        "200":
+          description: Role updated
+
+    delete:
+      tags: [Collaborators]
+      summary: Remove a collaborator
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: collaboratorId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Collaborator removed
+
+  /invites/accept/{token}:
+    post:
+      tags: [Collaborators]
+      summary: Accept a collaborator invite
+      security: []
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Invite accepted
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # COMMENTS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /chapters/{chapterId}/comments:
+    get:
+      tags: [Comments]
+      summary: List comments on a chapter
+      parameters:
+        - in: path
+          name: chapterId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Comment' }
+
+    post:
+      tags: [Comments]
+      summary: Add a comment to a chapter
+      parameters:
+        - in: path
+          name: chapterId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+                anchor_text: { type: string, description: Selected text this comment refers to }
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+
+  /comments/{commentId}:
+    put:
+      tags: [Comments]
+      summary: Update a comment
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: string }
+      responses:
+        "200":
+          description: Comment updated
+
+    delete:
+      tags: [Comments]
+      summary: Delete a comment
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Comment deleted
+
+  /comments/{commentId}/resolve:
+    post:
+      tags: [Comments]
+      summary: Mark a comment as resolved
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Comment resolved
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # CLUBS & CLASSES
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /clubs:
+    get:
+      tags: [Clubs]
+      summary: List clubs/classes I belong to
+      responses:
+        "200":
+          description: Clubs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Club' }
+
+    post:
+      tags: [Clubs]
+      summary: Create a club or class
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                type: { type: string, enum: [book_club, class, group] }
+                visibility: { type: string, enum: [public, private] }
+      responses:
+        "201":
+          description: Club created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Club' }
+
+  /clubs/public:
+    get:
+      tags: [Clubs]
+      summary: List public clubs
+      security: []
+      responses:
+        "200":
+          description: Public clubs
+
+  /clubs/{clubId}:
+    get:
+      tags: [Clubs]
+      summary: Get a club with members and books
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Club details
+
+    put:
+      tags: [Clubs]
+      summary: Update a club
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                visibility: { type: string, enum: [public, private] }
+      responses:
+        "200":
+          description: Club updated
+
+  /clubs/{clubId}/books:
+    post:
+      tags: [Clubs]
+      summary: Add a book to a club reading list
+      parameters:
+        - in: path
+          name: clubId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [book_id]
+              properties:
+                book_id: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Book added to club
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # VERSIONS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books/{bookId}/versions:
+    get:
+      tags: [Versions]
+      summary: List version snapshots for a book
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Versions list
+
+    post:
+      tags: [Versions]
+      summary: Create a manual version snapshot
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string, example: "v1.0 — Final draft" }
+      responses:
+        "201":
+          description: Version snapshot created
+
+  /books/{bookId}/versions/{versionId}/restore:
+    post:
+      tags: [Versions]
+      summary: Restore a version snapshot
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: versionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Version restored
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # NOTIFICATIONS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Get my notifications
+      parameters:
+        - in: query
+          name: unread_only
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Notifications list
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Get unread notification count
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+
+  /notifications/read-all:
+    put:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: All marked read
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: Mark a single notification as read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Marked read
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # BOOK CHAT
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /book-chat/{bookId}/messages:
+    get:
+      tags: [Chat]
+      summary: Get book-level chat messages
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: before
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Chat messages
+
+    post:
+      tags: [Chat]
+      summary: Send a message in book chat
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+                chapter_id: { type: string, format: uuid, description: Tag message to a specific chapter }
+      responses:
+        "201":
+          description: Message sent
+
+  /book-chat/{bookId}/unread-count:
+    get:
+      tags: [Chat]
+      summary: Get unread message count in book chat
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Unread count
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # EXPORTS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books/{id}/export/json:
+    get:
+      tags: [Export]
+      summary: Export book as JSON
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: JSON export
+          content:
+            application/json:
+              schema: { type: object }
+
+  /books/{id}/export/pdf:
+    post:
+      tags: [Export]
+      summary: Export book as PDF (requires PDF service)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+
+  /books/{id}/export/epub:
+    post:
+      tags: [Export]
+      summary: Export book as EPUB
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: EPUB file
+
+  /books/{id}/export/docx:
+    post:
+      tags: [Export]
+      summary: Export book as DOCX (Word)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: DOCX file
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # PROFILE
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /profile/me:
+    get:
+      tags: [Profile]
+      summary: Get my public profile
+      responses:
+        "200":
+          description: My profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+
+    put:
+      tags: [Profile]
+      summary: Update my profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                bio: { type: string }
+                avatar_url: { type: string }
+      responses:
+        "200":
+          description: Updated profile
+
+  /profile/{userId}:
+    get:
+      tags: [Profile]
+      summary: Get a user's public profile
+      security:
+        - {}
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: User profile
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # RATINGS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /books/{bookId}/ratings:
+    get:
+      tags: [Ratings]
+      summary: Get ratings for a book
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Ratings summary
+
+    post:
+      tags: [Ratings]
+      summary: Rate a book (1–5 stars)
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                review: { type: string }
+      responses:
+        "201":
+          description: Rating submitted
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # SAVED BOOKS
+  # ────────────────────────────────────────────────────────────────────────────
+
+  /saved-books:
+    get:
+      tags: [Library]
+      summary: Get my saved/bookmarked books
+      security: []
+      responses:
+        "200":
+          description: Saved books
+
+  /saved-books/{bookId}:
+    post:
+      tags: [Library]
+      summary: Save a book to my library
+      security: []
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Book saved
+
+    delete:
+      tags: [Library]
+      summary: Remove a book from my library
+      security: []
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Book removed
+
+tags:
+  - name: Health
+    description: Service status
+  - name: Auth
+    description: Authentication — login, register, profile
+  - name: Books
+    description: Book CRUD and management
+  - name: Publishing
+    description: Publish, unpublish, and share books
+  - name: Chapters
+    description: Chapter creation and editing
+  - name: Collaborators
+    description: Team access and invitations
+  - name: Comments
+    description: Chapter-level comments and review
+  - name: Clubs
+    description: Book clubs and reading classes
+  - name: Versions
+    description: Version history and snapshots
+  - name: Chat
+    description: Book-level and chapter-level chat
+  - name: Notifications
+    description: User notifications
+  - name: Export
+    description: Export books to PDF, EPUB, DOCX, JSON
+  - name: Profile
+    description: User profiles
+  - name: Ratings
+    description: Book ratings and reviews
+  - name: Library
+    description: Saved books / personal library

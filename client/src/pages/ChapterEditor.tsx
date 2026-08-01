@@ -5,7 +5,7 @@ import {
   Video, GripVertical, EyeOff, Trash2, ChevronDown, ChevronUp, ExternalLink, Pencil,
   Volume2, Square, Loader2, ChevronRight, List, Type, AlignLeft, Circle, CheckSquare, Code, BookOpen, X,
   LayoutGrid, Image, ArrowUp, ArrowDown, Copy, ListChecks, Table2, Rows3, Columns3,
-  Indent, Outdent, MessageSquare, FileSignature, Undo2, Redo2
+  Indent, Outdent, MessageSquare, FileSignature, Undo2, Redo2, FileCode
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -843,7 +843,7 @@ export default function ChapterEditor() {
 
   const INLINE_FORM_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'poll', 'signature'];
   // Types that can be inserted as an atom node at the cursor (no text selection needed)
-  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block', 'media_response', 'signature'];
+  const CURSOR_INSERTABLE_TYPES = ['audio', 'video', 'image', 'drawing', 'question', 'highlight', 'note', 'link', 'code_block', 'scripture_block', 'html_block', 'media_response', 'signature'];
 
   async function handleCreateInlineContent(data: Partial<InlineContent>) {
     if (!chapterId || !showInlineModal) return;
@@ -1321,7 +1321,7 @@ export default function ChapterEditor() {
         <div className="flex-1 min-w-0">
           {/* Start of Chapter Preview */}
           {(bookSettings?.show_inline_form_preview ?? true) && (() => {
-            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block', 'media_response'];
+            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block', 'html_block', 'media_response'];
             const startItems = inlineContents.filter(
               item => POSITIONED_TYPES.includes(item.content_type) && item.position_in_chapter === 'start_of_chapter'
             );
@@ -1542,6 +1542,13 @@ export default function ChapterEditor() {
               <BookOpen className="h-4 w-4" />
             </ToolbarButton>
             <ToolbarButton
+              onClick={() => handleAddInlineContent('html_block')}
+              title="Add HTML Block"
+              className="text-rose-600"
+            >
+              <FileCode className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
               onClick={() => handleAddInlineContent('image')}
               title="Add Image"
               className="text-sky-600"
@@ -1656,7 +1663,7 @@ export default function ChapterEditor() {
 
           {/* End of Chapter Preview */}
           {(bookSettings?.show_inline_form_preview ?? true) && (() => {
-            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block', 'media_response'];
+            const POSITIONED_TYPES = ['textbox', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'audio', 'video', 'code_block', 'scripture_block', 'html_block', 'media_response'];
             const endItems = inlineContents.filter(
               item => POSITIONED_TYPES.includes(item.content_type) && item.position_in_chapter === 'end_of_chapter'
             );
@@ -1865,6 +1872,7 @@ export default function ChapterEditor() {
               { type: 'checkbox',        icon: '✅', label: 'Checkbox' },
               { type: 'code_block',      icon: '💻', label: 'Code' },
               { type: 'scripture_block', icon: '📖', label: 'Scripture' },
+              { type: 'html_block',      icon: '🌐', label: 'HTML' },
               { type: 'drawing',         icon: '🎨', label: 'Drawing' },
             ] as { type: InlineContent['content_type']; icon: string; label: string }[]).map(({ type, icon, label }) => (
               <button
@@ -2414,6 +2422,21 @@ function ContentPreview({ item }: { item: InlineContent }) {
       );
     }
 
+    case 'html_block': {
+      const hb = data as { title?: string; html?: string };
+      return (
+        <div className="text-sm">
+          <div className="flex items-center gap-2 text-rose-700">
+            <FileCode className="h-4 w-4" />
+            <span className="font-medium">{hb.title || 'HTML Block'}</span>
+          </div>
+          <p className="text-xs text-muted mt-1">
+            {(hb.html?.length || 0).toLocaleString()} characters of HTML
+          </p>
+        </div>
+      );
+    }
+
     default:
       return <p className="text-sm text-muted">Preview not available</p>;
   }
@@ -2545,18 +2568,22 @@ function InlineFormPreviewItem({ item }: { item: InlineContent }) {
           </div>
         );
       }
+      case 'html_block': {
+        const hb = data as any;
+        return <HtmlBlockPreview html={hb?.html || ''} title={hb?.title} />;
+      }
       default:
         return null;
     }
   }
 
   // Audio/video/code/scripture: render full-width without the anchor mark structure
-  const FULL_WIDTH_TYPES = ['audio', 'video', 'code_block', 'scripture_block', 'media_response'];
+  const FULL_WIDTH_TYPES = ['audio', 'video', 'code_block', 'scripture_block', 'media_response', 'html_block'];
   if (FULL_WIDTH_TYPES.includes(item.content_type)) {
     const typeColors: Record<string, string> = {
       audio: 'text-orange-600', video: 'text-red-600',
       code_block: 'text-slate-600', scripture_block: 'text-amber-700',
-      media_response: 'text-blue-700',
+      media_response: 'text-blue-700', html_block: 'text-rose-600',
     };
     return (
       <div id={`preview-${item.id}`} className="w-full scroll-mt-6">
@@ -2576,6 +2603,38 @@ function InlineFormPreviewItem({ item }: { item: InlineContent }) {
         {anchorText}
       </mark>
       {renderInput()}
+    </div>
+  );
+}
+
+function HtmlBlockPreview({ html, title }: { html: string; title?: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(600);
+
+  const resize = () => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentDocument?.body) return;
+    const h = iframe.contentDocument.documentElement.scrollHeight
+      || iframe.contentDocument.body.scrollHeight;
+    if (h > 0) setHeight(h + 8);
+  };
+
+  const handleLoad = () => {
+    resize();
+    setTimeout(resize, 400);
+    setTimeout(resize, 1200);
+  };
+
+  return (
+    <div className="w-full rounded overflow-hidden border border-gray-200 shadow-sm">
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        sandbox="allow-same-origin allow-scripts"
+        onLoad={handleLoad}
+        style={{ width: '100%', height, border: 'none', display: 'block' }}
+        title={title || 'HTML Block'}
+      />
     </div>
   );
 }

@@ -247,7 +247,7 @@ export type InlineContentType =
   | 'question' | 'poll' | 'highlight' | 'note' | 'link' | 'audio' | 'video'
   | 'select' | 'multiselect' | 'textbox' | 'textarea' | 'radio' | 'checkbox'
   | 'code_block' | 'scripture_block' | 'image' | 'drawing' | 'media_response'
-  | 'signature';
+  | 'signature' | 'html_block';
 
 // Display mode for interactive content
 export type InlineDisplayMode = 'inline' | 'sidebar' | 'start_of_chapter' | 'end_of_chapter';
@@ -263,7 +263,7 @@ export interface InlineContent {
   content_data: QuestionData | PollData | HighlightData | NoteData | LinkData | MediaData
     | SelectData | MultiselectData | TextboxData | TextareaData | RadioData | CheckboxData
     | CodeBlockData | ScriptureBlockData | ImageData | DrawingData | MediaResponsePromptData
-    | SignatureData;
+    | SignatureData | HtmlBlockData;
   created_by: string;
   is_author_content: boolean;
   visibility: 'author_only' | 'all_readers' | 'private';
@@ -427,6 +427,11 @@ export interface ScriptureBlockData {
   title?: string;
   notes?: string;
   show_reference?: boolean;
+}
+
+export interface HtmlBlockData {
+  html: string;
+  title?: string;
 }
 
 export interface ImageData {

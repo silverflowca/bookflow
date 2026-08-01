@@ -129,10 +129,39 @@ function withResponseMeta(response, context) {
   };
 }
 
-async function buildBookResponses(bookId, { chapterId = null, viewerId = null, authorMode = false } = {}) {
+async function buildBookResponses(bookId, { chapterId = null, viewerId = null, authorMode = false, clubId = null } = {}) {
   const context = await getBookResponseContext(bookId, viewerId);
   if (!authorMode && !context.canAccess) {
     return { forbidden: true, items: [] };
+  }
+
+  // ── Class visibility settings (when viewing from within a class) ─────────────
+  // Determines whether this viewer can see OTHER students' responses.
+  // Defaults to blocking (private) when in a class context unless the teacher enables sharing.
+  let classVisibility = null; // null = not in a class context, use standard visibility rules
+  if (clubId && viewerId && !authorMode) {
+    const [{ data: settings }, { data: memberVisPref }] = await Promise.all([
+      supabase.schema('bookflow').from('club_settings')
+        .select('show_member_answers, responses_visible_to_all, allow_students_set_visibility')
+        .eq('club_id', clubId)
+        .maybeSingle(),
+      supabase.schema('bookflow').from('club_member_visibility_prefs')
+        .select('share_responses')
+        .eq('club_id', clubId)
+        .eq('user_id', viewerId)
+        .maybeSingle(),
+    ]);
+    const isPrivileged = context.viewerIsAuthor;
+    classVisibility = {
+      // Can this viewer see anyone else's answers?
+      canSeeOthers: isPrivileged
+        || settings?.responses_visible_to_all === true
+        || settings?.show_member_answers === true,
+      // Can this viewer see answers from students who opted in?
+      canSeeOptedIn: settings?.allow_students_set_visibility === true,
+      // Did this viewer themselves opt in (relevant for deciding what others see of them, not used here)
+      viewerOptedIn: memberVisPref?.share_responses === true,
+    };
   }
 
   let icQuery = supabase
@@ -188,9 +217,30 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
       : Promise.resolve({ data: [] }),
   ]);
 
+  // Fetch opted-in user IDs for class visibility (only when needed)
+  let optedInUserIds = null; // Set<string> if class context with per-student opt-in enabled
+  if (classVisibility?.canSeeOptedIn && !classVisibility.canSeeOthers) {
+    const { data: prefs } = await supabase.schema('bookflow')
+      .from('club_member_visibility_prefs')
+      .select('user_id')
+      .eq('club_id', clubId)
+      .eq('share_responses', true);
+    optedInUserIds = new Set((prefs || []).map(p => p.user_id));
+  }
+
+  // Gate function: can viewer see this respondent's answers in a class context?
+  function canViewerSeeInClass(respondentId) {
+    if (!classVisibility) return true; // not a class context — use standard rules
+    if (respondentId === viewerId) return true; // always see own answers
+    if (classVisibility.canSeeOthers) return true; // teacher enabled sharing for all
+    if (classVisibility.canSeeOptedIn && optedInUserIds?.has(respondentId)) return true; // student opted in
+    return false;
+  }
+
   const formResponsesByItem = {};
   for (const row of (frsRes.data || [])) {
     if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    if (!canViewerSeeInClass(row.user_id)) continue;
     const enriched = withResponseMeta(row, context);
     if (!formResponsesByItem[row.inline_content_id]) formResponsesByItem[row.inline_content_id] = [];
     formResponsesByItem[row.inline_content_id].push(enriched);
@@ -199,6 +249,7 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
   const pollResponsesByItem = {};
   for (const row of (prsRes.data || [])) {
     if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    if (!canViewerSeeInClass(row.user_id)) continue;
     const enriched = withResponseMeta(row, context);
     if (!pollResponsesByItem[row.inline_content_id]) pollResponsesByItem[row.inline_content_id] = [];
     pollResponsesByItem[row.inline_content_id].push(enriched);
@@ -207,6 +258,7 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
   const questionAnswersByItem = {};
   for (const row of (qasRes.data || [])) {
     if (!authorMode && !canViewerSeeResponse(row.visibility || 'shared', row.user_id, context)) continue;
+    if (!canViewerSeeInClass(row.user_id)) continue;
     const enriched = withResponseMeta(row, context);
     if (!questionAnswersByItem[row.inline_content_id]) questionAnswersByItem[row.inline_content_id] = [];
     questionAnswersByItem[row.inline_content_id].push(enriched);
@@ -214,6 +266,7 @@ async function buildBookResponses(bookId, { chapterId = null, viewerId = null, a
 
   const mediaResponsesByItem = {};
   for (const row of (mrsRes.data || [])) {
+    if (!canViewerSeeInClass(row.user_id)) continue;
     if (!authorMode && viewerId && row.user_id !== viewerId && !context.canAccess) continue;
     const enriched = withResponseMeta({ ...row, visibility: 'public', response_data: { value: row.body || row.media_url || row.response_type } }, context);
     if (!mediaResponsesByItem[row.inline_content_id]) mediaResponsesByItem[row.inline_content_id] = [];
@@ -1058,13 +1111,14 @@ router.get('/:id/responses', authenticate, requireAuthor, async (req, res) => {
 // - guests on a public book: public only
 router.get('/:id/accessible-responses', optionalAuth, async (req, res) => {
   const bookId = req.params.id;
-  const { chapter_id } = req.query;
+  const { chapter_id, club_id } = req.query;
 
   try {
     const result = await buildBookResponses(bookId, {
       chapterId: typeof chapter_id === 'string' ? chapter_id : null,
       viewerId: req.user?.id || null,
       authorMode: false,
+      clubId: typeof club_id === 'string' ? club_id : null,
     });
 
     if (result.forbidden) {
