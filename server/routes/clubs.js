@@ -14,6 +14,14 @@ const router = express.Router();
 
 // ── Helper: check club membership/role ────────────────────────────────────────
 export async function getClubRole(clubId, userId) {
+  // Super admins always get owner-level access
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('system_role')
+    .eq('id', userId)
+    .single();
+  if (profile?.system_role === 'super_admin') return 'owner';
+
   const { data: club } = await supabase
     .from('book_clubs')
     .select('id, created_by')

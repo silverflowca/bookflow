@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { BookOpen, CheckCircle2, Clock, Star, Users, MessageSquare } from 'lucide-react';
+import { BookOpen, CheckCircle2, Clock, Star, Users, MessageSquare, GraduationCap } from 'lucide-react';
 import api from '../../lib/api';
 import type { ClassSubmission, ClassSubmissionFeedback } from '../../types';
 
@@ -279,15 +279,20 @@ export default function ClassProgressPanel({ clubId }: { clubId: string }) {
                     <StatusBadge status={sub.status} />
                   </div>
                   {feedback && (
-                    <div className="mt-2.5 pt-2.5 border-t border-strong/10 flex items-start gap-3">
-                      {feedback.grade !== undefined && feedback.grade !== null && (
-                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                          {feedback.grade}/100
-                        </span>
-                      )}
-                      {feedback.feedback_text && (
-                        <p className="text-xs text-muted leading-relaxed">{feedback.feedback_text}</p>
-                      )}
+                    <div className="mt-2.5 pt-2.5 border-t border-strong/10">
+                      <p className="text-[11px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wide flex items-center gap-1 mb-1.5">
+                        <GraduationCap className="h-3 w-3" /> Teacher Feedback
+                      </p>
+                      <div className="flex items-start gap-3">
+                        {feedback.grade !== undefined && feedback.grade !== null && (
+                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-lg">
+                            {feedback.grade}/100
+                          </span>
+                        )}
+                        {feedback.feedback_text && (
+                          <p className="text-sm text-theme leading-relaxed">{feedback.feedback_text}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -324,15 +329,20 @@ export default function ClassProgressPanel({ clubId }: { clubId: string }) {
                     <p className="text-sm text-muted mt-1 whitespace-pre-wrap">{responseText}</p>
                   </div>
                   {a.feedback && (
-                    <div className="pt-2 border-t border-strong/10 flex items-start gap-3">
-                      {a.feedback.grade !== undefined && a.feedback.grade !== null && (
-                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                          {a.feedback.grade}/100
-                        </span>
-                      )}
-                      {a.feedback.feedback_text && (
-                        <p className="text-xs text-muted leading-relaxed">{a.feedback.feedback_text}</p>
-                      )}
+                    <div className="pt-2 border-t border-strong/10">
+                      <p className="text-[11px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wide flex items-center gap-1 mb-1.5">
+                        <GraduationCap className="h-3 w-3" /> Teacher Feedback
+                      </p>
+                      <div className="flex items-start gap-3">
+                        {a.feedback.grade !== undefined && a.feedback.grade !== null && (
+                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-lg">
+                            {a.feedback.grade}/100
+                          </span>
+                        )}
+                        {a.feedback.feedback_text && (
+                          <p className="text-sm text-theme leading-relaxed">{a.feedback.feedback_text}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
