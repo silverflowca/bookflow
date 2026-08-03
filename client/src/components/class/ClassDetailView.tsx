@@ -62,6 +62,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [tab, setTab] = useState<ClassTab>('overview');
+  const [progressKey, setProgressKey] = useState(0);
   const isTeacher = role === 'owner' || role === 'admin';
   // Messages tab: active DM conversation
   const [activeDM, setActiveDM] = useState<{ userId: string; name: string } | null>(null);
@@ -168,7 +169,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
         {visibleTabs.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); if (t.key === 'progress') setProgressKey(k => k + 1); }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t.key ? 'theme-button-primary' : 'text-muted hover:text-theme'
             }`}
@@ -194,7 +195,14 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
       )}
       {tab === 'progress' && !isTeacher && (
         <div>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end gap-2 mb-4">
+            <button
+              onClick={() => setProgressKey(k => k + 1)}
+              className="flex items-center gap-1.5 theme-button-secondary px-3 py-2 rounded-lg text-sm"
+              title="Refresh progress"
+            >
+              <TrendingUp className="h-4 w-4" /> Refresh
+            </button>
             <button
               onClick={() => setShowMyReport(true)}
               className="flex items-center gap-1.5 theme-button-secondary px-3 py-2 rounded-lg text-sm"
@@ -202,7 +210,7 @@ export default function ClassDetailView({ club, role, onReload }: Props) {
               <FileText className="h-4 w-4" /> Download Report
             </button>
           </div>
-          <ClassProgressPanel clubId={club.id} />
+          <ClassProgressPanel key={progressKey} clubId={club.id} />
         </div>
       )}
       {tab === 'schedule' && (

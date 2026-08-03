@@ -1664,6 +1664,7 @@ export default function BookReader() {
                 compact
                 mode="accessible"
                 viewerUserId={user?.id ?? null}
+                clubId={clubIdFromParam ?? undefined}
               />
             </div>
           </div>
