@@ -798,6 +798,62 @@ export default function BookSettings() {
           </div>
         </div>
 
+        {/* Reader Layout */}
+        <div className="p-6 border-t border-theme">
+          <h2 className="text-lg font-semibold mb-4 text-theme">Reader Layout</h2>
+          <p className="text-sm text-muted mb-4">
+            Control the default content width readers see, and whether readers can adjust it themselves.
+          </p>
+
+          <div className="space-y-5">
+            {/* Width selector */}
+            <div>
+              <p className="text-sm font-medium text-theme mb-1">Default content width</p>
+              <p className="text-xs text-muted mb-3">
+                Choose how wide the chapter text appears to readers by default.
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { value: null,  label: 'Default',    desc: 'Comfortable reading width (~48rem)', preview: 'w-1/2 mx-auto' },
+                  { value: 75,    label: '75%',         desc: 'Wider, suits image-rich content',   preview: 'w-3/4 mx-auto' },
+                  { value: 100,   label: '100%',        desc: 'Full container width',              preview: 'w-full' },
+                ] as const).map(opt => {
+                  const active = (settings.reading_width ?? null) === opt.value;
+                  return (
+                    <button
+                      key={String(opt.value)}
+                      type="button"
+                      onClick={() => updateSetting('reading_width', opt.value)}
+                      className={`flex flex-col items-start gap-2 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                        active
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-700'
+                      }`}
+                    >
+                      {/* Mini width visualiser */}
+                      <div className="w-full h-5 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden flex items-center px-1">
+                        <div className={`h-2.5 bg-blue-400 dark:bg-blue-500 rounded ${opt.preview}`} />
+                      </div>
+                      <span className={`text-sm font-semibold ${active ? 'text-blue-600 dark:text-blue-400' : 'text-theme'}`}>
+                        {opt.label}
+                      </span>
+                      <span className="text-xs text-muted leading-snug">{opt.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Allow reader resize */}
+            <ToggleSetting
+              label="Allow readers to toggle content width"
+              description="Shows a small width-toggle button next to the focus mode button in the reader header. Readers can switch between the default width and full width at any time."
+              checked={settings.allow_reader_resize ?? false}
+              onChange={(v) => updateSetting('allow_reader_resize', v)}
+            />
+          </div>
+        </div>
+
         {/* Editor Options */}
         <div className="p-6 border-t border-theme">
           <h2 className="text-lg font-semibold mb-4 text-theme">Editor Options</h2>

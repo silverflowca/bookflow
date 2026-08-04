@@ -5,7 +5,8 @@ import {
   Highlighter, StickyNote, Link2, Play, Video, Volume2, VolumeX, Square, Loader2,
   User, Crown, List, Type, AlignLeft, Circle, CheckSquare, Code, Pencil,
   Check, AlertCircle, Users, Lock, Globe, CheckCircle, ArrowUp, Maximize2, Star,
-  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, FileSignature, Send
+  Eye, EyeOff, HelpCircle, Share2, Mic, MessageSquare, Flag, Trash2, FileSignature, Send,
+  ChevronsLeftRight
 } from 'lucide-react';
 import { getTextAlignStyle, getTextStyleAttributes } from '../components/editor/PasteFormattingExtensions';
 
@@ -196,6 +197,24 @@ export default function BookReader() {
   };
   // Clean up body attribute on unmount
   useEffect(() => () => { document.body.dataset.readerFocus = ''; }, []);
+
+  // Reader width — tracks whether the reader has toggled to wide mode
+  const [readerWide, setReaderWide] = useState(false);
+  // Compute content width class from book setting + reader toggle
+  const contentWidthClass = (() => {
+    const base = settings?.reading_width ?? null; // null | 75 | 100
+    const effective = readerWide ? 100 : (base ?? null);
+    if (effective === 100) return 'w-full px-4 py-8';
+    if (effective === 75)  return 'max-w-[75%] mx-auto px-4 py-8';
+    return 'max-w-3xl mx-auto px-4 py-8'; // default
+  })();
+  const headerWidthClass = (() => {
+    const base = settings?.reading_width ?? null;
+    const effective = readerWide ? 100 : (base ?? null);
+    if (effective === 100) return 'w-full px-4';
+    if (effective === 75)  return 'max-w-[75%] mx-auto px-4';
+    return 'max-w-3xl mx-auto px-4';
+  })();
 
   // Share toast
   const [shareToast, setShareToast] = useState<string | null>(null);
@@ -1301,13 +1320,24 @@ export default function BookReader() {
               <BookOpen className="h-6 w-6" />
               <span className="text-lg font-bold">BookFlow</span>
             </Link>
-            <button
-              onClick={toggleFocusMode}
-              className="p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
-              title="Exit focus mode"
-            >
-              <Maximize2 className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {(settings?.allow_reader_resize || isAuthor) && (
+                <button
+                  onClick={() => setReaderWide(v => !v)}
+                  title={readerWide ? 'Narrow content' : 'Expand content width'}
+                  className={`p-1.5 rounded-lg transition-colors ${readerWide ? 'text-accent bg-accent/10' : 'text-muted hover:text-theme hover:bg-surface-hover'}`}
+                >
+                  <ChevronsLeftRight className="h-5 w-5" />
+                </button>
+              )}
+              <button
+                onClick={toggleFocusMode}
+                className="p-1.5 rounded-lg text-muted hover:text-theme hover:bg-surface-hover transition-colors"
+                title="Exit focus mode"
+              >
+                <Maximize2 className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -1315,7 +1345,7 @@ export default function BookReader() {
         {!focusMode && (
         <header id="bf-reader-header" className="flex-shrink-0 bg-surface border-b border-theme z-10">
           {/* Row 1: nav + chapter counter + TTS + Edit */}
-          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className={`${headerWidthClass} py-3 flex items-center justify-between`}>
             <button
               onClick={() => setShowToc(true)}
               className="lg:hidden text-muted hover:text-theme"
@@ -1380,6 +1410,16 @@ export default function BookReader() {
                 <span className="hidden sm:inline">Edit</span>
               </Link>
             )}
+            {/* Width toggle — shown when author enables it, or always for the author */}
+            {(settings?.allow_reader_resize || isAuthor) && (
+              <button
+                onClick={() => setReaderWide(v => !v)}
+                title={readerWide ? 'Narrow content' : 'Expand content width'}
+                className={`p-1.5 rounded-lg transition-colors ${readerWide ? 'text-accent bg-accent/10' : 'text-muted hover:text-theme hover:bg-surface-hover'}`}
+              >
+                <ChevronsLeftRight className="h-4 w-4" />
+              </button>
+            )}
             {/* Focus mode toggle */}
             <button
               onClick={toggleFocusMode}
@@ -1393,7 +1433,7 @@ export default function BookReader() {
 
           {/* Row 2: content filter + component type icons */}
           <div className="border-t border-theme">
-            <div className="max-w-3xl mx-auto px-4 py-1.5 flex items-center gap-2 overflow-x-auto">
+            <div className={`${headerWidthClass} py-1.5 flex items-center gap-2 overflow-x-auto`}>
               {/* Component type filter icons */}
               <HeaderComponentIcons
                 inlineContent={visibleInlineContent}
@@ -1428,7 +1468,7 @@ export default function BookReader() {
 
         {/* Chapter Content */}
         {chapterLoading ? (
-          <article className="max-w-3xl mx-auto px-4 py-8 animate-pulse">
+          <article className={`${contentWidthClass} animate-pulse`}>
             <div className="h-9 bg-gray-200 dark:bg-gray-700 rounded-lg w-2/3 mb-8" />
             <div className="space-y-3">
               <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
@@ -1455,7 +1495,7 @@ export default function BookReader() {
           <ProgressContext.Provider value={{ completions: chapterCompletions, markComplete, markIncomplete, enabled: progressEnabled }}>
           <PollResponsesContext.Provider value={pollResponsesCtx}>
           <TaskChecksContext.Provider value={{ checked: taskChecks, toggle: toggleTaskCheck, setChecked: setTaskCheckValue }}>
-          <article className="max-w-3xl mx-auto px-4 py-8">
+          <article className={contentWidthClass}>
             <div className="flex items-start gap-3 mb-6">
               <h1 className="text-3xl font-bold flex-1">{chapter.title}</h1>
               {book.visibility === 'public' && (
@@ -1584,7 +1624,7 @@ export default function BookReader() {
           </MediaContext.Provider>
           </HighlightsContext.Provider>
         ) : (
-          <div className="max-w-3xl mx-auto px-4 py-8 text-center text-muted">
+          <div className={`${contentWidthClass} text-center text-muted`}>
             Select a chapter to start reading
           </div>
         )}

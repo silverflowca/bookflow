@@ -81,6 +81,10 @@ export interface BookSettings {
   enable_chapter_chat?: boolean;
   chat_share_reader_progress?: boolean;
   chat_share_book_progress?: boolean;
+  /** Default content width: null = original (max-w-3xl), 75 = 75% of container, 100 = full width */
+  reading_width?: 75 | 100 | null;
+  /** When true, readers see a width-toggle button to switch between the default and expanded width */
+  allow_reader_resize?: boolean;
 }
 
 export interface BookLanding {
